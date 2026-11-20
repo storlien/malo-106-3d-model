@@ -21,7 +21,11 @@ function deckPatch(x0, x1, z0, z1, m, parent){
     sections.push(sec);
   }
   if (sections.length < 2) return null;
-  return add(new T.Mesh(loft(sections), m), parent);
+  const g = loft(sections);
+  const pos = g.attributes.position, uv = [];
+  for (let i = 0; i < pos.count; i++) uv.push(pos.getX(i), pos.getZ(i));   // uv i meter → 105 mm planker med repeat
+  g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  return add(new T.Mesh(g, m), parent);
 }
 (function buildDeck(){
   const CR = 1.01, CK = 1.175;                       // coachroof- og cockpit-halvbredde
@@ -43,7 +47,7 @@ function deckPatch(x0, x1, z0, z1, m, parent){
       const y = deckY(x, s*(w - 0.03));
       secs.push([[x, y - 0.025, s*(w - 0.10)], [x, y + 0.035, s*(w - 0.095)], [x, y + 0.035, s*(w + 0.005)], [x, y - 0.025, s*(w + 0.01)]]);
     }
-    add(new T.Mesh(loft(secs), dmat.teakP), boat);
+    add(new T.Mesh(loft(secs), dmat.rail), boat);   // malt i krem, ikke teak
   }
 })();
 
@@ -105,10 +109,12 @@ function deckPatch(x0, x1, z0, z1, m, parent){
     rod([0.26, 1.10, s*1.14], [0.22, TOP, s*1.06], r, dmat.steel, boat, 10);      // mellomstang
   }
   tube([[0.00, TOP, -0.12], [0.00, TOP, 0], [0.00, TOP, 0.12]], r, dmat.steel, boat);
-  // daviter: fra pushpuiten og opp-bak over akterspeilet
+  // daviter: solide buer fra dekket ved pushpiten, opp og bak over akterspeilet (som på foto)
+  const ddY = x => deckY(x, 1.2);
   for (const s of [1, -1]){
-    tube([[0.58, TOP - 0.06, s*0.55], [0.30, TOP + 0.45, s*0.55],
-          [-0.10, TOP + 0.83, s*0.55], [-0.38, TOP + 0.86, s*0.55], [-0.48, TOP + 0.78, s*0.55]], 0.013, dmat.chrome, boat);
+    tube([[0.80, ddY(0.80), s*1.22], [0.55, TOP + 0.30, s*1.10],
+          [0.05, TOP + 0.80, s*0.78], [-0.40, TOP + 0.85, s*0.50], [-0.60, TOP + 0.78, s*0.38]], 0.02, dmat.chrome, boat);
+    rod([0.44, TOP + 0.38, s*1.06], [0.70, ddY(0.70) - 0.02, s*1.26], 0.014, dmat.chrome, boat, 8);   // støtte
   }
 })();
 

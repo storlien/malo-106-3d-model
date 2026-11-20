@@ -112,7 +112,7 @@ function shapeSail(s, tack, head, clew, depth, t, flutter){
 /* Seilpose (furlet storseil) og rullede fofock-seil */
 let furledMain = null;
 (function sailCover(){
-  const g = new T.CylinderGeometry(0.085, 0.15, RIG.boomLen - 0.3, 14);
+  const g = new T.CylinderGeometry(0.075, 0.125, RIG.boomLen - 0.3, 14);
   g.rotateZ(Math.PI/2); g.translate(-(RIG.boomLen)/2 + 0.05, 0.145, 0);
   furledMain = new T.Mesh(g, dmat.navy); furledMain.castShadow = true; boomPivot.add(furledMain);
 })();

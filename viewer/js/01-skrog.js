@@ -93,8 +93,8 @@ function plankTexture(opts){
   t.repeat.set(opts.rx, opts.ry);
   return t;
 }
-/* 105 mm teakplanker (8 planker per flis) */
-const teakTex = plankTexture({ seed:7, hue:31, sat:42, light:45, vary:7, seam:'rgba(28,22,16,.9)', seamW:5, rx:1.19, ry:1.19 });
+/* 105 mm teakplanker (8 planker per flis) — sølvgrått, forværet teak som på foto */
+const teakTex = plankTexture({ seed:7, hue:36, sat:11, light:64, vary:6, seam:'rgba(58,55,48,.8)', seamW:3, rx:1.19, ry:1.19 });
 
 /* Tekst i skråskrift (navnet på akterspeilet) */
 const SCRIPT = '"Pinyon Script", "Snell Roundhand", "Segoe Script", "Apple Chancery", Georgia, serif';
@@ -142,9 +142,11 @@ const dmat = {
   teakP:   MD('#704f2b', { roughness:0.7 }),
   gel:     MD('#ede5cc', { roughness:0.22 }),                     // kremgelcoat
   port:    MD('#1a1f29', { roughness:0.12, metalness:0.3 }),
-  glass:   MD('#2a3a46', { roughness:0.05, metalness:0.3, transparent:true, opacity:0.5, depthWrite:false }),
+  glass:   MD('#1c2830', { roughness:0.05, metalness:0.35, transparent:true, opacity:0.78, depthWrite:false }),
+  hatch:   MD('#93a7b3', { roughness:0.12, metalness:0.05 }),         // lyse lukelokk (som på foto)
   canvas:  MD('#dcddd6', { roughness:0.95 }),
   navy:    MD('#0f1742', { roughness:0.9 }),                      // sprayhood, vinduer, puter
+  rail:    MD('#e9e3d1', { roughness:0.32 }),                     // malt (krem) toerail
   steel:   MD('#e2e6ea', { roughness:0.14, metalness:0.85 }),
   chrome:  MD('#eef1f4', { roughness:0.08, metalness:0.95 }),
   dark:    MD('#262a31', { roughness:0.5 }),
@@ -314,6 +316,23 @@ function buildHull(){
 }
 buildHull();
 
+/* Rivporter lavt i toppsidene (hvite rammer, mørkt glass — som på foto) */
+(function hullPorts(){
+  const pts = [4.55, 5.75, 6.95];
+  for (const s of [1, -1]){
+    for (const px of pts){
+      const y = deckY(px, 0) - 0.52, z = halfWidthAt(px, y);
+      if (z < 0.2) continue;
+      const g = new T.Group(); g.position.set(px, y, s*(z + 0.004));
+      g.rotation.y = s > 0 ? 0 : Math.PI;
+      g.rotation.x = s*-0.05;
+      const fr = new T.Mesh(new T.TorusGeometry(0.085, 0.016, 10, 22), dmat.mast);
+      const gl = new T.Mesh(new T.CircleGeometry(0.082, 22), dmat.port);
+      fr.castShadow = false; g.add(fr); g.add(gl); add(g, boat);
+    }
+  }
+})();
+
 /* Skrogmaterialet: krem med marineblå striper (fra eierens malingsplan), boot top
    på vannlinjen og blå bunnstoff — alt i fragment-shaderen, med avstand under
    dekkskanten (vSheer) og høyde over vannlinjen (vH) som varying-er. */
@@ -354,7 +373,7 @@ function makeHullMat(){
     for (let ix = 0; ix <= NX; ix++){
       const fx = ix/NX, z = (fx - 0.5)*W;
       pos.push(xTr(y) + TC*z*z - 0.006, y, z);
-      uv.push(1 - fx, 1 - fy);   // speiles: sett bakfra peker +z mot venstre
+      uv.push(fx, fy);   // «A» mot babord, teksten opprett — sjekket rett fra akterspeilet
     }
   }
   for (let iy = 0; iy < NY; iy++) for (let ix = 0; ix < NX; ix++){

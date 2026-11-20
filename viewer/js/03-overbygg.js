@@ -50,7 +50,7 @@ function crPatch(x0, x1, f0, f1, off, m){
   add(new T.Mesh(loft(sections), dmat.gel), boat);
 
   /* de tre sidevinduene: marineblå ramme + mørkt glass, fulgt langs veggen */
-  const rows = [[5.0, 5.7], [6.1, 6.9], [7.3, 8.1]];
+  const rows = [[4.9, 5.6], [6.0, 6.8], [7.25, 8.38]];
   for (const s of [1, -1]){
     for (const [x0, x1] of rows){
       crPatch(x0, x1, 0.46, 1.0, s*0.012, dmat.navy);
@@ -105,7 +105,7 @@ function crPatch(x0, x1, f0, f1, off, m){
     const g1 = rrectGeom(2*hl, 2*hw); g1.rotateX(-Math.PI/2);
     const f1 = new T.Mesh(g1, dmat.mast); f1.position.set(x, y + 0.012, zc); add(f1, boat);
     const g2 = rrectGeom(2*hl - 0.07, 2*hw - 0.06); g2.rotateX(-Math.PI/2);
-    const f2 = new T.Mesh(g2, lidMat || dmat.glass); f2.position.set(x, y + 0.026, zc); add(f2, boat);
+    const f2 = new T.Mesh(g2, lidMat || dmat.hatch); f2.position.set(x, y + 0.026, zc); add(f2, boat);
   }
   const topY = (x, zc) => deckY(x, Math.abs(zc)) + crTopH(x) + 0.02;
   hatch(5.10, 0, 0.31, 0.26, topY(5.10, 0));
@@ -129,7 +129,7 @@ function crPatch(x0, x1, f0, f1, off, m){
     const a = pts[i], b = pts[i+1], f = Math.min(1, Math.max(0, (x-a[0])/(b[0]-a[0])));
     const top = a[2] + (b[2]-a[2])*f, w = a[1] + (b[1]-a[1])*f;
     const edge = deckY(x, w*0.9) + 0.10;
-    return { top, w, edge, y: edge + (top - edge)*Math.sqrt(Math.max(0, 1 - (z/w)**2)*0.96 + 0.04) };
+    return { top, w, edge, y: edge + (top - edge)*Math.pow(Math.max(0, 1 - (z/w)**2), 0.38) };
   };
   const sections = [], n = 26;
   for (let i = 0; i <= n; i++){
