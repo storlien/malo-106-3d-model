@@ -62,6 +62,9 @@ scene.add(grid);
 
 new THREE.GLTFLoader().parse(b64ToBuf(B64), '', (gltf) => {
   const m = gltf.scene;
+  // OCCT writes Z-up geometry into the Y-up glTF convention; rotate back so the
+  // boat is upright in this Z-up scene (camera.up = +Z).
+  m.rotation.x = Math.PI / 2;
   // OCCT exports metallic materials, which render near-black under punctual
   // lights without an environment map. Force dielectric look.
   m.traverse((o) => {
@@ -75,12 +78,14 @@ new THREE.GLTFLoader().parse(b64ToBuf(B64), '', (gltf) => {
   const box = new THREE.Box3().setFromObject(m);
   const size = box.getSize(new THREE.Vector3());
   const ctr = box.getCenter(new THREE.Vector3());
-  const d = Math.max(size.x, size.y) * 1.5;
-  camera.position.set(ctr.x - d * 0.72, ctr.y - d * 0.78, ctr.z + size.z * 0.42);
+  // Frame the hull, not the whole rig: target near deck level, camera at an
+  // aft-quarter 3/4 view.
+  const d = Math.max(size.x, size.y) * 1.15;
+  controls.target.set(ctr.x, ctr.y, size.z * 0.16);
+  camera.position.set(ctr.x - d * 0.52, ctr.y - d * 0.88, size.z * 0.30);
   camera.near = d / 200;
   camera.far = d * 40;
   camera.updateProjectionMatrix();
-  controls.target.copy(ctr);
   controls.update();
 }, (err) => {
   console.error('GLB load failed:', err);

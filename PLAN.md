@@ -1,5 +1,13 @@
 # Plan: SY Alizée 3D Model — Boat First, Then Solar Arch
 
+**Boat identified: Malö 36 (Malö 36/106), built by Malö Yachts / Kungsviken, Sweden.**
+Reference set: builder brochure (TEKNISKA DATA: hull 11.20 m, beam 3.35 m, draft 1.58 m,
+6100 kg / 2500 kg ballast, masthead sloop with double spreaders, 12 mm teak deck,
+skeg rudder, Volvo Penta 2003T) + owner photos in `photos/`. The model reproduces
+the as-photographed appearance: cream topsides, twin navy stripes + navy boot top,
+blue antifoul, full teak deck with toe rail, navy sprayhood + TARGA bimini,
+stainless rails incl. pushpit davits.
+
 **Goal:** A dimensionally correct 3D model of *Alizée*. That model is then used to
 design a solar/targa arch for the stern, ending with an exact fabrication package.
 **The boat model is the current phase; the arch comes after we're happy with the boat.**

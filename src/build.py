@@ -49,6 +49,7 @@ COLORS = {
     "second_stripe": NAVY,
     "deck": TEAK,
     "cockpit_sole": TEAK,
+    "toe_rail": TEAK_DARK,
     "coachroof": CREAM,
     "coachroof_windshield": GLASS,
     "windows": NAVY,
@@ -199,7 +200,7 @@ def make_viewer(p, parts=None, template_path=ROOT / "viewer" / "viewer_template.
                         ("__GLTF__", "GLTFLoader.js")]:
         js = (ROOT / "viewer" / "vendor" / rel).read_text()
         tpl = tpl.replace(f"/* {marker} */", js)
-    title = f"{p.get('name', 'SY Alizée')} — Malö 36 — LOA {p['loa_hull'] / 1000:.2f} m"
+    title = f"{p.get('name', 'SY Alizée')} — LOA {p['loa_hull'] / 1000:.2f} m"
     if p.get("placeholder"):
         title += "  ⚠ PLACEHOLDER DATA"
     html = tpl.replace("__TITLE__", title).replace("__MODEL_B64__", b64)

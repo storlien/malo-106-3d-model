@@ -281,6 +281,17 @@ def build_boat(p: dict[str, Any]) -> dict[str, Any]:
     parts["hatches"] = hatches_base[0].fuse(*hatches_base[1:])
     parts["hatch_glass"] = hatches_glass[0].fuse(*hatches_glass[1:])
 
+    # ---- teak toe rail around the deck edge
+    tr = []
+    edge = []
+    for x in np.linspace(60, loa - 40, 40):
+        edge.append((float(x), hf.hb_at(float(x)), hf.sheer_at(float(x)) + 14))
+    for sgn in (1, -1):
+        tr.append(tube_along([(ex[0], sgn * ex[1], ex[2]) for ex in edge], 13))
+    tr.append(tube_along([(60, -hf.hb_at(60), hf.sheer_at(60) + 14),
+                          (60, hf.hb_at(60), hf.sheer_at(60) + 14)], 13))
+    parts["toe_rail"] = tr[0].fuse(*tr[1:])
+
     # ---- canvas: sprayhood + bimini (TARGA) with stainless arches
     sh = p["sprayhood"]
     sh_xa, sh_xf = float(sh["x_aft"]), float(sh["x_fwd"])
