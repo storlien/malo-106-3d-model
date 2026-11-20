@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>SY Alizée — 3D model</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#14181d;font-family:system-ui,sans-serif}
+  #c{width:100%;height:100%;display:block}
+  #hud{position:fixed;top:12px;left:14px;color:#cfd8e3;font-size:13px;line-height:1.5;
+       background:rgba(10,14,18,.75);padding:10px 14px;border-radius:10px;user-select:none;
+       backdrop-filter:blur(4px)}
+  #hud b{font-size:15px;color:#fff;display:block;margin-bottom:2px}
+  #hud .hint{color:#8fa1b3;font-size:12px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <b>__TITLE__</b>
+  <span class="hint">drag · orbit&nbsp;&nbsp;|&nbsp;&nbsp;wheel · zoom&nbsp;&nbsp;|&nbsp;&nbsp;right-drag · pan&nbsp;&nbsp;|&nbsp;&nbsp;grid = waterline (Z=0)</span>
+</div>
+<script>/* __THREE__ */</script>
+<script>/* __ORBIT__ */</script>
+<script>/* __GLTF__ */</script>
+<script>
+"use strict";
+const B64 = "__MODEL_B64__";
+
+function b64ToBuf(b64) {
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a222b);
+
+const camera = new THREE.PerspectiveCamera(45, 2, 1, 60000);
+camera.up.set(0, 0, 1);                       // model convention: Z is up
+
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+scene.add(new THREE.HemisphereLight(0xe8f1ff, 0x3a4652, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+sun.position.set(-0.5, -1.0, 1.1);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xbfd4ff, 0.30);
+fill.position.set(1, 1, -0.8);
+scene.add(fill);
+
+const grid = new THREE.GridHelper(40000, 40, 0x2e4a5c, 0x22303a);
+grid.rotation.x = Math.PI / 2;                // lie flat at Z = 0 (waterline)
+scene.add(grid);
+
+new THREE.GLTFLoader().parse(b64ToBuf(B64), '', (gltf) => {
+  const m = gltf.scene;
+  scene.add(m);
+  const box = new THREE.Box3().setFromObject(m);
+  const size = box.getSize(new THREE.Vector3());
+  const ctr = box.getCenter(new THREE.Vector3());
+  const d = Math.max(size.x, size.y) * 1.1;
+  camera.position.set(ctr.x - d * 0.72, ctr.y - d * 0.78, ctr.z + size.z * 0.42);
+  camera.near = d / 200;
+  camera.far = d * 40;
+  camera.updateProjectionMatrix();
+  controls.target.copy(ctr);
+  controls.update();
+}, (err) => {
+  console.error('GLB load failed:', err);
+  document.getElementById('hud').innerHTML = '<b style="color:#ff7b72">GLB load failed</b>';
+});
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+(function tick() {
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

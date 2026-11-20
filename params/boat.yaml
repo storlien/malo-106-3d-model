@@ -1,0 +1,51 @@
+# SY Alizée — hull & deck parameters
+# PLACEHOLDER VALUES — generic 11 m sloop until real reference data arrives.
+# Coordinate system: origin at transom centreline at design waterline,
+# X forward, Y starboard, Z up. All lengths in mm.
+
+placeholder: true          # flip to false once real measurements replace these
+name: "SY Alizée"
+
+# ---- principal dimensions
+loa: 10800                 # hull length, transom to stem tip
+beam: 3700                 # max hull beam
+beam_transom: 2900         # transom beam at sheer/cap-rail height
+canoe_draft: 900           # hull body depth below waterline (keel excluded)
+draft: 1950                # total draft to keel tip (Z of keel bottom = -draft)
+freeboard_aft: 950         # sheer height above waterline at transom
+freeboard_mid: 1100        # sheer at midships
+freeboard_fwd: 1350        # sheer at bow
+stations: 18               # loft stations (cosine-spaced)
+
+# ---- keel & rudder (side-view key points, auto-derived unless overridden)
+keel_half_thk: 80          # half thickness of fin keel
+rudder_half_thk: 22
+
+# ---- rig (visual placeholder; mast base position matters for the arch only via backstay)
+mast_x: 6700
+mast_r: 75
+rig_top: 16500             # masthead height above waterline
+boom_z: 2350               # gooseneck/boom height above waterline
+boom_len: 3800
+
+# ---- coachroof (side-profile key points, z = height above waterline)
+coachroof_x0: 4900
+coachroof_x1: 8600
+coachroof_peak_z: 1580
+coachroof_half_width: 1150
+
+# ---- cockpit (rectangular recess, placeholder)
+cockpit:
+  x0: 1000                 # forward edge? -> aft end is nearer transom: x0 = fwd edge
+  len: 2400
+  width: 2300
+  z_floor: 600
+
+# ---- deck furniture (rough placeholder positions; measured later)
+rail_tube_r: 25
+pushpit_x: 150
+pushpit_y: 1350
+pushpit_top: 1600
+pulpit_x: 10450
+stanchion_height: 600
+lifeline_r: 8
