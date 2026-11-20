@@ -36,6 +36,7 @@ function b64ToBuf(b64) {
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
 renderer.setPixelRatio(window.devicePixelRatio);
+if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a222b);
@@ -61,11 +62,20 @@ scene.add(grid);
 
 new THREE.GLTFLoader().parse(b64ToBuf(B64), '', (gltf) => {
   const m = gltf.scene;
+  // OCCT exports metallic materials, which render near-black under punctual
+  // lights without an environment map. Force dielectric look.
+  m.traverse((o) => {
+    if (o.isMesh && o.material) {
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach((mt) => {
+        if (mt.isMeshStandardMaterial) { mt.metalness = 0.0; mt.roughness = 0.55; }
+      });
+    }
+  });
   scene.add(m);
   const box = new THREE.Box3().setFromObject(m);
   const size = box.getSize(new THREE.Vector3());
   const ctr = box.getCenter(new THREE.Vector3());
-  const d = Math.max(size.x, size.y) * 1.1;
+  const d = Math.max(size.x, size.y) * 1.5;
   camera.position.set(ctr.x - d * 0.72, ctr.y - d * 0.78, ctr.z + size.z * 0.42);
   camera.near = d / 200;
   camera.far = d * 40;

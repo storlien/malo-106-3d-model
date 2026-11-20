@@ -137,10 +137,13 @@ def render(parts, path, exclude=()):
     plt.close(fig)
 
 
-def make_viewer(parts, p, template_path=ROOT / "viewer" / "viewer_template.html"):
-    compound = bd.Compound(children=list(parts.values()))
+def make_viewer(p, parts=None, template_path=ROOT / "viewer" / "viewer_template.html"):
     glb = OUT / "alizee.glb"
-    bd.export_gltf(compound, str(glb), binary=True)
+    if parts is not None:
+        compound = bd.Compound(children=list(parts.values()))
+        bd.export_gltf(compound, str(glb), binary=True)
+    if not glb.exists():
+        raise FileNotFoundError("out/alizee.glb missing - run a full build first")
     b64 = base64.b64encode(glb.read_bytes()).decode()
     tpl = template_path.read_text()
     for marker, rel in [("__THREE__", "three.min.js"), ("__ORBIT__", "OrbitControls.js"),
@@ -158,6 +161,12 @@ def main():
     OUT.mkdir(exist_ok=True)
     RENDERS.mkdir(parents=True, exist_ok=True)
     p = yaml.safe_load((ROOT / "params" / "boat.yaml").read_text())
+
+    if "--viewer" in sys.argv:  # fast path: regenerate viewer from existing GLB
+        make_viewer(p)
+        print(f"viewer:  {OUT / 'alizee_viewer.html'}")
+        return
+
     print(f"Building {p.get('name', 'boat')} (placeholder={bool(p.get('placeholder'))}) ...")
 
     parts = build_geometry(p)
@@ -177,7 +186,7 @@ def main():
     render(parts, RENDERS / "hull_only.png", exclude=("rig",))
 
     if "--no-view" not in sys.argv:
-        make_viewer(parts, p)
+        make_viewer(p, parts)
         print(f"viewer:  {OUT / 'alizee_viewer.html'}")
 
     if not all_ok:
