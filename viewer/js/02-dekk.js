@@ -109,12 +109,12 @@ function deckPatch(x0, x1, z0, z1, m, parent){
     rod([0.26, 1.10, s*1.14], [0.22, TOP, s*1.06], r, dmat.steel, boat, 10);      // mellomstang
   }
   tube([[0.00, TOP, -0.12], [0.00, TOP, 0], [0.00, TOP, 0.12]], r, dmat.steel, boat);
-  // daviter: solide buer fra dekket ved pushpiten, opp og bak over akterspeilet (som på foto)
+  // daviter: lave buer fra dekket ved pushpiten, litt opp og bak over akterspeilet (som på foto)
   const ddY = x => deckY(x, 1.2);
   for (const s of [1, -1]){
-    tube([[0.80, ddY(0.80), s*1.22], [0.55, TOP + 0.30, s*1.10],
-          [0.05, TOP + 0.80, s*0.78], [-0.40, TOP + 0.85, s*0.50], [-0.60, TOP + 0.78, s*0.38]], 0.02, dmat.chrome, boat);
-    rod([0.44, TOP + 0.38, s*1.06], [0.70, ddY(0.70) - 0.02, s*1.26], 0.014, dmat.chrome, boat, 8);   // støtte
+    tube([[0.80, ddY(0.80), s*1.22], [0.55, TOP + 0.18, s*1.12],
+          [0.10, TOP + 0.32, s*0.80], [-0.30, TOP + 0.34, s*0.56], [-0.48, TOP + 0.26, s*0.44]], 0.02, dmat.chrome, boat);
+    rod([0.44, TOP + 0.10, s*1.06], [0.70, ddY(0.70) - 0.02, s*1.26], 0.014, dmat.chrome, boat, 8);   // støtte
   }
 })();
 

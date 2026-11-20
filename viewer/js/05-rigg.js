@@ -9,7 +9,7 @@
    ===================================================================== */
 const RIG = { mx: 7.0, top: 15.2, r: 0.082, boomY: 2.15, boomLen: 3.75, drumR: 0.145 };
 let boomPivot = null;   // settes i buildRig, roteres av seilene
-const mastBaseY = () => deckY(RIG.mx, 0) + crTopH(RIG.mx) + 0.02;   // doghouse-tak under masten
+const mastBaseY = () => crTopY(RIG.mx) + 0.03*(1 - 0) + 0.02;   // doghouse-tak under masten (kamber midts)
 function mastAt(y){ return [RIG.mx, y, 0]; }
 const spreader = (frac, len) => {
   const y = frac*RIG.top, sweep = 7*Math.PI/180;
@@ -114,7 +114,7 @@ const CAP_CP = [6.30], LOW_CP = [6.90];      // x for overfall / D1-fester på s
   drum.position.set(10.62, deckY(10.62, 0) + 0.14, 0); add(drum, boat);
 
   /* mestersheet-spor på doghouse-taket, med bil og skjøteblokker */
-  const trY = crPt(4.62, 1)[1] + 0.055;
+  const trY = crTopY(4.62) + 0.065;   // på rufftaket (kamber tatt med)
   for (const s of [1, -1]) box(4.60, 4.66, trY - 0.012, trY, s*0.75 - 0.016, s*0.75 + 0.016, dmat.steel, boat);
   box(4.56, 4.70, trY - 0.05, trY - 0.012, -0.8, 0.8, dmat.gel, boat);
   const car = box(4.59, 4.67, trY, trY + 0.035, -0.07, 0.07, dmat.dark, boat);

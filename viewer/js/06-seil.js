@@ -13,7 +13,7 @@ const sideS = { v:-1 };                // glir mellom -1 og +1 i vendinger
 const gen = { p:0 };
 const sail = { p:0, goal:0, t:0, frame:0, kind:'seil' };
 const rigUp = { p:1 };                 // 1 = seil ute; 0 = rullet inn (motor)
-const WX = { wind:7, windDir:65, wave:1.1, period:5.2, cloud:0.15, fog:0,
+const WX = { wind:5, windDir:65, wave:0.5, period:4.2, cloud:0.15, fog:0,
              sunEl:42, sunAz:135, speed:null, rain:0, thunder:0, hour:13, heading:0 };
 const WXT = Object.assign({}, WX);    // målverdier: WX glir mot disse
 const WX_WRAP = { windDir:360, sunAz:360, hour:24 };

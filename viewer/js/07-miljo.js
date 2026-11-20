@@ -17,7 +17,7 @@ sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
 sun.shadow.bias = -0.00035;
 scene.add(sun); scene.add(sun.target);
 const SUN0 = new V3(-7, 20, 11), sunTmp = new V3(), moonTmp = new V3();
-const hemi = new T.HemisphereLight(C('#bcd8ec'), C('#1c2a33'), 0.45); scene.add(hemi);
+const hemi = new T.HemisphereLight(C('#eef4fa'), C('#6d6150'), 0.45); scene.add(hemi);
 const fill = new T.DirectionalLight(C('#cfe2f2'), 0.3); fill.position.set(9, 6, -8); scene.add(fill);
 const dirFrom = (el, az, v) => { const e = el*Math.PI/180, a = az*Math.PI/180; return v.set(Math.cos(e)*Math.cos(a), Math.sin(e), Math.cos(e)*Math.sin(a)); };
 
@@ -633,7 +633,7 @@ function applyScene(){
   sun.color.copy(SUNCOL.t);
   hemi.intensity = 0.45 + 0.45*(0.12 + 0.88*dayF)*(1 - 0.4*darkE) + 0.2*cloudE*dayF - 0.45 + 1.4*wxU.flash.value;
   fill.intensity = 0.3*dayF + 0.04;
-  renderer.toneMappingExposure = 1.1 + 0.5*(1 - dayF);
+  renderer.toneMappingExposure = 1 + 0.5*(1 - dayF);
   NIGHT.lamps.forEach(m => { m.material.emissiveIntensity = 0.5 + 3.0*(1 - dayF); });
   // ratt og vindpeker
   const aw = Math.hypot(Math.cos(rr), Math.sin(rr))*WX.wind + speed;

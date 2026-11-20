@@ -2,120 +2,164 @@
 /* overbygg — se deloverskriftene i filen. */
 
 /* =====================================================================
-   COACHROOF / DOGHOUSE — lav og strømlinjeformet (480 mm over dekkskant),
-   med de tre høye sidevinduene (marineblå ramme, mørkt glass, litt stolt av
-   veggen), krumbuet vindskjerm forut, skyveluke og sprayhood i marineblått.
+   COACHROOF — bygd som et sveipt «hus» med kamberet topp og vegger med
+   fall innover (slik Abela gjør det): kvartsnitt loftet lengdeskips,
+   lukket gavl mot cockpit. Vinduene bøyes langs veggens egen profil
+   (marineblå ramme + mørkt glass), hjørneglasset foran vikler rundt
+   rufffronten. Sprayhood i marineblått over skyvedøra.
    ===================================================================== */
-const CR = { x0: 4.35, x1: 8.9, hw: 1.01, top: 0.48 };
-function crTopH(x){
-  if (x < CR.x0 || x > CR.x1) return 0;
-  if (x < 5.0) return CR.top * smq((x - CR.x0)/0.55);
-  if (x <= 7.4) return CR.top;
-  return CR.top * (1 - smq((x - 7.4)/1.5));
+const CR = { x0: 4.35, x1: 8.95, top: 0.48, hw: 1.01 };
+function crHalf(x){
+  if (x <= CR.x0 || x >= CR.x1) return 0.001;
+  if (x <= 7.55) return CR.hw;
+  const f = (x - 7.55)/1.4;
+  return Math.max(0.001, CR.hw*Math.sqrt(Math.max(0, 1 - f*f)));
 }
-/* vegg/skulder-profil: f = 0 ved dekk, 1 på tak */
-const CR_SEC = [[0,1.01],[0.30,0.995],[0.62,0.94],[0.88,0.85],[1,0.74]];
-function crZ(f){ return interp(CR_SEC, f); }
-function crPt(x, f){
-  const h = crTopH(x), deck = deckY(x, 0.95);
-  return [x, deck + h*f, crZ(f)];
+function crTopY(x){                       // absolutt topphøyde (følger dekkets stigning)
+  if (x <= CR.x0) return 0;
+  const base = deckY(x, 0);
+  if (x >= CR.x1) return base;
+  if (x <= 7.9) return base + CR.top;
+  const f = (x - 7.9)/(CR.x1 - 7.9);
+  return base + CR.top*(1 - f*f*(3 - 2*f));
 }
-function crPatch(x0, x1, f0, f1, off, m){
-  const sections = [], n = Math.max(2, Math.ceil((x1-x0)/0.1));
-  for (let i = 0; i <= n; i++){
-    const x = x0 + (x1-x0)*i/n, sec = [];
-    for (let j = 0; j <= 6; j++) sec.push([x, crPt(x, f0 + (f1-f0)*j/6)[1], crPt(x, f0 + (f1-f0)*j/6)[2] + off]);
-    sections.push(sec);
-  }
-  return add(new T.Mesh(loft(sections), m), boat);
+function crSec(x){
+  const w = crHalf(x), yb = deckY(x, w) - 0.02, top = crTopY(x);
+  const wt = Math.max(0.001, w - 0.055*Math.min(1, (top - yb)/0.4));   // veggene heller innover
+  const top0 = [];
+  for (let k = 0; k <= 10; k++){ const z = -wt + 2*wt*k/10; top0.push([x, top + 0.03*(1 - (z/wt)**2), z]); }
+  const side = s => [[x, yb, s*w], [x, top - 0.005, s*(wt + 0.012)]];
+  return { top: top0, port: side(-1), stbd: side(1), yb, top0: top, w, wt };
 }
+/* bredde (uten fortegn) på sideveggen ved høyde Y */
+function crZWall(X, Y){
+  const q = crSec(X), f = Math.max(0, Math.min(1, (Y - q.yb)/(q.top0 - q.yb)));
+  return q.w + (q.wt + 0.012 - q.w)*f;
+}
+/* punkt på sideveggen: f = 0 ved dekk, 1 ved takkant (signert z) */
+function crWallPt(x, f, s){
+  const q = crSec(x), y = q.yb + (q.top0 - q.yb)*f;
+  return new V3(x, y, s*crZWall(x, y));
+}
+
 (function buildCoachroof(){
-  /* selve doghouse-kroppen: speilet tverrsnitt loftet lengdeskips */
-  const sections = [], n = 34;
-  for (let i = 0; i <= n; i++){
-    const x = CR.x0 + (CR.x1-CR.x0)*i/n, sec = [];
-    for (const s of [1, -1]){
-      const h = crTopH(x), deck = deckY(x, 0.99);
-      const pts = [
-        [CR.hw, deck - 0.008],
-        [CR.hw - 0.02, deck + 0.30*h], [crZ(0.62), deck + 0.62*h],
-        [crZ(0.88), deck + 0.88*h], [crZ(1), deck + h],
-        [0.55, deck + h + 0.012], [0, deck + h + 0.02]
-      ];
-      pts.forEach(p => sec.push([x, p[1], s*p[0]]));
-    }
-    sec.reverse();                       // kontinuerlig fra styrbord til babord
-    sections.push(sec.filter((p, i, a) => i === 0 || Math.hypot(p[1]-a[i-1][1], p[2]-a[i-1][2]) > 1e-6));
-  }
-  add(new T.Mesh(loft(sections), dmat.gel), boat);
+  const xs = [];
+  for (let x = CR.x0; x <= CR.x1 + 1e-6; x += 0.05) xs.push(Math.min(x, CR.x1));
+  const secs = xs.map(x => Object.assign(crSec(x), { x }));
+  add(new T.Mesh(loft(secs.map(s => s.top)), dmat.gel), boat);
+  ['port', 'stbd'].forEach(k => { const m = add(new T.Mesh(loft(secs.map(s => s[k])), dmat.gel), boat); m.castShadow = false; });
+  const ring = s => [...s.port, ...s.top.slice(1, -1), ...s.stbd.slice().reverse()];
+  add(new T.Mesh(capGeom(ring(secs[0])), dmat.gel), boat);   // gavl mot skyvedøra
 
-  /* de tre sidevinduene: marineblå ramme + mørkt glass, fulgt langs veggen */
-  const rows = [[4.9, 5.6], [6.0, 6.8], [7.25, 8.38]];
+  /* hjørneglasset foran: mørkt glass-bånd som vikler rundt rufffronten
+     langs omrisset (fra 7,7 og frem), med marineblå karm under */
   for (const s of [1, -1]){
-    for (const [x0, x1] of rows){
-      crPatch(x0, x1, 0.46, 1.0, s*0.012, dmat.navy);
-      crPatch(x0+0.035, x1-0.035, 0.50, 0.955, s*0.024, dmat.glass);
-    }
-  }
-
-  /* vindskjermen: krumbuet glass rundt doghouse-fronten */
-  (function windshield(){
-    const cols = [];
-    for (let i = 0; i <= 16; i++){
-      const f = i/16, zc = -0.78 + 1.56*f;
-      const x = 8.42 + 0.30*Math.sin(Math.PI*f);
-      const h = crTopH(x), deck = deckY(x, 0.7);
-      cols.push([[x, deck + h + 0.012, zc], [x, deck + h*0.40 + 0.02, zc]]);
-    }
-    const g = loft(cols);
-    add(new T.Mesh(g, dmat.glass), boat);
-    const topEdge = cols.map(c => [c[0][0], c[0][1], c[0][2]]);
-    tube(topEdge, 0.009, dmat.chrome, boat);
-  })();
-
-  /* fremside med skyvedørspor, mørk himling og teak-skyveluke */
-  (function companionway(){
-    const deck = deckY(CR.x0, 0.5), y = deck;
-    const hw = 0.52, cw = 0.31;
-    box(CR.x0 - 0.06, CR.x0, y, y + 0.50, -hw, -cw, dmat.gel, boat);
-    box(CR.x0 - 0.06, CR.x0, y, y + 0.50, cw, hw, dmat.gel, boat);
-    box(CR.x0 - 0.06, CR.x0, y, y + 0.13, -cw, cw, dmat.gel, boat);
-    box(CR.x0 - 0.10, CR.x0 - 0.05, y + 0.11, y + 0.50, -cw, cw, dmat.port, boat);   // mørk himling
-    // teak-skyveluke i sporet opp på doghouse-taket
-    const secs = [];
-    for (const xx of [4.38, 5.32]){
-      const yy = deckY(xx, 0.4) + 0.505 + (xx < 4.7 ? 0.0 : 0.005);
-      secs.push([[xx, yy, -cw], [xx, yy, cw]]);
-    }
-    add(new T.Mesh(loft(secs), dmat.teak), boat);
-    box(4.36, 4.40, deck + 0.49, deck + 0.545, -cw - 0.03, cw + 0.03, dmat.gel, boat);   // listverk
-  })();
-
-  /* håndrekker i teak på taket */
-  for (const s of [1, -1]){
-    tube([[5.0, crPt(5.0, 1)[1] + 0.045, s*0.74], [5.3, crPt(5.3, 1)[1] + 0.045, s*0.72],
-          [7.6, crPt(7.6, 1)[1] + 0.045, s*0.72], [7.9, crPt(7.9, 1)[1] + 0.045, s*0.74]], 0.017, dmat.teakP, boat);
-    for (const fx of [5.15, 7.75]) rod([fx, crPt(fx, 1)[1] + 0.01, s*0.73], [fx, crPt(fx, 1)[1] + 0.05, s*0.73], 0.012, dmat.teakP, boat, 8);
+    const strip = (f0, f1, off) => {
+      const secs = [];
+      for (let x = 7.7; x <= CR.x1 - 0.05; x += 0.04){
+        const q = crSec(x), y0 = q.yb + (q.top0 - q.yb)*f0, y1 = q.yb + (q.top0 - q.yb)*f1;
+        secs.push([[x, y0, s*(crZWall(x, y0) - 0.012 - off)], [x, y1, s*(crZWall(x, y1) - 0.012 - off)]]);
+      }
+      return secs;
+    };
+    add(new T.Mesh(loft(strip(0.40, 0.94, 0.014)), dmat.glass), boat);
+    add(new T.Mesh(loft(strip(0.36, 0.41, 0.017)), dmat.navy), boat);
   }
 })();
 
-/* Luker: tre hvite takluker på doghouse, dekkluke + fortøyningslukke forut */
-(function hatches(){
-  function hatch(x, zc, hl, hw, y, lidMat){
-    const g1 = rrectGeom(2*hl, 2*hw); g1.rotateX(-Math.PI/2);
-    const f1 = new T.Mesh(g1, dmat.mast); f1.position.set(x, y + 0.012, zc); add(f1, boat);
-    const g2 = rrectGeom(2*hl - 0.07, 2*hw - 0.06); g2.rotateX(-Math.PI/2);
-    const f2 = new T.Mesh(g2, lidMat || dmat.hatch); f2.position.set(x, y + 0.026, zc); add(f2, boat);
+/* Vinduer som bøyes etter veggen: avrundet rektangel bygget som stripe
+   av kolonner (portert fra Abela), her med marineblå ramme. */
+function winStrip(len, h, r){
+  const a = len/2, b = h/2, us = [];
+  for (let k = 8; k >= 1; k--) us.push(-(a - r) - r*Math.sin(k/8*Math.PI/2));
+  const m = Math.max(2, Math.ceil(2*(a - r)/0.04));
+  for (let k = 0; k <= m; k++) us.push(-(a - r) + 2*(a - r)*k/m);
+  for (let k = 1; k <= 8; k++) us.push((a - r) + r*Math.sin(k/8*Math.PI/2));
+  const half = u => { const e = Math.abs(u) - (a - r); return e <= 0 ? b : (b - r) + Math.sqrt(Math.max(0, r*r - e*e)); };
+  const pts = [], idx = [];
+  us.forEach((u, i) => { pts.push([u, -half(u)], [u, half(u)]);
+    if (i){ const p0 = 2*(i-1), p1 = 2*i; idx.push(p0, p1, p1+1, p0, p1+1, p0+1); } });
+  return { pts, idx };
+}
+function sideWindow(len, h, basis, pos, n, s, zWall, frameMat){
+  frameMat = frameMat || dmat.navy;
+  const R = new T.Matrix3().setFromMatrix4(basis);
+  const make = (L, H, r, off, mat) => {
+    const { pts, idx } = winStrip(L, H, r), arr = [];
+    pts.forEach(([u, v]) => {
+      const q = new V3(u, v, 0).applyMatrix3(R).add(pos);
+      if (zWall){ const tz = s*(zWall(q.x, q.y) + off); q.addScaledVector(n, (tz - q.z)/n.z); }
+      else q.addScaledVector(n, off);
+      arr.push(q.x, q.y, q.z);
+    });
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(arr, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const mesh = new T.Mesh(g, mat); boat.add(mesh); return mesh;
+  };
+  make(len + 0.035, h + 0.035, 0.05, 0.005, frameMat);
+  make(len, h, 0.035, 0.009, dmat.glass);
+}
+/* to sidevinduer per side (hjørneglasset foran er eget bånd) */
+(function sideWindows(){
+  const rows = [[6.55, 0.78, 0.17, 0.64], [5.3, 0.5, 0.13, 0.58]];
+  for (const s of [1, -1]){
+    for (const [xc, len, hgt, f] of rows){
+      const q = crSec(xc);
+      const c = crWallPt(xc, f, s), a = crWallPt(xc - 0.05, f, s), b = crWallPt(xc + 0.05, f, s);
+      const along = b.clone().sub(a).normalize();
+      const up = new V3(0, q.top0 - q.yb, s*(q.wt + 0.012 - q.w)).normalize();
+      let n = new V3().crossVectors(along, up).normalize();
+      if (n.z*s < 0) n.negate();
+      const yAx = new V3().crossVectors(n, along).normalize();
+      sideWindow(len, hgt, new T.Matrix4().makeBasis(along, yAx, n), c, n, s, crZWall);
+    }
   }
-  const topY = (x, zc) => deckY(x, Math.abs(zc)) + crTopH(x) + 0.02;
-  hatch(5.10, 0, 0.31, 0.26, topY(5.10, 0));
-  hatch(6.30, -0.32, 0.28, 0.24, topY(6.30, -0.32));
-  hatch(7.30, 0, 0.33, 0.26, topY(7.30, 0));
-  hatch(9.20, 0, 0.30, 0.25, deckY(9.20, 0) + 0.008);
+})();
+
+/* Skyvedøra forut: hvit karm, mørk himling, garasjehus med teak-luke */
+(function companionway(){
+  const x = CR.x0, deck = deckY(x, 0), q = crSec(x);
+  const hw = 0.52, cw = 0.31, top = q.top0;
+  box(x - 0.06, x + 0.02, deck - 0.01, top, -hw, -cw, dmat.gel, boat);
+  box(x - 0.06, x + 0.02, deck - 0.01, top, cw, hw, dmat.gel, boat);
+  box(x - 0.06, x + 0.02, deck - 0.01, deck + 0.13, -cw, cw, dmat.gel, boat);
+  box(x - 0.10, x - 0.05, deck + 0.11, top - 0.06, -cw, cw, dmat.port, boat);        // mørk himling
+  box(x + 0.02, x + 1.0, top - 0.035, top + 0.055, -cw - 0.05, cw + 0.05, dmat.gel, boat);
+  box(x + 0.30, x + 0.92, top + 0.055, top + 0.075, -cw, cw, dmat.port, boat);
+  const secs = [];
+  for (const xx of [x + 0.04, x + 0.96]){
+    const yy = top + (xx < x + 0.4 ? 0.055 : 0.075) + 0.001;
+    secs.push([[xx, yy, -cw], [xx, yy, cw]]);
+  }
+  add(new T.Mesh(loftUV(secs), dmat.teak), boat);   // teak-skyveluke
+})();
+
+/* Luker: stålramme + mørkt lokk (som på foto), takluker og dekkluke */
+(function hatches(){
+  function hatch(x, zc, hl, hw, y){
+    box(x - hl - 0.03, x + hl + 0.03, y, y + 0.035, zc - hw - 0.03, zc + hw + 0.03, dmat.steel, boat);
+    box(x - hl, x + hl, y + 0.035, y + 0.058, zc - hw, zc + hw, dmat.port, boat);
+  }
+  hatch(5.75, 0, 0.30, 0.25, crTopY(5.75) + 0.045);
+  hatch(6.95, -0.30, 0.27, 0.23, crTopY(6.95) + 0.05);
+  hatch(9.35, 0, 0.30, 0.25, deckY(9.35, 0) + 0.008);       // dekkluke forut
   /* ankerkisteteke i baugen */
   const g = rrectGeom(0.56, 0.48); g.rotateX(-Math.PI/2);
   const lid = new T.Mesh(g, dmat.teak); lid.position.set(10.0, deckY(10.0, 0) + 0.012, 0); add(lid, boat);
   box(9.72, 9.74, deckY(9.73, 0.22) + 0.0, deckY(9.73, 0.22) + 0.03, -0.21, 0.21, dmat.chrome, boat);
+})();
+
+/* Håndrekker i teak på rufftaket, med støtter */
+(function handrails(){
+  for (const s of [1, -1]){
+    const zAt = x => s*(crHalf(x) - 0.22);
+    const yAt = x => crTopY(x) + 0.03*(1 - (zAt(x)/crHalf(x))**2) + 0.045;
+    const pts = [];
+    for (let x = 4.75; x <= 7.45; x += 0.25) pts.push([x, yAt(x), zAt(x)]);
+    tube(pts, 0.017, dmat.teakP, boat);
+    for (const fx of [4.85, 6.1, 7.35]){
+      rod([fx, crTopY(fx) + 0.035, zAt(fx)], [fx, yAt(fx) - 0.005, zAt(fx)], 0.012, dmat.teakP, boat, 8);
+    }
+  }
 })();
 
 /* Sprayhood i marineblått over skyvedøra, med krombøyle i front */
@@ -124,7 +168,7 @@ function crPatch(x0, x1, f0, f1, off, m){
     [3.20, 0.55, 1.30], [3.80, 0.80, 1.58], [4.60, 0.95, 1.85],
     [5.20, 0.95, 1.99], [5.85, 0.92, 1.55]
   ];
-  const yAt = (x, z) => {   // canvas-høyde: kuppform over bredden
+  const yAt = (x, z) => {   // canvas-høyde: boksform over bredden
     let i = 0; while (i < pts.length-2 && x > pts[i+1][0]) i++;
     const a = pts[i], b = pts[i+1], f = Math.min(1, Math.max(0, (x-a[0])/(b[0]-a[0])));
     const top = a[2] + (b[2]-a[2])*f, w = a[1] + (b[1]-a[1])*f;

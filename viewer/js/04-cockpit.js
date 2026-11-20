@@ -2,98 +2,146 @@
 /* cockpit — se deloverskriftene i filen. */
 
 /* =====================================================================
-   COCKPIT — dypt og trygt (sole 430 mm under dekkskant), teak-spir i
-   tverrgående planker, felgteak-seter langs sidene, akterkiste, teaklist
-   på rekka, pult med ratt (r = 230 mm) og self-tailing spill forut.
+   COCKPIT — hvite karmer med teaklokk (tre flater utover/oppå/innenfor,
+   som Abela), puter i marineblått som avrundede ekstruderinger med fasing,
+   styrekonsoll sveipt av superelliptiske ring som vider seg ut mot hodet
+   med kartplotter, stor ratt med fem eiker. Spill: dreide
+   kromprofiler (LatheGeometry) med selvhalende topp.
    ===================================================================== */
+
+/* Spill: drept krom-profil (fot, trommel, selvhaler, topp) + avtaksarm */
+function winch(x, y, z, sc){
+  const g = new T.Group(); g.position.set(x, y, z); g.scale.setScalar(sc); boat.add(g);
+  const lathe = (pts, m) => { const me = new T.Mesh(new T.LatheGeometry(pts.map(([r,h]) => new V2(r,h)), 40), m); me.castShadow = true; me.receiveShadow = true; g.add(me); return me; };
+  lathe([[0,0],[0.104,0],[0.109,0.004],[0.11,0.012],[0.11,0.036],[0.106,0.042],[0.1,0.046],[0.092,0.05],[0.08,0.062],[0.07,0.078],[0.066,0.09],[0.065,0.096]], dmat.chrome);
+  lathe([[0.065,0.095],[0.064,0.13],[0.064,0.158],[0.066,0.162]], dmat.drum);
+  lathe([[0.066,0.161],[0.084,0.168],[0.088,0.176],[0.088,0.196],[0.082,0.203],[0.07,0.205]], dmat.black);
+  lathe([[0.07,0.204],[0.083,0.206],[0.085,0.212],[0.08,0.221],[0.06,0.227],[0.03,0.23],[0.018,0.23],[0.016,0.226],[0,0.226]], dmat.chrome);
+  const arm = new T.Mesh(new T.BoxGeometry(0.05, 0.05, 0.03), dmat.chrome);
+  arm.position.set(0.082, 0.186, 0); arm.rotation.z = -0.2; g.add(arm);
+  const lip = new T.Mesh(new T.BoxGeometry(0.03, 0.012, 0.026), dmat.chrome);
+  lip.position.set(0.1, 0.165, 0); g.add(lip);
+  g.rotation.y = Math.random()*Math.PI*2;
+  return g;
+}
+
+/* Pute: avrundet rektangel ekstrudert med fasing — ser polstret ut */
+function cushion(x0, x1, z0, z1, y0, h){
+  const s = new T.Shape(), r = Math.min(0.05, (x1-x0)/4, (z1-z0)/4);
+  s.moveTo(x0+r, -z0); s.lineTo(x1-r, -z0); s.quadraticCurveTo(x1, -z0, x1, -z0-r);
+  s.lineTo(x1, -z1+r); s.quadraticCurveTo(x1, -z1, x1-r, -z1);
+  s.lineTo(x0+r, -z1); s.quadraticCurveTo(x0, -z1, x0, -z1+r);
+  s.lineTo(x0, -z0-r); s.quadraticCurveTo(x0, -z0, x0+r, -z0);
+  const g = new T.ExtrudeGeometry(s, { depth:h-0.024, bevelEnabled:true, bevelThickness:0.012, bevelSize:0.012, bevelSegments:3, curveSegments:4 });
+  g.rotateX(-Math.PI/2); g.translate(0, y0+0.012, 0);
+  return add(new T.Mesh(g, dmat.cushion), boat);
+}
+
+function teakPlate(x0, x1, z0, z1, y){
+  const g = new T.PlaneGeometry(x1-x0, z1-z0); g.rotateX(-Math.PI/2); g.translate((x0+x1)/2, y, (z0+z1)/2);
+  const p = g.attributes.position, uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i), p.getZ(i));
+  return add(new T.Mesh(g, dmat.teak), boat);
+}
+
 (function cockpit(){
   const X0 = 0.85, X1 = 3.60, HW = 1.175;
-  const soleY = () => deckY(2.2, HW) - 0.43;                 // 0.59-ish
-  const seatY = soleY() + 0.32;
+  const F = deckY(2.2, HW) - 0.43;                 // dor hoveddor (sole)
+  const SEAT = F + 0.32;
+  const COAM = deckY(2.2, HW) + 0.26;              // karmens topp
 
-  /* sole i teak med tverrgående planker */
-  const soleTex = teakTex.clone();
-  soleTex.needsUpdate = true; soleTex.rotation = Math.PI/2; soleTex.center.set(0.5, 0.5);
-  const soleMat = MD('#ffffff', { map:soleTex, roughness:0.8 });
-  box(X0 + 0.07, X1 - 0.07, soleY() - 0.03, soleY(), -HW + 0.035, HW - 0.035, soleMat, boat);
-
-  /* kumvegger i kremgelcoat fra sole og opp til dekk */
+  /* karmer: hvit utside, teaklokk oppå, hvit innside ned mot setene */
   for (const s of [1, -1]){
-    const secs = [], n = 22;
-    for (let i = 0; i <= n; i++){
-      const x = X0 + (X1-X0)*i/n;
-      secs.push([[x, soleY() - 0.03, s*HW], [x, deckY(x, s*HW) + 0.005, s*HW]]);
+    const outer = [], top = [], inner = [];
+    for (let x = X0; x <= X1 + 1e-6; x += 0.05){
+      const W = HW;
+      outer.push([[x, deckY(x, W) - 0.02, s*W], [x, COAM - 0.035, s*(W - 0.025)], [x, COAM, s*(W - 0.06)]]);
+      top.push([[x, COAM, s*(W - 0.06)], [x, COAM + 0.004, s*1.22]]);
+      inner.push([[x, COAM, s*1.22], [x, COAM - 0.03, s*1.2], [x, SEAT + 0.01, s*1.19]]);
     }
-    add(new T.Mesh(loft(secs), dmat.gel), boat);
+    add(new T.Mesh(loft(outer), dmat.gel), boat);
+    add(new T.Mesh(loftUV(top), dmat.teak), boat);
+    add(new T.Mesh(loft(inner), dmat.gel), boat);
+    const end = i => { const o = outer[i], t = inner[i]; return [o[0], o[1], o[2], t[0], t[1], t[2]]; };
+    add(new T.Mesh(capGeom(end(0)), dmat.gel), boat);
+    add(new T.Mesh(capGeom(end(outer.length-1)), dmat.gel), boat);
+    /* sidesete med pute, åpning akterst der rattet går ned */
+    box(1.08, 2.38, F, SEAT, s > 0 ? 0.75 : -1.2, s > 0 ? 1.2 : -0.75, dmat.gel, boat);
+    box(2.38, 3.44, F, SEAT, s > 0 ? 0.55 : -1.2, s > 0 ? 1.2 : -0.55, dmat.gel, boat);
+    cushion(2.4, 3.42, s > 0 ? 0.57 : -1.17, s > 0 ? 1.17 : -0.57, SEAT, 0.075);
+    cushion(1.1, 2.36, s > 0 ? 0.77 : -1.17, s > 0 ? 1.17 : -0.77, SEAT, 0.075);
+    /* spill på karmen */
+    winch(3.15, COAM + 0.004, s*1.30, 1.0);
+    winch(2.0, COAM + 0.004, s*1.29, 0.82);
   }
-  const wallAft = [], wallFwd = [];
-  for (let i = 0; i <= 12; i++){
-    const z = -HW + 2*HW*i/12;
-    wallAft.push([X0 + 0.07, soleY() - 0.03, z], [X0 + 0.07, deckY(X0 + 0.07, z) + 0.005, z]);
-    wallFwd.push([X1 - 0.07, soleY() - 0.03, z], [X1 - 0.07, deckY(X1 - 0.07, z) + 0.005, z]);
-  }
-  add(new T.Mesh(loft([wallAft.filter((p, i) => i % 2 === 0).concat(wallAft.filter((p, i) => i % 2 === 1))]), dmat.gel), boat);
-  add(new T.Mesh(loft([wallFwd.filter((p, i) => i % 2 === 0).concat(wallFwd.filter((p, i) => i % 2 === 1))]), dmat.gel), boat);
+  /* rorsmannssete på tvers akter + pute */
+  box(X0 + 0.06, 1.06, F, SEAT, -1.2, 1.2, dmat.gel, boat);
+  cushion(X0 + 0.1, 1.04, -1.17, 1.17, SEAT, 0.075);
+  box(X0 + 0.04, X0 + 0.065, SEAT, deckY(X0, 0) + 0.06, -1.2, 1.2, dmat.gel, boat);
+  /* dor i teak med hvit bunn */
+  teakPlate(1.08, 3.42, -0.72, 0.72, F + 0.003);
+  box(1.08, 3.42, F - 0.04, F, -0.72, 0.72, dmat.gel, boat);
 
-  /* seter: tre felgteak-planker per side, front i gelcoat */
-  for (const s of [1, -1]){
-    for (const p of [0, 1, 2]){
-      const z0 = s*(0.66 + p*0.17), z1 = s*(0.66 + p*0.17 + 0.14);
-      box(0.97, 3.44, seatY, seatY + 0.03, Math.min(z0, z1), Math.max(z0, z1), dmat.teak, boat);
-    }
-    box(0.97, 3.44, soleY(), seatY, s*0.63, s*0.655, dmat.gel, boat);
-    /* pute i marineblått på setet */
-    box(1.1, 3.3, seatY + 0.03, seatY + 0.07, s*0.68, s*1.12, dmat.cushion, boat);
-  }
-  /* akterkiste på tvers, med teakkant */
-  box(X0 + 0.09, 1.62, soleY(), seatY, -HW + 0.04, HW - 0.04, dmat.gel, boat);
-  box(X0 + 0.09, 1.58, seatY, seatY + 0.03, -HW + 0.05, HW - 0.05, dmat.teak, boat);
-  box(1.1, 1.55, seatY + 0.03, seatY + 0.07, -1.05, 1.05, dmat.cushion, boat);
+  /* styrekonsoll: smal søyle som vider seg ut til hodet med plotter */
+  (() => {
+    const cx = 3.30, N = 48;
+    const ring = (y, hx, hz, yTop) => {
+      const pts = [];
+      for (let i = 0; i < N; i++){
+        const t = 2*Math.PI*i/N, c = Math.cos(t), s2 = Math.sin(t);
+        const x = cx + hx*Math.sign(c)*Math.pow(Math.abs(c), 0.5), z = hz*Math.sign(s2)*Math.pow(Math.abs(s2), 0.5);
+        pts.push([x, yTop ? yTop(x) : y, z]);
+      }
+      pts.push(pts[0]);
+      return pts;
+    };
+    const topY = x => SEAT + 0.62 + (x - cx)*0.3;
+    const levels = [
+      ring(F, 0.09, 0.11), ring(F + 0.55, 0.10, 0.12), ring(SEAT + 0.18, 0.115, 0.14),
+      ring(SEAT + 0.30, 0.17, 0.24), ring(SEAT + 0.38, 0.20, 0.30), ring(SEAT + 0.46, 0.20, 0.31), ring(0, 0.195, 0.305, topY),
+    ];
+    add(new T.Mesh(loft(levels), dmat.gel), boat);
+    const top = levels[levels.length-1].slice(0, -1);
+    add(new T.Mesh(capGeom(top.map(p => [p[0], p[1] - 0.002, p[2]])), dmat.dark), boat);
+    const slope = Math.atan(0.3);
+    /* kartplotter felt ned i toppen */
+    const g = new T.Group(); g.position.set(cx - 0.01, topY(cx - 0.01) + 0.012, 0); g.rotation.z = slope; boat.add(g);
+    const body = new T.Mesh(new T.BoxGeometry(0.24, 0.035, 0.34), dmat.black); body.castShadow = true; g.add(body);
+    const sg = new T.PlaneGeometry(0.30, 0.18); sg.rotateX(-Math.PI/2); sg.rotateY(-Math.PI/2);
+    const scr = new T.Mesh(sg, new T.MeshStandardMaterial({ color:C('#1a2f3c'), roughness:0.15, metalness:0.1, emissive:C('#7fd4ff'), emissiveIntensity:0.35 }));
+    scr.position.set(0.005, 0.0185, 0); g.add(scr);
+    /* stålhåndtak foran plotteren */
+    const hx = cx + 0.15;
+    [-0.24, 0.24].forEach(z => rod([hx, topY(hx), z], [hx, topY(hx) + 0.11, z], 0.011, dmat.chrome, boat, 8));
+    rod([hx, topY(hx) + 0.11, -0.24], [hx, topY(hx) + 0.11, 0.24], 0.011, dmat.chrome, boat, 8);
+    /* gasshendel på styrbord side */
+    const lev = add(new T.Mesh(new T.BoxGeometry(0.03, 0.15, 0.03), dmat.black), boat);
+    lev.position.set(cx + 0.02, SEAT + 0.42, 0.33); lev.rotation.z = -0.5;
+    const knob = add(new T.Mesh(new T.SphereGeometry(0.026, 14, 10), dmat.black), boat);
+    knob.position.set(cx - 0.02, SEAT + 0.49, 0.33);
+    /* instrumenter på baksiden av hodet */
+    const face = cx - 0.19;
+    [[-0.17, SEAT + 0.36], [0.17, SEAT + 0.36]].forEach(([z, y]) => {
+      box(face - 0.01, face, y - 0.04, y + 0.04, z - 0.04, z + 0.04, dmat.black, boat);
+      const pg = new T.PlaneGeometry(0.07, 0.07); pg.rotateY(-Math.PI/2);
+      const m = new T.Mesh(pg, dmat.screen); m.position.set(face - 0.0105, y, z); boat.add(m);
+    });
+  })();
 
-  /* teakliste på cockpit-rekka */
-  for (const s of [1, -1]){
-    const secs = [], n = 22;
-    for (let i = 0; i <= n; i++){
-      const x = X0 + (X1-X0)*i/n, y = deckY(x, s*HW);
-      secs.push([[x, y - 0.01, s*(HW - 0.02)], [x, y + 0.035, s*(HW - 0.015)], [x, y + 0.035, s*(HW + 0.065)], [x, y - 0.01, s*(HW + 0.07)]]);
-    }
-    add(new T.Mesh(loft(secs), dmat.teakP), boat);
+  /* ratt: stor ring med fem eiker i rustfritt */
+  const wx = 3.02, wy = SEAT + 0.52;
+  rod([3.24, wy, 0], [wx - 0.04, wy, 0], 0.028, dmat.chrome, boat, 10);
+  const wheel = new T.Group(); wheel.position.set(wx, wy, 0); boat.add(wheel);
+  const hub = add(new T.Mesh(new T.CylinderGeometry(0.045, 0.055, 0.08, 20), dmat.chrome), wheel); hub.rotation.z = Math.PI/2;
+  const rim = add(new T.Mesh(new T.TorusGeometry(0.44, 0.017, 10, 64), dmat.dark), wheel); rim.rotation.y = Math.PI/2;
+  for (let k = 0; k < 5; k++){
+    const a = Math.PI/2 + k*2*Math.PI/5;
+    rod([0, 0, 0], [0, Math.sin(a)*0.435, Math.cos(a)*0.435], 0.009, dmat.chrome, wheel, 8);
   }
-  box(X0 - 0.075, X0 - 0.015, deckY(X0, 0) - 0.01, deckY(X0, 0) + 0.035, -HW - 0.07, HW + 0.07, dmat.teakP, boat);
-
-  /* styrepult med ratt, instrumentbryn og gass/spaker */
-  const pedX = 3.36;
-  box(pedX - 0.10, pedX + 0.10, soleY(), soleY() + 0.47, -0.11, 0.11, dmat.gel, boat);
-  box(pedX - 0.08, pedX + 0.08, soleY() + 0.47, soleY() + 0.85, -0.085, 0.085, dmat.gel, boat);
-  box(pedX - 0.075, pedX + 0.075, soleY() + 0.85, soleY() + 0.92, -0.10, 0.10, dmat.dark, boat);   // bryn
-  const compass = new T.Mesh(new T.CylinderGeometry(0.048, 0.052, 0.035, 18), dmat.black);
-  compass.position.set(pedX, soleY() + 0.94, 0); add(compass, boat);
-  const wheel = new T.Group();
-  const rim = new T.Mesh(new T.TorusGeometry(0.23, 0.017, 12, 40), dmat.steel);
-  wheel.add(rim);
-  for (let k = 0; k < 3; k++){
-    const sp = new T.Mesh(new T.CylinderGeometry(0.011, 0.011, 0.23, 8), dmat.steel);
-    sp.position.set(0, 0.115, 0);
-    const holder = new T.Group(); holder.add(sp);
-    holder.rotation.x = k*2*Math.PI/3; wheel.add(holder);
-  }
-  const hubb = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, 0.05, 14), dmat.dark);
-  hubb.rotation.z = Math.PI/2; wheel.add(hubb);
-  wheel.position.set(pedX - 0.10, soleY() + 0.72, 0);
-  wheel.rotation.order = 'ZYX'; wheel.rotation.z = Math.PI/2; wheel.rotation.y = -0.26;   // lener akterover
+  wheel.rotation.z = Math.PI/2; wheel.rotation.y = -0.22;
   wheel.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
-  boat.add(wheel); WHEEL = wheel;
-  rod([pedX + 0.09, soleY() + 0.62, 0.10], [pedX + 0.13, soleY() + 0.72, 0.13], 0.007, dmat.dark, boat, 8);   // gass
-  rod([pedX + 0.09, soleY() + 0.62, -0.10], [pedX + 0.13, soleY() + 0.72, -0.13], 0.007, dmat.dark, boat, 8); // gearbox
+  WHEEL = wheel;
 })();
 
-/* Self-tailing spill på sidedekkene ved skyvedøra */
-for (const s of [1, -1]){
-  const x = 4.52, y = deckY(x, s*1.25) + 0.004, z = s*1.25;
-  const base = new T.Mesh(new T.CylinderGeometry(0.075, 0.082, 0.012, 20), dmat.chrome);
-  base.position.set(x, y + 0.006, z); add(base, boat);
-  const drum = new T.Mesh(new T.CylinderGeometry(0.06, 0.066, 0.088, 20), dmat.chrome);
-  drum.position.set(x, y + 0.056, z); add(drum, boat);
-  const cap = new T.Mesh(new T.CylinderGeometry(0.05, 0.054, 0.02, 20), dmat.dark);
-  cap.position.set(x, y + 0.11, z); add(cap, boat);
-}
+/* Self-tailing spill på sidedekkene ved skyvedøra (i tillegg til karmspillene) */
+for (const s of [1, -1]) winch(4.55, deckY(4.55, s*1.25) + 0.004, s*1.25, 0.95);

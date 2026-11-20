@@ -172,6 +172,13 @@ function loft(sections){
   g.setAttribute('position', new T.Float32BufferAttribute(pos,3));
   g.setIndex(idx); g.computeVertexNormals(); return g;
 }
+/* loft med UV-er i meter (x, z) — slik at teakteksturen blir skarpe planker */
+function loftUV(sections){
+  const g = loft(sections), uv = [];
+  sections.forEach(s => s.forEach(p => uv.push(p[0], p[2])));
+  g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  return g;
+}
 function capGeom(sec){
   const pos = [], idx = []; let cx = 0, cy = 0, cz = 0;
   sec.forEach(p => { cx += p[0]; cy += p[1]; cz += p[2]; });
