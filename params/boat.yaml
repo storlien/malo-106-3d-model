@@ -1,51 +1,113 @@
-# SY Alizée — hull & deck parameters
-# PLACEHOLDER VALUES — generic 11 m sloop until real reference data arrives.
+# SY Alizée — Malö 36 (Malö 36/106), Kungsviken, Sweden
+# Sources: builder brochure (TEKNISKA DATA), owner photos.
+# Estimates (marked est) pending the measurement checklist.
 # Coordinate system: origin at transom centreline at design waterline,
-# X forward, Y starboard, Z up. All lengths in mm.
+# X forward, Y starboard, Z up. Z = 0 waterline. Units: mm.
 
-placeholder: true          # flip to false once real measurements replace these
-name: "SY Alizée"
+name: "SY Alizée — Malö 36"
+placeholder: false
 
-# ---- principal dimensions
-loa: 10800                 # hull length, transom to stem tip
-beam: 3700                 # max hull beam
-beam_transom: 2900         # transom beam at sheer/cap-rail height
-canoe_draft: 900           # hull body depth below waterline (keel excluded)
-draft: 1950                # total draft to keel tip (Z of keel bottom = -draft)
-freeboard_aft: 950         # sheer height above waterline at transom
-freeboard_mid: 1100        # sheer at midships
-freeboard_fwd: 1350        # sheer at bow
-stations: 18               # loft stations (cosine-spaced)
+# ---- principal dimensions (brochure)
+loa_hull: 11200             # Låå negativ akter (transom to stem tip)
+loa_std: 10600              # Låå std akter — hull length with standard stern
+beam: 3350                  # Bredd
+draft: 1580                 # Djupgående
+displacement_kg: 6100       # Vikt
+ballast_kg: 2500            # Kölvikt
 
-# ---- keel & rudder (side-view key points, auto-derived unless overridden)
-keel_half_thk: 80          # half thickness of fin keel
-rudder_half_thk: 22
+# ---- derived hull form (est from photos)
+beam_transom: 2750          # transom beam at sheer
+canoe_draft: 480            # hull body depth below waterline at midship
+freeboard_aft: 960
+freeboard_mid: 1080
+freeboard_fwd: 1380
+transom_rake_deg: 4         # top of transom aft of bottom
+stations: 21                # loft stations (cosine-spaced)
+stem_rake_deg: 24           # raked stem
 
-# ---- rig (visual placeholder; mast base position matters for the arch only via backstay)
-mast_x: 6700
-mast_r: 75
-rig_top: 16500             # masthead height above waterline
-boom_z: 2350               # gooseneck/boom height above waterline
-boom_len: 3800
+# ---- paint scheme (from photos)
+boot_stripe: { z0: -60, z1: 130 }        # navy boot top straddling WL
+sheer_stripe: { down0: 40, down1: 125 }  # navy stripe below sheer (vertical offsets)
+second_stripe: { down0: 190, down1: 235 } # thinner lower navy stripe
+stripe_proud: 1.2          # paint bands proud of hull surface (mm)
 
-# ---- coachroof (side-profile key points, z = height above waterline)
-coachroof_x0: 4900
-coachroof_x1: 8600
-coachroof_peak_z: 1580
-coachroof_half_width: 1150
+# ---- keel / skeg / rudder (est from haul-out photo)
+keel_root_x0: 4200          # fin root fwd end
+keel_root_x1: 6500          # fin root aft end
+keel_tip_x0: 5000           # fin tip fwd
+keel_tip_x1: 6350
+keel_half_thk: 95
+skeg_x0: 6800
+skeg_top_x1: 7800
+skeg_bottom_x0: 7150
+rudder_x0: 8100
+rudder_x1: 9100
+rudder_bottom_x0: 8300
+rudder_half_thk: 30
+shaft_x_hull: 6650          # shaft exits hull here
+shaft_x_prop: 7050          # propeller centre (aperture keel↔skeg)
+shaft_z_hull: -950
+shaft_z_prop: -1180
 
-# ---- cockpit (rectangular recess, placeholder)
+# ---- deck & coachroof
+deck_thk: 45
+deck_crown: 70              # camber crown at centreline
 cockpit:
-  x0: 1000                 # forward edge? -> aft end is nearer transom: x0 = fwd edge
-  len: 2400
-  width: 2300
-  z_floor: 600
+  x0: 850
+  x1: 3600
+  width: 2350
+  sole_below_deck: 430      # cockpit sole depth below deck edge
+coachroof:
+  x0: 4350                  # aft end (companionway)
+  x1: 8900                  # fwd end
+  half_width: 1010
+  top_z_off_deck: 480       # coachroof top above deck edge
+companionway_width: 620
+sprayhood:                  # navy canvas over companionway
+  x_aft: 3200
+  x_fwd: 5850
+  peak_z: 1990
+  half_width: 950
+bimini:                     # TARGA bimini over cockpit
+  x_aft: 1250
+  x_fwd: 2450
+  top_z: 1950
+  half_width: 1000
+hatches:                    # [x_center, y_center, half_len, half_wid]
+  - [5100, 0, 310, 260]
+  - [6300, -320, 280, 240]
+  - [7300, 0, 330, 260]
+  - [9200, 0, 300, 250]
+  - [10000, 0, 280, 240]
+window_rows:                # coachroof side windows [x0, x1, z0, z1]
+  - [5000, 5700, 1310, 1560]
+  - [6100, 6900, 1310, 1560]
+  - [7300, 8100, 1310, 1560]
 
-# ---- deck furniture (rough placeholder positions; measured later)
-rail_tube_r: 25
-pushpit_x: 150
-pushpit_y: 1350
-pushpit_top: 1600
-pulpit_x: 10450
-stanchion_height: 600
-lifeline_r: 8
+# ---- rig (brochure: masthead sloop, double spreaders; heights est)
+mast_x: 7000
+mast_r: 82
+rig_top: 15200              # masthead above waterline
+boom_z: 2150
+boom_len: 3750
+sail_cover_r: 145           # furled mainsail cover radius
+spreader1_z_frac: 0.44      # lower spreader height fraction of rig_top
+spreader2_z_frac: 0.73
+spreader1_len: 1450         # each side, measured from mast wall
+spreader2_len: 1150
+spreader_sweep_deg: 7       # swept aft
+chainplate_inset: 60        # shroud anchor inset from max deck half-beam
+inner_forestay_x: 9400      # high-cut staysail stay (est)
+
+# ---- rails & furniture
+rail_tube_r: 11
+pushpit_x: 180
+pushpit_top: 1620
+pulpit_x: 10600
+stanchion_x: [1600, 3050, 4500, 8200, 9500, 10300]
+stanchion_top_above_deck: 640
+lifeline_levels: [300, 600]  # above deck edge
+davit_height: 900           # davit tubes above pushpit top
+davit_overhang: -550        # aft of transom
+wheel_pedestal_x: 3400
+wheel_radius: 230
