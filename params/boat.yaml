@@ -52,6 +52,7 @@ shaft_z_prop: -1180
 # ---- deck & coachroof
 deck_thk: 45
 deck_crown: 70              # camber crown at centreline
+deck_plank_pitch: 105       # teak plank + caulk pitch (visual)
 cockpit:
   x0: 850
   x1: 3600

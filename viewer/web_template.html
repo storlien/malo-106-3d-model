@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SY Alizée — Malö 36</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#c8d8e1;font-family:system-ui,sans-serif}
+  #c{width:100%;height:100%;display:block;touch-action:none;outline:none}
+  #hud{position:fixed;top:16px;left:20px;color:#1b2b55;pointer-events:none;
+       text-shadow:0 0 4px rgba(255,255,255,.85),0 0 10px rgba(255,255,255,.6)}
+  #hud h1{margin:0;font:italic 400 clamp(26px,4vw,44px)/0.95 Georgia,'Times New Roman',serif}
+  #hud p{margin:6px 0 0 2px;font:500 13px/1.4 system-ui,sans-serif;color:#55627c}
+  #hint{position:fixed;left:20px;bottom:16px;color:#55627c;font:500 13px/1.4 system-ui,sans-serif;
+        text-shadow:0 0 4px rgba(255,255,255,.85)}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Interactive 3D model of SY Alizée. Drag to rotate."></canvas>
+<div id="hud"><h1>Alizée</h1><p>__TITLE__</p></div>
+<p id="hint">drag · orbit&nbsp;&nbsp;|&nbsp;&nbsp;wheel · zoom&nbsp;&nbsp;|&nbsp;&nbsp;right-drag · pan</p>
+<script>/* __THREE__ */</script>
+<script>/* __ORBIT__ */</script>
+<script>
+'use strict';
+/* =====================================================================
+   SY Alizée — Malö 36, procedural three.js model.
+   All dimensions come from params/boat.yaml via the PARAMS object (mm).
+   Axes: X = length (bow +X, transom at 0), Y = up (Y=0 waterline),
+   Z = starboard. Hull sections are sampled from the same HullForm curves
+   the CAD model uses, so web model and dimension model are one source.
+   Paint (stripes, boot top, antifoul) and teak planks are painted in
+   shaders so the lines stay crisp at any zoom.
+   ===================================================================== */
+const P = __PARAMS__;
+
+/* ---------- helpers ---------- */
+const T = THREE, V3 = T.Vector3;
+const C = h => new T.Color(h);
+const N_T = P.tableN;                                   // samples per curve
+function arrI(A, f){                                    // Catmull-Rom over a sampled curve
+  f = Math.min(A.length - 1.001, Math.max(0, f));
+  const i = Math.floor(f), t = f - i, n = A.length - 1;
+  const p0 = A[Math.max(0, i - 1)], p1 = A[i], p2 = A[Math.min(n, i + 1)], p3 = A[Math.min(n, i + 2)];
+  return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t
+       + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
+}
+const LOA = P.loa;
+const sheer  = x => arrI(P.table.sheer,  x / LOA * (N_T - 1));
+const hb     = x => arrI(P.table.hb,     x / LOA * (N_T - 1));
+const bottom = x => arrI(P.table.bottom, x / LOA * (N_T - 1));
+const deckZ  = x => sheer(x) + P.deckCrown;
+
+function add(mesh, parent){ mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh; }
+function mat(color, o = {}){
+  return new T.MeshStandardMaterial(Object.assign({ color: C(color), roughness: 0.55, metalness: 0.0 }, o));
+}
+const M_STEEL = () => mat(P.col.steel, { roughness: 0.28, metalness: 0.85 });
+const M_GLASS = () => mat(P.col.glass, { roughness: 0.06, metalness: 0.75 });
+const M_TEAK  = () => mat(P.col.white, { roughness: 0.72 });
+const M_CREAM = () => mat(P.col.cream, { roughness: 0.42 });
+const M_NAVY  = () => mat(P.col.navy,  { roughness: 0.8 });
+function rod(a, b, r, m, parent, seg = 10){
+  const A = new V3(...a), B = new V3(...b), d = B.clone().sub(A), L = d.length();
+  const mesh = new T.Mesh(new T.CylinderGeometry(r, r, L, seg), m);
+  mesh.position.copy(A.clone().add(B).multiplyScalar(0.5));
+  mesh.quaternion.setFromUnitVectors(new V3(0, 1, 0), d.normalize());
+  return add(mesh, parent);
+}
+function tubeThrough(pts, r, m, parent, seg = 64){
+  const curve = new T.CatmullRomCurve3(pts.map(p => new V3(...p)));
+  return add(new T.Mesh(new T.TubeGeometry(curve, seg, r, 8, false), m), parent);
+}
+/* side-view profile (x, up) -> symmetric solid extruded across Z */
+function sideSolid(pts2d, halfWidth, m, parent){
+  const s = new T.Shape();
+  s.moveTo(pts2d[0][0], pts2d[0][1]);
+  for (let i = 1; i < pts2d.length; i++) s.lineTo(pts2d[i][0], pts2d[i][1]);
+  const g = new T.ExtrudeGeometry(s, { depth: 2 * halfWidth, bevelEnabled: false });
+  const mesh = new T.Mesh(g, m);
+  mesh.position.z = -halfWidth;
+  return add(mesh, parent);
+}
+/* same, but with a smoothly curved outline (canvas, foils) */
+function sideSolidSpline(pts2d, halfWidth, m, parent){
+  const s = new T.Shape();
+  s.moveTo(pts2d[0][0], pts2d[0][1]);
+  s.splineThru(pts2d.slice(1).map(p => new T.Vector2(p[0], p[1])));
+  const g = new T.ExtrudeGeometry(s, { depth: 2 * halfWidth, bevelEnabled: false, curveSegments: 24 });
+  const mesh = new T.Mesh(g, m);
+  mesh.position.z = -halfWidth;
+  return add(mesh, parent);
+}
+function box(w, h, d, x, y, z, m, parent){
+  const mesh = new T.Mesh(new T.BoxGeometry(w, h, d), m);
+  mesh.position.set(x, y, z);
+  return add(mesh, parent);
+}
+
+/* ---------- renderer / scene / camera ---------- */
+const canvas = document.getElementById('c');
+const renderer = new T.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputEncoding = T.sRGBEncoding;
+renderer.toneMapping = T.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.62;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = T.PCFSoftShadowMap;
+
+const scene = new T.Scene();
+scene.fog = new T.Fog(C('#cfdde6').getHex(), 70000, 450000);
+
+/* environment map from a tiny gradient sky (gives gelcoat & steel life) */
+const pmrem = new T.PMREMGenerator(renderer);
+(function env(){
+  const es = new T.Scene();
+  const g = new T.SphereGeometry(100, 16, 12);
+  const m = new T.MeshBasicMaterial({ side: T.BackSide });
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = 'varying vec3 vP;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\nvP = position;');
+    sh.fragmentShader = 'varying vec3 vP;\n' + sh.fragmentShader.replace('#include <color_fragment>',
+      `#include <color_fragment>
+       float h = clamp(normalize(vP).y, -1.0, 1.0);
+       vec3 top = vec3(0.42, 0.62, 0.80), mid = vec3(0.78, 0.86, 0.91), bot = vec3(0.30, 0.33, 0.33);
+       vec3 c = h > 0.0 ? mix(mid, top, pow(h, 0.8)) : mix(mid, bot, clamp(-h * 2.5, 0.0, 1.0));
+       diffuseColor.rgb = c;`);
+  };
+  es.add(new T.Mesh(g, m));
+  scene.environment = pmrem.fromScene(es, 0.04).texture;
+})();
+
+const camera = new T.PerspectiveCamera(40, 2, 10, 800000);
+camera.position.set(-9500, 5000, -12500);
+
+const controls = new T.OrbitControls(camera, canvas);
+controls.target.set(4200, 1100, 0);
+controls.enableDamping = true; controls.dampingFactor = 0.07;
+controls.minDistance = 3000; controls.maxDistance = 90000;
+controls.maxPolarAngle = Math.PI * 0.52;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.7;
+canvas.addEventListener('pointerdown', () => controls.autoRotate = false, { once: true });
+
+/* sky dome */
+(function sky(){
+  const g = new T.SphereGeometry(260000, 24, 16);
+  const m = new T.ShaderMaterial({
+    side: T.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: C('#6fb0da') }, mid: { value: C('#b8d3e2') }, bot: { value: C('#eef5f8') } },
+    vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader: 'uniform vec3 top,mid,bot; varying vec3 vP;' +
+      'void main(){ float h = clamp(normalize(vP).y, -1.0, 1.0);' +
+      'vec3 c = h > 0.0 ? mix(mid, top, pow(h, 0.75)) : mix(mid, bot, clamp(-h*3.0, 0.0, 1.0));' +
+      'gl_FragColor = vec4(c, 1.0); }',
+  });
+  scene.add(new T.Mesh(g, m));
+})();
+
+/* lights */
+const sun = new T.DirectionalLight(0xfff3e0, 1.1);
+sun.position.set(-16000, 22000, -12000);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -14000; sun.shadow.camera.right = 14000;
+sun.shadow.camera.top = 14000;  sun.shadow.camera.bottom = -14000;
+sun.shadow.camera.near = 1000;  sun.shadow.camera.far = 80000;
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 40;
+scene.add(sun);
+scene.add(new T.HemisphereLight(0xbdd7ea, 0x2e4a58, 0.3));
+scene.add(new T.AmbientLight(0xffffff, 0.03));
+
+/* sea */
+(function sea(){
+  const g = new T.CircleGeometry(220000, 64);
+  g.rotateX(-Math.PI / 2);
+  const m = mat('#2e5d80', { roughness: 0.42, metalness: 0.02 });
+  const mesh = new T.Mesh(g, m);
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+})();
+
+/* ---------- the boat ---------- */
+const boat = new T.Group();
+scene.add(boat);
+
+/* ===== hull: grid from injected sections, paint in shader ===== */
+(function buildHull(){
+  const xs = P.hull.x, ys = P.hull.y, zs = P.hull.z;
+  const nS = xs.length, nT = ys.length / nS, M = 2 * nT - 1;
+  const pos = [], sh = [], idx = [];
+  for (let i = 0; i < nS; i++){
+    const x = xs[i], sr = sheer(x);
+    for (let jm = 0; jm < M; jm++){
+      const j = Math.abs(jm - (nT - 1)), sgn = jm < nT - 1 ? -1 : 1;
+      const k = i * nT + j;
+      pos.push(x, zs[k], sgn * ys[k]);
+      sh.push(sr - zs[k]);
+    }
+  }
+  for (let i = 0; i < nS - 1; i++) for (let j = 0; j < M - 1; j++){
+    const a = i * M + j, b = a + 1, c = a + M, d = c + 1;
+    idx.push(a, b, c, b, d, c);
+  }
+  /* ensure outward winding of the hull grid: signed volume of the open mesh */
+  {
+    let vol = 0;
+    for (let i = 0; i < idx.length; i += 3){
+      const A = new V3(pos[3 * idx[i]], pos[3 * idx[i] + 1], pos[3 * idx[i] + 2]);
+      const B = new V3(pos[3 * idx[i + 1]], pos[3 * idx[i + 1] + 1], pos[3 * idx[i + 1] + 2]);
+      const Cc = new V3(pos[3 * idx[i + 2]], pos[3 * idx[i + 2] + 1], pos[3 * idx[i + 2] + 2]);
+      vol += A.dot(B.cross(Cc));
+    }
+    if (vol < 0) for (let i = 0; i < idx.length; i += 3){
+      const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t;
+    }
+  }
+  /* transom cap: triangle fan around the section centroid */
+  const base = pos.length / 3, tIdx = [];
+  let cz0 = 0;
+  for (let jm = 0; jm < M; jm++){
+    const j = Math.abs(jm - (nT - 1)), sgn = jm < nT - 1 ? -1 : 1;
+    pos.push(xs[0], zs[j], sgn * ys[j]);
+    sh.push(sheer(xs[0]) - zs[j]);
+    cz0 += zs[j];
+  }
+  const cen = pos.length / 3;
+  pos.push(xs[0], cz0 / M, 0); sh.push(sheer(xs[0]) - cz0 / M);
+  for (let j = 0; j < M - 1; j++) tIdx.push(cen, base + j, base + j + 1);
+  tIdx.push(cen, base + M - 1, base);   // close the fan across the deck edge
+  const pv = i => new V3(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]);
+  const nv = new V3().crossVectors(pv(base).sub(pv(cen)), pv(base + 1).sub(pv(cen)));
+  if (nv.x > 0) for (let i = 0; i < tIdx.length; i += 3){ const t = tIdx[i + 1]; tIdx[i + 1] = tIdx[i + 2]; tIdx[i + 2] = t; }
+  idx.push(...tIdx);
+
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aSheer', new T.Float32BufferAttribute(sh, 1));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+
+  const m = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.24, metalness: 0.0 });
+  m.onBeforeCompile = shd => {
+    const f = v => v.toFixed(1);
+    shd.uniforms.uWhite = { value: C(P.col.cream) };
+    shd.uniforms.uNavy  = { value: C(P.col.navy) };
+    shd.uniforms.uAnti  = { value: C(P.col.anti) };
+    shd.vertexShader = 'attribute float aSheer; varying float vSheer; varying float vY;\n' +
+      shd.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\n vSheer = aSheer; vY = position.y;');
+    shd.fragmentShader = 'uniform vec3 uWhite,uNavy,uAnti; varying float vSheer; varying float vY;\n' +
+      shd.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        float e = 3.0;
+        vec3 hc = uWhite;
+        hc = mix(uAnti, hc, smoothstep(${f(-P.boot[0])} - e, ${f(-P.boot[0])} + e, vY));
+        float boot = smoothstep(${f(P.boot[0])} - e, ${f(P.boot[0])} + e, vY)
+                   * (1.0 - smoothstep(${f(P.boot[1])} - e, ${f(P.boot[1])} + e, vY));
+        hc = mix(hc, uNavy, boot);
+        float s1 = smoothstep(${f(P.sheerStripe[0])} - e, ${f(P.sheerStripe[0])} + e, vSheer)
+                 * (1.0 - smoothstep(${f(P.sheerStripe[1])} - e, ${f(P.sheerStripe[1])} + e, vSheer));
+        hc = mix(hc, uNavy, s1);
+        float s2 = smoothstep(${f(P.secondStripe[0])} - e, ${f(P.secondStripe[0])} + e, vSheer)
+                 * (1.0 - smoothstep(${f(P.secondStripe[1])} - e, ${f(P.secondStripe[1])} + e, vSheer));
+        hc = mix(hc, uNavy, s2);
+        diffuseColor.rgb = hc;`);
+  };
+  add(new T.Mesh(g, m), boat);
+})();
+
+/* ===== teak deck material (planks painted in shader) ===== */
+const teakMat = (() => {
+  const m = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.72, metalness: 0.0 });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uTeak  = { value: C(P.col.teak) };
+    sh.uniforms.uTeak2 = { value: C(P.col.teak2) };
+    sh.uniforms.uCaulk = { value: C(P.col.caulk) };
+    sh.vertexShader = 'varying vec3 vPos;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\n vPos = position;');
+    sh.fragmentShader = 'uniform vec3 uTeak,uTeak2,uCaulk; varying vec3 vPos;\n' +
+      sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        float pitch = ${P.plankPitch.toFixed(1)};
+        float zz = abs(vPos.z);
+        float row = floor(zz / pitch);
+        float f = fract(zz / pitch);
+        float seam = 1.0 - smoothstep(2.0, 4.5, min(f, 1.0 - f) * pitch);
+        float seed = fract(sin(row * 127.1) * 43758.5453);
+        vec3 teak = mix(uTeak, uTeak2, 0.55 * seed);
+        vec3 hc = mix(teak, uCaulk, seam);
+        diffuseColor.rgb = hc;`);
+  };
+  return m;
+})();
+
+/* ===== deck: cambered surface, cockpit cut out, planks in shader ===== */
+(function buildDeck(){
+  function strip(x0, x1, zLeft, zRight, nx, nz){
+    const pos = [], idx = [];
+    for (let i = 0; i <= nx; i++){
+      const x = x0 + (x1 - x0) * i / nx;
+      const zl = zLeft(x), zr = zRight(x);
+      for (let j = 0; j <= nz; j++){
+        const z = zl + (zr - zl) * j / nz;
+        const y = deckZ(x) - P.deckCrown * Math.pow(Math.min(1, Math.abs(z) / Math.max(hb(x), 1)), 2);
+        pos.push(x, y, z);
+      }
+    }
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++){
+      const a = i * (nz + 1) + j, b = a + 1, c = a + nz + 1, d = c + 1;
+      idx.push(a, b, c, b, d, c);
+    }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  }
+  const NX = 120, NZ = 14, s = i => (1 - Math.cos(Math.PI * i / NX)) / 2;
+  const cx0 = P.cockpit.x0, cx1 = P.cockpit.x1, cw = P.cockpit.w / 2;
+  const segs = [];
+  const edges = [0, cx0, cx1, LOA];
+  for (let k = 0; k < 3; k++){
+    const xa = edges[k], xb = edges[k + 1];
+    const n = Math.max(6, Math.round(NX * (xb - xa) / LOA));
+    const xs = Array.from({ length: n + 1 }, (_, i) => xa + (xb - xa) * s(i) / s(n));
+    if (k === 1){
+      segs.push(strip(xs[0], xs[n], x => cw, x => hb(x), n, NZ));
+      segs.push(strip(xs[0], xs[n], x => -hb(x), x => -cw, n, NZ));
+    } else {
+      segs.push(strip(xs[0], xs[n], x => -hb(x), x => hb(x), n, NZ));
+    }
+  }
+  for (const g of segs) add(new T.Mesh(g, teakMat), boat);
+
+  /* cockpit: sole, seats, coamings, forward bulkhead */
+  const soleZ = deckZ((cx0 + cx1) / 2) - P.cockpit.soleBelow;
+  box(cx1 - cx0 - 80, 20, cw - 420, (cx0 + cx1) / 2, soleZ + 10, 0, teakMat, boat);          // sole
+  for (const sg of ([-1, 1])){
+    box(cx1 - cx0 - 80, 24, 340, (cx0 + cx1) / 2, soleZ + 280, sg * (cw - 190), teakMat, boat);  // seats
+    box(cx1 - cx0, 460, 24, (cx0 + cx1) / 2, soleZ + 230, sg * (cw + 10), M_CREAM(), boat);        // coaming
+  }
+  box(30, 460, cw, cx1 + 10, soleZ + 230, 0, M_CREAM(), boat);                                  // bulkhead
+})();
+
+/* ===== cockpit furniture: wheel pedestal ===== */
+(function buildWheel(){
+  const wx = P.rails.pedX, soleZ = deckZ((P.cockpit.x0 + P.cockpit.x1) / 2) - P.cockpit.soleBelow;
+  const pedTop = deckZ(wx) + 170, st = M_STEEL();
+  rod([wx, 0, soleZ], [wx, 0, pedTop], 30, st, boat);
+  const tor = new T.Mesh(new T.TorusGeometry(P.rails.wheelR, 16, 12, 48), st);
+  tor.position.set(wx, 0, pedTop + 290);
+  tor.rotation.y = Math.PI / 2;
+  add(tor, boat);
+  rod([wx, 0, pedTop + 290], [wx, 0, pedTop + 420], 16, st, boat);
+})();
+
+/* ===== coachroof with raised doghouse, windows, windshield, hatches ===== */
+(function buildCoachroof(){
+  const cr = P.coachroof;
+  const prof = [
+    [cr.x0,       deckZ(cr.x0) - 60],
+    [cr.x0 + 260, deckZ(cr.x0 + 260) + cr.topOff],
+    [cr.x1 - 2900, deckZ(cr.x1 - 2900) + cr.topOff + 20],
+    [cr.x1 - 2500, deckZ(cr.x1 - 2500) + cr.topOff + 110],
+    [cr.x1 - 700,  deckZ(cr.x1 - 700) + cr.topOff + 110],
+    [cr.x1 - 160,  deckZ(cr.x1 - 160) + cr.topOff - 220],
+    [cr.x1,        deckZ(cr.x1) - 60],
+  ];
+  sideSolid(prof, cr.hw, M_CREAM(), boat);
+
+  /* windshield onto the doghouse front */
+  const wx = cr.x1 - 420;
+  box(330, 300, 2 * (cr.hw - 120), wx, deckZ(wx) + cr.topOff - 130 + 150, 0, M_GLASS(), boat);
+
+  /* side windows: navy base + dark glass, slightly proud of the coachroof */
+  for (const w of P.winRows){
+    const xm = (w[0] + w[1]) / 2;
+    const z0 = deckZ(xm) + 280;
+    const z1 = Math.min(z0 + 170, deckZ(xm) + cr.topOff + 90);
+    box(w[1] - w[0] + 60, z1 - z0, 2 * (cr.hw + 2), xm, (z0 + z1) / 2, 0, M_NAVY(), boat);
+    box(w[1] - w[0], z1 - z0 - 30, 2 * (cr.hw + 8), xm, (z0 + z1) / 2, 0, M_GLASS(), boat);
+  }
+  /* deck hatches */
+  for (const h of P.hatches){
+    const zb = deckZ(h[0]) + P.deckCrown * (1 - Math.abs(h[1]) / 1600) - 30;
+    box(2 * h[2], 45, 2 * h[3], h[0], zb + 22, h[1], mat(P.col.white, { roughness: 0.4 }), boat);
+    box(2 * h[2] - 60, 22, 2 * h[3] - 60, h[0], zb + 49, h[1], M_GLASS(), boat);
+  }
+})();
+
+/* ===== canvas: sprayhood + TARGA bimini, stainless frames ===== */
+(function buildCanvas(){
+  const sh = P.sprayhood;
+  sideSolidSpline([
+    [sh.x0, deckZ(sh.x0) - 40],
+    [sh.x0 + 60, deckZ(sh.x0) + 240],
+    [sh.x0 + 380, sh.peak - 150],
+    [sh.x0 + 1050, sh.peak],
+    [sh.x1 - 1450, sh.peak - 40],
+    [sh.x1 - 900, deckZ(sh.x1) + 470],
+    [sh.x1 - 500, deckZ(sh.x1) + 340],
+    [sh.x1 - 40, deckZ(sh.x1) + 60],
+    [sh.x1, deckZ(sh.x1) - 40],
+  ], sh.hw, M_NAVY(), boat);
+
+  const bm = P.bimini, st = M_STEEL();
+  sideSolidSpline([
+    [bm.x0, bm.top - 150], [bm.x0 + 80, bm.top + 20],
+    [bm.x1 - 150, bm.top], [bm.x1, bm.top - 180],
+  ], bm.hw + 40, M_NAVY(), boat);
+  for (const bx of [bm.x0 + 40, bm.x1 - 40]){
+    const zd = deckZ(bx);
+    for (const sg of ([-1, 1])){
+      tubeThrough([
+        [bx, zd - 20, sg * bm.hw],
+        [bx, zd + (bm.top - zd) * 0.55, sg * (bm.hw + 150)],
+        [bx, bm.top, sg * 180],
+      ], 11, st, boat);
+    }
+  }
+})();
+
+/* ===== appendages: keel, skeg, rudder, shaft, prop ===== */
+(function buildAppendages(){
+  const mAnti = mat(P.col.anti, { roughness: 0.5 });
+  const canoe = P.canoe, dr = P.draft;
+  sideSolid([
+    [P.keel.x0, -0.80 * canoe], [P.keel.x1, -0.86 * canoe],
+    [P.keel.tipX1, -dr], [P.keel.tipX0, -dr],
+  ], P.keel.halfThk, mAnti, boat);
+  sideSolid([
+    [P.skeg.x0, -0.55 * canoe], [P.skeg.topX1, -0.60 * canoe],
+    [P.skeg.botX0, -dr + 210],
+  ], 45, mAnti, boat);
+  sideSolid([
+    [P.rud.x0, -0.35 * canoe], [P.rud.x1, -0.42 * canoe],
+    [P.rud.botX0, -dr + 130],
+  ], P.rud.halfThk, mAnti, boat);
+
+  const mGrey = mat('#8c8f94', { roughness: 0.35, metalness: 0.8 });
+  rod([P.shaft.xHull, P.shaft.zHull, 0], [P.shaft.xProp, P.shaft.zProp, 0], 18, mGrey, boat);
+  const hub = new T.Mesh(new T.CylinderGeometry(26, 26, 70, 12), mGrey);
+  hub.rotation.z = Math.PI / 2;
+  hub.position.set(P.shaft.xProp + 15, P.shaft.zProp, 0);
+  add(hub, boat);
+  for (let i = 0; i < 3; i++){
+    const bl = new T.Mesh(new T.BoxGeometry(10, 170, 55), mGrey);
+    bl.position.set(P.shaft.xProp + 15, P.shaft.zProp, 0);
+    bl.rotation.x = i * 2 * Math.PI / 3;
+    bl.rotation.y = 0.5;
+    add(bl, boat);
+  }
+})();
+
+/* ===== rig: mast, boom, cover, double spreaders, standing rigging ===== */
+(function buildRig(){
+  const mx = P.mast.x, top = P.mast.top, st = M_STEEL();
+  const mb = deckZ(mx) + 60;
+  const mast = new T.Mesh(new T.CylinderGeometry(P.mast.r, P.mast.r * 1.25, top - mb, 16),
+                          mat(P.col.white, { roughness: 0.4 }));
+  mast.position.set(mx, mb + (top - mb) / 2, 0);
+  add(mast, boat);
+
+  const boomEnd = mx - P.mast.boomLen;
+  rod([mx - 80, 0, P.mast.boomZ], [boomEnd, 0, P.mast.boomZ], 58, mat(P.col.white, { roughness: 0.4 }), boat);
+  rod([mx - 320, 0, P.mast.boomZ + 20], [boomEnd + 130, 0, P.mast.boomZ + 20], P.mast.coverR, M_NAVY(), boat);
+
+  const s1z = P.mast.s1f * top, s2z = P.mast.s2f * top;
+  const s1l = P.mast.s1l, s2l = P.mast.s2l;
+  const sweep = Math.sin(P.mast.sweep * Math.PI / 180);
+  for (const sg of ([-1, 1])){
+    const tip1 = [mx - sweep * s1l, s1z, sg * s1l];
+    const tip2 = [mx - sweep * s2l, s2z, sg * s2l];
+    const cp = [mx - 260, sheer(mx - 260) - 10, sg * (hb(mx - 260) - P.rails.chainInset)];
+    rod([mx, 0, s1z], tip1, 14, st, boat);                       // spreader 1
+    rod([mx, 0, s2z], tip2, 14, st, boat);                       // spreader 2
+    tubeThrough([[mx, top - 120, 0], tip2, tip1, cp], 5.5, st, boat);   // cap shroud
+    rod([mx, 0, (s1z + s2z) / 2 + 350], [cp[0] + 320, cp[1], cp[2]], 5.5, st, boat);  // lower 1
+    rod([mx, 0, s1z - 500], [cp[0] - 250, cp[1], cp[2]], 5.5, st, boat);              // lower 2
+  }
+  rod([mx, top - 80, 0], [LOA - 200, sheer(LOA - 200) + 60, 0], 6, st, boat);          // backstay
+  rod([mx, top - 80, 0], [140, sheer(140) + 60, 0], 6, st, boat);                      // forestay
+  rod([mx, 0.72 * top, 0], [P.innerStay.x, deckZ(P.innerStay.x), 0], 5, st, boat);     // inner stay
+})();
+
+/* ===== rails: pushpit + davits, pulpit, stanchions, lifelines, toe rail ===== */
+(function buildRails(){
+  const r = P.rails.tubeR, st = M_STEEL();
+  const px = P.rails.pushX, ptop = P.rails.pushTop;
+  const py = hb(px) - 130, pz = sheer(px);
+  const dh = ptop + P.rails.davitH, dox = P.rails.davitO;
+  for (const sg of ([-1, 1])){
+    rod([px, pz - 20, sg * py], [px, ptop, sg * py], r, st, boat);
+    rod([px + 420, pz - 20, sg * (py - 60)], [px + 420, ptop - 40, sg * (py - 60)], r, st, boat);
+    rod([px, ptop, sg * py], [px + 420, ptop - 40, sg * (py - 60)], r, st, boat);
+    rod([px, ptop - 320, sg * py], [px + 420, ptop - 360, sg * (py - 60)], r, st, boat);
+    tubeThrough([
+      [px, ptop, sg * py],
+      [-120, dh - 120, sg * (py - 60)],
+      [dox, dh, sg * (py - 90)],
+    ], r, st, boat);
+  }
+  rod([dox, dh, -(py - 90)], [dox, dh, py - 90], r, st, boat);
+
+  const pulpX = P.rails.pulpX, pulpY = hb(pulpX) - 70, pulpZ = sheer(pulpX);
+  for (const sg of ([-1, 1]))
+    rod([pulpX, pulpZ - 20, sg * pulpY], [pulpX, pulpZ + 660, sg * pulpY], r, st, boat);
+  rod([pulpX, pulpZ + 660, -pulpY], [pulpX, pulpZ + 660, pulpY], r, st, boat);
+
+  for (const sx of P.rails.stanchions){
+    const sy = hb(sx) - 30, sz = sheer(sx);
+    for (const sg of ([-1, 1]))
+      rod([sx, sz - 15, sg * sy], [sx, sz + P.rails.stTop, sg * sy], 10, st, boat);
+  }
+  for (const lvl of P.rails.lifelines)
+    for (const sg of ([-1, 1]))
+      rod([pulpX, pulpZ + 660 - lvl + 100, sg * pulpY], [px, ptop - lvl + 60, sg * py], 3.5, st, boat);
+
+  /* teak toe rail along both deck edges */
+  const edge = [];
+  for (let i = 0; i <= 40; i++){
+    const x = 60 + (LOA - 100) * i / 40;
+    edge.push([x, sheer(x) + 14, hb(x)]);
+  }
+  for (const sg of ([-1, 1]))
+    tubeThrough(edge.map(e => [e[0], e[1], sg * e[2]]), 13, mat(P.col.teak2, { roughness: 0.6 }), boat);
+})();
+
+/* ---------- animation ---------- */
+scene.traverse(o => { if (o.isMesh && o.material && o.material.envMapIntensity !== undefined) o.material.envMapIntensity = 0.45; });
+(function loop(){
+  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+})();
+new ResizeObserver(() => {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width === w * renderer.getPixelRatio() && canvas.height === h * renderer.getPixelRatio()) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}).observe(canvas);
+renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+camera.aspect = canvas.clientWidth / canvas.clientHeight;
+camera.updateProjectionMatrix();
+</script>
+</body>
+</html>
