@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SY Alizée — Malö 36</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap">
+</head>
+<body>
+<div class="b3d-root" id="root">
+<canvas id="c"></canvas>
+
+<header class="b3d-header">
+  <h1>SY&nbsp;<b>Alizée</b></h1>
+  <p>Malö&nbsp;36&nbsp;·&nbsp;Kungsviken, Sverige</p>
+</header>
+
+<div class="b3d-actions" id="actions">
+  <button class="b3d-btn" id="btnSail" aria-pressed="false"><span>La oss seile</span></button>
+  <button class="b3d-btn" id="btnPlate"><span>Om båten</span></button>
+  <button class="b3d-btn" id="btnFilm"><span>Film</span></button>
+  <button class="b3d-btn" id="btnTest"><span>Testpanel</span></button>
+  <button class="b3d-btn" id="btnQ"><span>Kvalitet</span></button>
+</div>
+
+<div class="b3d-hint" id="hint">Dra for å se rundt&nbsp;·&nbsp;skroll for å zoome</div>
+
+<!-- Byggeskiltet: Om båten -->
+<div class="b3d-plate" id="plate" hidden>
+  <div class="b3d-plate-box" role="dialog" aria-modal="true" aria-label="Om båten">
+    <button class="b3d-plate-close" id="plateClose" aria-label="Lukk">×</button>
+    <h2 class="b3d-plate-title">Om båten</h2>
+    <div class="b3d-plate-steel" id="plateSteel">
+      <div class="pl-logo">MALÖ YACHTS</div>
+      <div class="pl-row">
+        <span class="pl-model">MALÖ&nbsp;36</span>
+        <span class="pl-place">KUNGSVIKEN</span>
+      </div>
+      <span class="pl-screw" style="left:9px;top:9px"></span>
+      <span class="pl-screw" style="right:9px;top:9px"></span>
+      <span class="pl-screw" style="left:9px;bottom:9px"></span>
+      <span class="pl-screw" style="right:9px;bottom:9px"></span>
+    </div>
+    <div class="b3d-spec">
+      <div><b>LENGDE</b>11,20 m</div>
+      <div><b>BREDDE</b>3,35 m</div>
+      <div><b>DYPGANG</b>1,58 m</div>
+      <div><b>DEPLASEMENT</b>6 100 kg</div>
+      <div><b>BALLAST</b>2 500 kg</div>
+      <div><b>MOTOR</b>Volvo Penta 2003T</div>
+      <div><b>RIGG</b>Masthead-slup, doble spreddere</div>
+      <div><b>DEKK</b>Teak, 12 mm</div>
+      <div><b>ROR</b>Skjeggbåret</div>
+      <div><b>KJØLFORM</b>Finne med skjegg</div>
+      <div class="wide"><b>BYGGET AV</b>Malö Yachts AB, Kungsviken, Sverige</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filmmodus -->
+<div class="cine-hud" id="cineHud">
+  <div class="cine-cap" id="cineCap"><b id="capTitle"></b><span id="capSub"></span></div>
+  <div class="cine-ctrl">
+    <div class="cine-menu">
+      <div class="cine-chips" id="cineChips" hidden></div>
+    </div>
+    <button class="cine-btn" id="cinePrev">‹&nbsp;Forrige</button>
+    <button class="cine-btn" id="cineNext">Neste&nbsp;›</button>
+    <button class="cine-btn on" id="cineCapBtn">Tekst</button>
+    <button class="cine-btn" id="cineExit">Avslutt</button>
+  </div>
+</div>
+
+<!-- Testpanel -->
+<div class="b3d-test" id="test" hidden>
+  <button class="t-close" id="testClose" aria-label="Lukk">×</button>
+  <h2>Testpanel</h2>
+  <p class="t-sub">Styr vind, sjø og lys — modellen svarer som på sjøen.</p>
+  <h3>Vind</h3>
+  <div class="t-grid">
+    <label for="tDir">Retning</label><input type="range" id="tDir" min="0" max="360" step="1" value="70"><output id="oDir">70°</output>
+    <label for="tSpd">Fart</label><input type="range" id="tSpd" min="0" max="25" step="0.5" value="8"><output id="oSpd">8 m/s</output>
+  </div>
+  <h3>Sjø og himmel</h3>
+  <div class="t-grid">
+    <label for="tWave">Bølgehøyde</label><input type="range" id="tWave" min="0" max="4" step="0.1" value="1.1"><output id="oWave">1,1 m</output>
+    <label for="tSol">Klokkeslett</label><input type="range" id="tSol" min="0" max="24" step="0.1" value="13"><output id="oSol">13:00</output>
+  </div>
+  <h3>Vær</h3>
+  <div class="t-row" id="wChips">
+    <button class="t-chip" data-w="sol" aria-pressed="true">Sol</button>
+    <button class="t-chip" data-w="skya">Skyet</button>
+    <button class="t-chip" data-w="regn">Regn</button>
+    <button class="t-chip" data-w="dis">Dis</button>
+    <button class="t-chip" data-w="torden">Torden</button>
+  </div>
+  <h3>Været nå (Open-Meteo)</h3>
+  <div class="t-geo">
+    <input id="tLat" placeholder="Breddegrad" value="59.9" inputmode="decimal">
+    <input id="tLon" placeholder="Lengdegrad" value="10.7" inputmode="decimal">
+    <button class="go" id="tFetch">Hent vær</button>
+  </div>
+  <div class="t-out" id="tOut"></div>
+</div>
+
+<!-- Grafikkkvalitet -->
+<div class="b3d-qpop" id="qpop" hidden>
+  <h3>Grafikkkvalitet</h3>
+  <div class="b3d-qlabel" id="qLabel">Høy</div>
+  <input type="range" id="qRange" min="0" max="2" step="1" value="2" aria-label="Kvalitet">
+  <p class="b3d-qinfo" id="qInfo">Skarpe skygger og full oppløsning.</p>
+  <label class="b3d-qcheck"><input type="checkbox" id="qEco"> Strømsparemodus (maks 30 fps)</label>
+</div>
+
+<div class="b3d-fps" id="fps" hidden><i></i><b id="fpsN">–</b><span>FPS</span>&nbsp;<em id="fpsQ">Høy</em></div>
+<div class="b3d-toast" id="toast"></div>
+<div class="b3d-fade" id="fade"></div>
+</div>
+
+<div class="b3d-err" id="err" hidden></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/00-oppsett.js"></script>
+<script src="js/01-skrog.js"></script>
+<script src="js/02-dekk.js"></script>
+<script src="js/03-overbygg.js"></script>
+<script src="js/04-cockpit.js"></script>
+<script src="js/05-rigg.js"></script>
+<script src="js/06-seil.js"></script>
+<script src="js/07-miljo.js"></script>
+<script src="js/08-kamera.js"></script>
+<script src="js/09-kvalitet.js"></script>
+<script src="js/10-film.js"></script>
+<script src="js/11-testpanel.js"></script>
+<script src="js/12-hoved.js"></script>
+</body>
+</html>
