@@ -1,12 +1,12 @@
 # SY Alizée: 3D model
 
-Open `../alizee.html` in a browser. It is one self-contained file and works offline.
+Open `../public/index.html` in a browser. It is one self-contained page and works offline.
 
 ## Changing the boat
 
 1. Edit the numbers in `spec.js`. Every dimension lives there, tagged with its source.
 2. Run `python3 model/build.py`.
-3. Reload `alizee.html`. Use **Brosjyretegning** with the **Side** or **Ovenfra** view to compare against the builder's drawing in true scale.
+3. Reload the page. Use **Brochure drawing** with the **Side** or **Top** view to compare against the builder's drawing in true scale.
 
 Coordinates are metres: `x` forward from the transom, `y` up from the design waterline, `z` to starboard.
 
@@ -16,9 +16,13 @@ The brochure drawing shows the optional 11.20 m reverse stern. Alizée has the s
 
 ## Solar arch designs
 
-Choose a design in the **Solbue** panel. Its heights, size, clearances, power and weight are measured from the finished geometry and shown in the panel.
+In the **Solar arch** panel, choose a design, 2, 3 or 4 panels, and 25 or 32 mm pipe. Heights, size, clearances, power and weight are measured from the finished geometry.
 
-To add a design, copy an entry in `solarArches.designs` in `spec.js`, change its `id`, name and numbers, and rebuild. It appears in the panel automatically. Clearances under `warnGap` are flagged as tight. A link can point at one design with `alizee.html#bue=<id>`.
+To add a design, copy an entry in `solarArches.designs` in `spec.js`, change its `id`, name and numbers, and rebuild. Clearances under `warnGap` are flagged as tight. A link can open one configuration, for example `#arch=split&panels=4&pipe=32`.
+
+## Deploying on Vercel
+
+The site is the static page `public/index.html`, which is committed. Vercel only serves that folder, so `photos/` is not published as part of the site. Run `python3 model/build.py` and commit the result before pushing a change.
 
 ## Files
 

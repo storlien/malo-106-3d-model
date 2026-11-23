@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nb">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -21,50 +21,61 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .arch summary::-webkit-details-marker{display:none}.arch summary:focus-visible{outline:2px solid var(--focus);outline-offset:-2px;border-radius:16px}
 .arch summary span{font:500 13px/1.2 system-ui,sans-serif;color:var(--ink2);text-align:right}
 .arch-body{padding:0 16px 14px}
-.pick{border:0;margin:0;padding:0;display:grid;gap:3px}.pick legend{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-.pick label{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;font-size:14px;font-weight:500;color:var(--ink2);cursor:pointer}
+.pick{border:0;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:3px}.pick legend{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.pick label{display:flex;align-items:center;gap:7px;padding:8px;border-radius:9px;font-size:13px;font-weight:500;color:var(--ink2);cursor:pointer}
 .pick label:hover{background:rgba(20,39,95,.07);color:var(--ink)}.pick input{accent-color:var(--ink);margin:0}
 .pick label:has(input:checked){background:var(--ink);color:#fff}.pick label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:1px}
+.seg{border:0;margin:10px 0 0;padding:0}.seg legend{padding:0 2px 4px;font-size:12px;font-weight:600;color:var(--ink2)}
+.seg>div{display:flex;gap:2px;padding:3px;border-radius:10px;background:rgba(20,39,95,.08)}
+.seg label{flex:1;position:relative;text-align:center;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:500;color:var(--ink2);cursor:pointer}
+.seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}.seg label:has(input:checked){background:var(--ink);color:#fff}
+.seg label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:1px}
+#archOptions[hidden]{display:none}
 .note{margin:10px 2px 4px;font-size:13px;line-height:1.45;color:var(--ink2)}
 .stats h2{margin:13px 2px 3px;font-size:12px;font-weight:600;color:var(--ink2)}
 .stats dl{margin:0}.stats dl div{display:flex;justify-content:space-between;gap:10px;padding:4px 2px;border-top:1px solid var(--line);font-size:13.5px}
 .stats dt{color:var(--ink2)}.stats dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-.stats dd.warn{color:#a4331f}.stats dd.warn::before{content:"Trangt  ";font-weight:500}
+.stats dd.warn{color:#a4331f}.stats dd.warn::before{content:"Tight  ";font-weight:500}
+.stats dd.hit{color:#fff;background:#a4331f;padding:0 6px;border-radius:5px}
 .fine{margin:11px 2px 0;font-size:12px;line-height:1.4;color:var(--ink2)}
 @media (max-width:760px){.arch{top:auto;right:8px;left:8px;width:auto;max-width:none;bottom:calc(112px + env(safe-area-inset-bottom,0px));max-height:calc(100dvh - 210px)}}
 @media (max-width:620px){button{padding:9px 10px;font-size:13px}.title{left:16px}}
 </style>
 </head>
 <body>
-<canvas id="view" tabindex="0" aria-label="3D-modell av seilbåten Alizée. Dra for å snu, rull for å zoome."></canvas>
+<canvas id="view" tabindex="0" aria-label="3D model of the sailing yacht Alizée. Drag to rotate, scroll to zoom."></canvas>
 <div class="title"><h1>Alizée</h1><p>Malö 36</p></div>
 <details class="arch" id="archPanel" open>
-  <summary>Solbue <span id="archCurrent"></span></summary>
+  <summary>Solar arch <span id="archCurrent"></span></summary>
   <div class="arch-body">
-    <fieldset class="pick" id="archPick"><legend>Velg solbue</legend></fieldset>
+    <fieldset class="pick" id="archPick"><legend>Arch design</legend></fieldset>
+    <div id="archOptions">
+      <fieldset class="seg"><legend>Panels</legend><div id="archPanelPick"></div></fieldset>
+      <fieldset class="seg"><legend>Pipe diameter</legend><div id="archPipePick"></div></fieldset>
+    </div>
     <p class="note" id="archNote"></p>
     <div class="stats" id="archStats" aria-live="polite"></div>
-    <p class="fine">Målt på 3D-modellen. Akterpartiet er anslått fra bilder, så kontroller med målebånd før bygging.</p>
+    <p class="fine">Measured on the 3D model. The stern is estimated from photos, so check with a tape measure before building.</p>
   </div>
 </details>
 <div class="bar">
-  <div class="group" role="group" aria-label="Lag">
-    <button data-layer="water" aria-pressed="true">Vann</button>
-    <button data-layer="canvas" aria-pressed="true">Kalesje</button>
-    <button data-layer="rig" aria-pressed="true">Rigg</button>
-    <button data-layer="rails" aria-pressed="true">Rekker</button>
-    <button data-layer="drawing" aria-pressed="false">Brosjyretegning</button>
+  <div class="group" role="group" aria-label="Layers">
+    <button data-layer="water" aria-pressed="true">Water</button>
+    <button data-layer="canvas" aria-pressed="true">Canvas</button>
+    <button data-layer="rig" aria-pressed="true">Rig</button>
+    <button data-layer="rails" aria-pressed="true">Rails</button>
+    <button data-layer="drawing" aria-pressed="false">Brochure drawing</button>
   </div>
-  <div class="group" role="group" aria-label="Visning">
-    <button data-view="hero">Oversikt</button>
-    <button data-view="deck">Dekk</button>
-    <button data-view="stern">Akter</button>
+  <div class="group" role="group" aria-label="View">
+    <button data-view="hero">Overview</button>
+    <button data-view="deck">Deck</button>
+    <button data-view="stern">Quarter</button>
     <button data-view="side">Side</button>
-    <button data-view="full">Hele riggen</button>
-    <button data-view="top">Ovenfra</button>
-    <button data-view="arch">Bue</button>
-    <button data-view="aft">Hekk</button>
-    <button data-view="bow">Baug</button>
+    <button data-view="full">Full rig</button>
+    <button data-view="top">Top</button>
+    <button data-view="arch">Arch</button>
+    <button data-view="aft">Stern</button>
+    <button data-view="bow">Bow</button>
   </div>
 </div>
 <script>/**
@@ -209,36 +220,36 @@ const SPEC = {
     furlerR: 0.05,           // [P] furled genoa in its blue UV strip
   },
 
-  solarArches: {   // DESIGN PROPOSALS in 316L stainless. Check against tape measurements before fabrication.
-    tube: 0.040, strut: 0.030, rail: 0.025, wall: 0.002,   // outer diameters and wall thickness
-    panelThick: 0.035, wattPerM2: 200, panelKgPerM2: 11,   // [E] typical rigid panels
-    warnGap: 0.05,                                         // clearances below this are flagged
+  solarArches: {   // DESIGN PROPOSALS in stainless steel. Check against tape measurements before fabrication.
+    panel: { length: 0.895, width: 0.580, thick: 0.030, watts: 100, kg: 6.5 }, // [M] owner's panels; kg is [E]
+    panelCounts: [2, 3, 4],
+    panelGap: 0.015,        // [E] between neighbouring panels
+    pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
+    pipeWall: 0.002,        // [E] used for the weight estimate
+    backstaySlot: 0.09,     // half-width of the opening around the backstay in the split layout
+    warnGap: 0.05,          // clearances below this are flagged as tight
+    contactGap: 0.01,       // clearances below this are treated as contact
     ensign: { base: [0.10, 1.22, 1.02], tip: [-0.62, 2.08, 1.02] },  // moved under the panels
 
-    // To add a design, copy one entry and change its numbers. It appears in the page automatically.
-    // panels: [forward x, aft x, port z, starboard z]
+    // To add a design, copy one entry and change its numbers. It appears on the page automatically.
+    // fwdX is the forward edge of the panels. It must stay aft of the backstay unless layout is 'split'.
     designs: [
-      { id: 'lav', name: 'Lav bue', note: 'Lavest vekt og vindfang. Du må dukke deg under panelene ved akterstigen.',
+      { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },
-        aftStrut: { footX: 0.15, footHalf: 1.01, topX: -0.30 },
-        panelY: 2.315, panels: [[0.48, -0.54, -0.99, -0.015], [0.48, -0.54, 0.015, 0.99]] },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.48 },
 
-      { id: 'hoy', name: 'Ståhøyde', note: 'Du kan stå oppreist på akterdekket. Mer vekt og vind høyt oppe, så rammen må være stivere.',
+      { id: 'tall', name: 'Standing height', note: 'You can stand upright on the aft deck. More weight and windage up high, so the frame must be stiffer.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.62, topY: 2.99, half: 0.98, bend: 0.22 },
-        aftStrut: { footX: 0.15, footHalf: 1.01, topX: -0.20 },
-        panelY: 3.045, panels: [[0.74, -0.46, -0.99, -0.015], [0.74, -0.46, 0.015, 0.99]] },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.74 },
 
-      { id: 'delt', name: 'Delt rundt akterstaget', note: 'Størst panelareal i lav høyde. Panelene går forbi akterstaget på hver side, over kalesjen.',
+      { id: 'split', name: 'Split at backstay', note: 'Panels pass the backstay on each side and reach forward over the cockpit tent, which keeps the overhang short.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.345, half: 0.98, bend: 0.18 },
-        aftStrut: { footX: 0.15, footHalf: 1.01, topX: -0.26 },
-        foreStrut: { footX: 1.30, footHalf: 1.20 },
-        panelY: 2.40, panels: [[0.98, -0.46, -0.99, -0.09], [0.98, -0.46, 0.09, 0.99]] },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, foreStrut: { footX: 1.30, footHalf: 1.20 },
+        layout: 'split', fwdX: { 2: 0.80, 3: 0.98, 4: 0.98 } },
 
-      { id: 'davit', name: 'Med daviter', note: 'Middels høyde med to daviter for joller. Daviter og feste må dimensjoneres for jollens vekt.',
+      { id: 'davit', name: 'With davits', note: 'Medium height with two dinghy davits. The davits and their mounts must be sized for the weight of your dinghy.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.44, topY: 2.60, half: 0.98, bend: 0.20 },
-        aftStrut: { footX: 0.15, footHalf: 1.01, topX: -0.25 },
-        davits: { z: 0.72, tipX: -0.95, tipY: 2.20 },
-        panelY: 2.655, panels: [[0.60, -0.52, -0.99, -0.015], [0.60, -0.52, 0.015, 0.99]] },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, davits: { z: 0.72, tipX: -0.95, tipY: 2.20 }, fwdX: 0.60 },
     ],
   },
 
@@ -246,7 +257,8 @@ const SPEC = {
     stanchions: [0.524, 2.084, 3.784, 5.634, 7.564], // [D]
     height: 0.62, inset: 0.085, wires: [0.31, 0.60],
     pulpit: { aftX: 9.384, frontX: 10.964, topY: 1.87 },  // [D]
-    pushpit: { topY: 1.76, foreX: 0.524 },               // [D/P]
+    pushpit: { topY: 1.76, foreX: 0.524, tube: 0.025 },  // tube is [M]
+                    // [D/P]
   },
 };
 
@@ -961,12 +973,12 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   };
   [1, -1].forEach(s => {
     const line = stern(s);
-    tube(G.rails, line, .0135, mat.steel, false, 10);
-    tube(G.rails, line.map(p => [p[0], lerp(deckY(p[0], p[2]), yt, .52), p[2]]), .0105, mat.steel, false, 8);
-    line.forEach((p, i) => { if (i === 2 || i === 0 || i === 3) { const x = Math.max(p[0], HS.transomCurve*p[2]*p[2] + .05), z = p[2], b = [x, deckY(x, z), z]; rod(G.rails, b, [p[0], yt, p[2]], .0135, mat.steel); } });
+    tube(G.rails, line, Q.tube/2, mat.steel, false, 10);
+    tube(G.rails, line.map(p => [p[0], lerp(deckY(p[0], p[2]), yt, .52), p[2]]), Q.tube/2, mat.steel, false, 10);
+    line.forEach((p, i) => { if (i === 2 || i === 0 || i === 3) { const x = Math.max(p[0], HS.transomCurve*p[2]*p[2] + .05), z = p[2], b = [x, deckY(x, z), z]; rod(G.rails, b, [p[0], yt, p[2]], Q.tube/2, mat.steel); } });
     const g = line[3];
-    tube(G.rails, [[g[0], yt, g[2]], [g[0] - .012, yt + .05, g[2]*.6], [g[0] - .012, yt + .05, 0]], .01, mat.steel);
-    rod(G.rails, [g[0], yt - .34, g[2]], [g[0], yt - .34, 0], .0095, mat.steel);
+    tube(G.rails, [[g[0], yt, g[2]], [g[0] - .012, yt + .05, g[2]*.6], [g[0] - .012, yt + .05, 0]], Q.tube/2, mat.steel);
+    rod(G.rails, [g[0], yt - .34, g[2]], [g[0], yt - .34, 0], Q.tube/2, mat.steel);
   });
 })();
 
@@ -1058,75 +1070,97 @@ mat.cell = (() => {
   return M('#ffffff', { map: t, roughness: .14, metalness: .25, envMapIntensity: 1.1 });
 })();
 
-function buildArch(d) {
+/* Panel positions as [forward x, aft x, port z, starboard z]. Panels lie across the boat unless three share a row. */
+function panelLayout(d, count) {
+  const { length: P, width: W } = AC.panel, g = AC.panelGap, f = typeof d.fwdX === 'number' ? d.fwdX : d.fwdX[count];
+  const pair = (x, s) => [[x, x - W, -s - P, -s], [x, x - W, s, s + P]], row2 = f - W - g;
+  if (d.layout === 'split') {
+    const first = pair(f, AC.backstaySlot);
+    if (count === 2) return first;
+    return count === 3 ? [...first, [row2, row2 - W, -P/2, P/2]] : [...first, ...pair(row2, g/2)];
+  }
+  if (count === 2) return pair(f, g/2);
+  if (count === 3) return [-1, 0, 1].map(k => [f, f - P, k*(W + g) - W/2, k*(W + g) + W/2]);
+  return [...pair(f, g/2), ...pair(row2, g/2)];
+}
+
+function buildArch(d, count, D) {
   const group = new T.Group(), frame = new T.Group(), extras = new T.Group();
   group.add(frame, extras); group.visible = false; G.arch.add(group);
-  let steelKg = 0;
-  const kgPerM = D => Math.PI*(D - AC.wall)*AC.wall*7980;
-  const pipe = (pts, D, seg = 12) => {
-    for (let i = 0; i < pts.length - 1; i++) steelKg += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2])*kgPerM(D);
+  let steelKg = 0, steelM = 0;
+  const kgPerM = Math.PI*(D - AC.pipeWall)*AC.pipeWall*7980;
+  const pipe = (pts, seg = 12) => {
+    for (let i = 0; i < pts.length - 1; i++) steelM += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2]);
     return pts.length === 2 ? rod(frame, pts[0], pts[1], D/2, mat.steel, seg) : tube(frame, pts, D/2, mat.steel, false, seg);
   };
-  const footPlate = (p, D) => {
+  const footPlate = p => {
     const plate = put(frame, new T.CylinderGeometry(.062, .068, .012, 22), mat.steel); plate.position.set(p[0], p[1] + .006, p[2]);
     const socket = put(frame, new T.CylinderGeometry(D/2 + .006, D/2 + .009, .06, 18), mat.steel); socket.position.set(p[0], p[1] + .035, p[2]);
   };
 
   // main hoop
-  const H = d.hoop, fy = deckY(H.footX, H.footHalf);
+  const H = d.hoop, fy = deckY(H.footX, H.footHalf), yS = H.topY - H.bend;
   const onHoop = y => lerp(H.footX, H.topX, (y - fy)/(H.topY - fy));
   const side = s => {
-    const pts = [[H.footX, fy, s*H.footHalf]], yS = H.topY - H.bend;
+    const pts = [[H.footX, fy, s*H.footHalf]];
     for (let i = 1; i <= 5; i++) { const f = i/5, y = lerp(fy, yS, f); pts.push([onHoop(y), y, s*lerp(H.footHalf, H.half, f)]); }
     for (let i = 1; i <= 8; i++) { const a = i/8*Math.PI/2, y = yS + H.bend*Math.sin(a); pts.push([onHoop(y), y, s*(H.half - H.bend + H.bend*Math.cos(a))]); }
     return pts;
   };
-  pipe([...side(-1), [H.topX, H.topY, 0], ...side(1).reverse()], AC.tube, 14);
+  pipe([...side(-1), [H.topX, H.topY, 0], ...side(1).reverse()], 14);
+  const hoopYAt = z => { const o = Math.abs(z) - (H.half - H.bend); return o <= 0 ? H.topY : yS + Math.sqrt(Math.max(0, H.bend*H.bend - o*o)); };
 
-  // carrier rails under the panel edges, closed by two cross tubes
-  const yRail = d.panelY - AC.panelThick/2 - AC.rail/2;
-  const fwd = Math.max(...d.panels.map(q => q[0])), aft = Math.min(...d.panels.map(q => q[1]));
-  const halfW = Math.max(...d.panels.flatMap(q => [Math.abs(q[2]), Math.abs(q[3])]));
-  const edges = d.panels.flatMap(q => [q[2], q[3]]).sort((a, b) => a - b).reduce((o, z) => {
-    if (o.length && z - o[o.length - 1] < .06) o[o.length - 1] = (o[o.length - 1] + z)/2; else o.push(z); return o;
-  }, []);
-  edges.forEach(z => {
-    pipe([[fwd, yRail, z], [aft, yRail, z]], AC.rail);
-    pipe([[H.topX, H.topY, Math.sign(z)*Math.min(Math.abs(z), H.half - H.bend*.3)], [H.topX, yRail, z]], AC.rail*.8, 10);
+  // carrier rails rest on the hoop and run under the panel edges, closed by two cross tubes
+  const panels = panelLayout(d, count), yRail = H.topY + D, panelY = yRail + D/2 + AC.panel.thick/2;
+  const fwd = Math.max(...panels.map(q => q[0])), aft = Math.min(...panels.map(q => q[1]));
+  const halfW = Math.max(...panels.flatMap(q => [Math.abs(q[2]), Math.abs(q[3])]));
+  const A = d.aftStrut, strutTop = Math.min(aft, -.04), railFwd = Math.max(fwd, H.topX + .01), railAft = strutTop;
+  // each rail runs under the panels it carries; the outer pair also ties the hoop to the struts
+  const rails = [];
+  panels.forEach(([f, a, z0, z1]) => [z0, z1].forEach(z => {
+    const r = rails.find(q => Math.abs(q.z - z) < .06);
+    if (r) { r.z = (r.z*r.n + z)/(r.n + 1); r.n++; r.f = Math.max(r.f, f); r.a = Math.min(r.a, a); } else rails.push({ z, n: 1, f, a });
+  }));
+  rails.forEach(r => {
+    const outer = Math.abs(Math.abs(r.z) - halfW) < .001, f = outer ? railFwd : r.f, a = outer ? railAft : r.a;
+    pipe([[f, yRail, r.z], [a, yRail, r.z]]);
+    if (H.topX <= f && H.topX >= a) { const y = hoopYAt(r.z); pipe([[onHoop(y), y, r.z], [H.topX, yRail, r.z]], 10); }  // saddle on the hoop
   });
-  [fwd, aft].forEach(x => pipe([[x, yRail, -halfW], [x, yRail, halfW]], AC.rail));
+  [railFwd, railAft].forEach(x => pipe([[x, yRail, -halfW], [x, yRail, halfW]]));
 
-  const A = d.aftStrut;
   [1, -1].forEach(s => {
-    const f = [A.footX, deckY(A.footX, A.footHalf), s*A.footHalf];
-    pipe([f, [A.topX, yRail, s*halfW]], AC.strut);
-    footPlate(f, AC.strut); footPlate([H.footX, fy, s*H.footHalf], AC.tube);
+    // aft strut stands off the transom, outside the pushpit
+    const tz = s*A.footHalf, tx = transomX(A.footY, tz), f = [tx - A.standoff, A.footY, tz];
+    pipe([f, [strutTop, yRail, s*halfW]]);
+    pipe([[tx, A.footY, tz], f], 10);
+    const plate = put(frame, new T.CylinderGeometry(.055, .055, .01, 22), mat.steel); plate.rotation.z = Math.PI/2; plate.position.set(tx - .004, A.footY, tz);
+    footPlate([H.footX, fy, s*H.footHalf]);
     if (d.foreStrut) {
       const q = d.foreStrut, b = [q.footX, deckY(q.footX, q.footHalf), s*q.footHalf];
-      pipe([b, [fwd, yRail, s*halfW]], AC.strut); footPlate(b, AC.strut);
+      pipe([b, [fwd, yRail, s*halfW]]); footPlate(b);
     }
     if (d.davits) {
       const v = d.davits, z = s*v.z, a = [H.topX, H.topY - .01, z], m = [lerp(H.topX, v.tipX, .55), lerp(H.topY, v.tipY, .3), z], t = [v.tipX, v.tipY, z];
-      pipe([a, m, [lerp(v.tipX, H.topX, .08), v.tipY + .05, z], t], AC.tube, 12);
-      pipe([m, [lerp(A.footX, A.topX, .72), lerp(f[1], yRail, .72), s*lerp(A.footHalf, halfW, .72)]], AC.rail);
+      pipe([a, m, [lerp(v.tipX, H.topX, .08), v.tipY + .05, z], t]);
+      pipe([m, [lerp(f[0], strutTop, .72), lerp(f[1], yRail, .72), s*lerp(A.footHalf, halfW, .72)]]);
       const sheave = put(frame, new T.CylinderGeometry(.04, .04, .025, 18), mat.dark); sheave.rotation.x = Math.PI/2; sheave.position.set(v.tipX, v.tipY - .035, z);
     }
   });
+  steelKg = steelM*kgPerM;
 
-  // panels, framed in anodised aluminium
-  let area = 0;
-  d.panels.forEach(([f, a, z0, z1]) => {
-    const len = f - a, w = z1 - z0, xc = (f + a)/2, zc = (z0 + z1)/2; area += len*w;
-    box(frame, [xc, d.panelY, zc], [len, AC.panelThick, w], mat.alu);
+  // panels in anodised aluminium frames
+  panels.forEach(([f, a, z0, z1]) => {
+    const len = f - a, w = z1 - z0, xc = (f + a)/2, zc = (z0 + z1)/2;
+    box(frame, [xc, panelY, zc], [len, AC.panel.thick, w], mat.alu);
     const face = put(frame, new T.PlaneGeometry(len - .03, w - .03), mat.cell, false);
-    face.rotation.x = -Math.PI/2; face.position.set(xc, d.panelY + AC.panelThick/2 + .001, zc);
+    face.rotation.x = -Math.PI/2; face.position.set(xc, panelY + AC.panel.thick/2 + .001, zc);
   });
 
   // ensign under the panels, antenna on the port shoulder
   ensign(extras, AC.ensign.base, AC.ensign.tip);
-  const yA = H.topY - H.bend - .05;
+  const yA = yS - .05;
   antenna(extras, [onHoop(yA), yA, -H.half - .005], [onHoop(yA) - .02, yA + .44, -H.half - .12]);
-  return { d, group, frame, area, steelKg };
+  return { d, group, frame, count, D, area: count*AC.panel.length*AC.panel.width, steelKg, steelM };
 }
 
 /* ---------- Measurements ----------
@@ -1203,11 +1237,11 @@ function measureArch(b) {
     boom = Math.min(boom, Math.hypot(Math.max(0, Math.hypot(x - B.fwd, z) - reach), Math.max(0, Math.abs(y - B.y) - B.h/2)));   // full swing
     if (Math.abs(z) < .45 && x > 0 && x < .75) head = Math.min(head, y - deckY(x, z));
   }
-  const cells = toCells(clear), panelKg = b.area*AC.panelKgPerM2;
+  const cells = toCells(clear), panelKg = b.count*AC.panel.kg;
   return b.report = {
     panelTopAboveWater: top - HS.floatSink, panelTopAboveDeck: top - deckY(.3, 0), headroom: head,
     width: maxZ - minZ, length: maxX - minX, overhang: Math.max(0, -minX), lengthWithArch: L + Math.max(0, -minX),
-    panelArea: b.area, estimatedWp: b.area*AC.wattPerM2, steelKg: b.steelKg, panelKg, totalKg: b.steelKg + panelKg,
+    panels: b.count, watts: b.count*AC.panel.watts, panelArea: b.area, pipeMm: b.D*1000, steelM: b.steelM, steelKg: b.steelKg, panelKg, totalKg: b.steelKg + panelKg,
     backstayGap: stay - .0045, railGap: surfaceGap(clear, cells, obstacles.rails, obstacles.railCells),
     canvasGap: surfaceGap(clear, cells, obstacles.canvas, obstacles.canvasCells), boomGap: boom,
   };
@@ -1215,47 +1249,58 @@ function measureArch(b) {
 
 /* ---------- Selection and page panel ---------- */
 const archBuilt = {};
+const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1] };
 let currentArch = 'none', lastArch = AC.designs[0].id, archKick = () => {};
 const archById = id => AC.designs.find(d => d.id === id);
-const nb = (v, n) => v.toLocaleString('nb-NO', { minimumFractionDigits: n, maximumFractionDigits: n });
-const fmtM = v => `${nb(v, 2)} m`, fmtCm = v => `${nb(v*100, 0)} cm`;
+const num = (v, n) => v.toLocaleString('en-GB', { minimumFractionDigits: n, maximumFractionDigits: n });
+const fmtM = v => `${num(v, 2)} m`, fmtCm = v => `${num(v*100, 0)} cm`;
+const gapRow = (label, v) => v < AC.contactGap ? [label, 'Contact', 'hit'] : [label, fmtCm(v), v < AC.warnGap ? 'warn' : ''];
 
 function renderArchStats(r) {
   const groups = [
-    ['Høyde', [['Paneltopp over vannet', fmtM(r.panelTopAboveWater)], ['Paneltopp over dekk', fmtM(r.panelTopAboveDeck)], ['Fri høyde på akterdekket', fmtM(r.headroom)]]],
-    ['Størrelse', [['Bredde', fmtM(r.width)], ['Lengde', fmtM(r.length)], ['Overheng bak akterspeilet', fmtM(r.overhang)], ['Båtlengde med bue', fmtM(r.lengthWithArch)]]],
-    ['Klaring', [['Akterstag', r.backstayGap], ['Rekker og pushpit', r.railGap], ['Kalesje', r.canvasGap], ['Bom, hele svingen', r.boomGap]].map(([k, v]) => [k, fmtCm(v), v < AC.warnGap])],
-    ['Effekt og vekt (anslag)', [['Panelareal', `${nb(r.panelArea, 2)} m²`], ['Effekt', `${nb(Math.round(r.estimatedWp/10)*10, 0)} Wp`], ['Stålramme', `${nb(r.steelKg, 0)} kg`], ['Paneler', `${nb(r.panelKg, 0)} kg`], ['Totalt', `${nb(r.totalKg, 0)} kg`]]],
+    ['Height', [['Panel top above water', fmtM(r.panelTopAboveWater)], ['Panel top above deck', fmtM(r.panelTopAboveDeck)], ['Headroom on aft deck', fmtM(r.headroom)]]],
+    ['Size', [['Width', fmtM(r.width)], ['Length', fmtM(r.length)], ['Overhang past transom', fmtM(r.overhang)], ['Boat length with arch', fmtM(r.lengthWithArch)]]],
+    ['Clearance', [gapRow('Backstay', r.backstayGap), gapRow('Rails and pushpit', r.railGap), gapRow('Canvas', r.canvasGap), gapRow('Boom, full swing', r.boomGap)]],
+    ['Power and materials', [['Solar power', `${r.panels} × ${AC.panel.watts} W = ${r.watts} W`], ['Panel area', `${num(r.panelArea, 2)} m²`], [`Pipe, ${num(r.pipeMm, 0)} mm`, `${num(r.steelM, 1)} m`], ['Steel weight (est.)', `${num(r.steelKg, 0)} kg`], ['Panel weight (est.)', `${num(r.panelKg, 0)} kg`], ['Total weight (est.)', `${num(r.totalKg, 0)} kg`]]],
   ];
   document.getElementById('archStats').innerHTML = groups.map(([h, rows]) =>
-    `<h2>${h}</h2><dl>${rows.map(([k, v, warn]) => `<div><dt>${k}</dt><dd${warn ? ' class="warn"' : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
+    `<h2>${h}</h2><dl>${rows.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
 }
-function setArch(id) {
+function setArch(id, opts = {}) {
+  if (opts.panels && AC.panelCounts.includes(opts.panels)) archState.panels = opts.panels;
+  if (opts.pipe && AC.pipes.includes(opts.pipe)) archState.pipe = opts.pipe;
   const d = archById(id);
   if (!d) id = 'none';
   Object.values(archBuilt).forEach(b => { b.group.visible = false; });
   currentArch = id; G.asBuilt.visible = !d;
+  document.getElementById('archOptions').hidden = !d;
   const stats = document.getElementById('archStats');
-  if (d) { lastArch = id; const b = archBuilt[id] || (archBuilt[id] = buildArch(d)); b.group.visible = true; renderArchStats(measureArch(b)); }
-  else stats.innerHTML = '';
-  document.getElementById('archCurrent').textContent = d ? d.name : 'Uten bue';
-  document.getElementById('archNote').textContent = d ? d.note : 'Båten slik den er i dag, med flaggstang og antenne på opprinnelig plass.';
-  const r = document.querySelector(`input[name="archDesign"][value="${id}"]`); if (r) r.checked = true;
-  try { history.replaceState(null, '', d ? `#bue=${id}` : '#bue=ingen'); } catch (e) { /* file:// in some browsers */ }
+  if (d) {
+    lastArch = id; archState.design = id;
+    const key = `${id}|${archState.panels}|${archState.pipe}`, b = archBuilt[key] || (archBuilt[key] = buildArch(d, archState.panels, archState.pipe));
+    b.group.visible = true; currentBuilt = b; renderArchStats(measureArch(b));
+  } else { stats.innerHTML = ''; currentBuilt = null; }
+  document.getElementById('archCurrent').textContent = d ? `${d.name}, ${archState.panels} panels` : 'No arch';
+  document.getElementById('archNote').textContent = d ? d.note : 'The boat as she is today, with the ensign staff and antenna in their original places.';
+  [['archDesign', id], ['archPanels', archState.panels], ['archPipe', archState.pipe]].forEach(([n, v]) => { const r = document.querySelector(`input[name="${n}"][value="${v}"]`); if (r) r.checked = true; });
+  try { history.replaceState(null, '', d ? `#arch=${id}&panels=${archState.panels}&pipe=${Math.round(archState.pipe*1000)}` : '#arch=none'); } catch (e) { /* not available in some file:// contexts */ }
   archKick();
 }
-function archReport() { const b = archBuilt[currentArch]; return b ? measureArch(b) : null; }
+let currentBuilt = null;
+function archReport() { return currentBuilt ? measureArch(currentBuilt) : null; }
 function initArchUI(kick) {
   archKick = kick;
-  const pick = document.getElementById('archPick');
-  [...AC.designs.map(d => [d.id, d.name]), ['none', 'Uten bue']].forEach(([id, name]) => {
+  const addRadios = (host, name, items, onPick) => items.forEach(([value, label]) => {
     const l = document.createElement('label'), i = document.createElement('input');
-    i.type = 'radio'; i.name = 'archDesign'; i.value = id; i.addEventListener('change', () => setArch(id));
-    l.append(i, document.createTextNode(name)); pick.append(l);
+    i.type = 'radio'; i.name = name; i.value = value; i.addEventListener('change', () => onPick(value));
+    l.append(i, document.createTextNode(label)); document.getElementById(host).append(l);
   });
+  addRadios('archPick', 'archDesign', [...AC.designs.map(d => [d.id, d.name]), ['none', 'No arch']], v => setArch(v));
+  addRadios('archPanelPick', 'archPanels', AC.panelCounts.map(n => [n, `${n} panels`]), v => setArch(lastArch, { panels: +v }));
+  addRadios('archPipePick', 'archPipe', AC.pipes.map(p => [p, `${Math.round(p*1000)} mm`]), v => setArch(lastArch, { pipe: +v }));
   if (innerWidth <= 760) document.getElementById('archPanel').open = false;
-  const h = (location.hash.match(/bue=([\w-]+)/) || [])[1];
-  setArch(h === 'ingen' ? 'none' : archById(h) ? h : AC.designs[0].id);
+  const q = new URLSearchParams(location.hash.slice(1)), h = q.get('arch');
+  setArch(h === 'none' ? 'none' : archById(h) ? h : AC.designs[0].id, { panels: +q.get('panels'), pipe: +q.get('pipe')/1000 });
 }
 
 /* Renderer, light, water, cameras, views and UI. */

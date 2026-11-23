@@ -132,36 +132,36 @@ const SPEC = {
     furlerR: 0.05,           // [P] furled genoa in its blue UV strip
   },
 
-  solarArches: {   // DESIGN PROPOSALS in 316L stainless. Check against tape measurements before fabrication.
-    tube: 0.040, strut: 0.030, rail: 0.025, wall: 0.002,   // outer diameters and wall thickness
-    panelThick: 0.035, wattPerM2: 200, panelKgPerM2: 11,   // [E] typical rigid panels
-    warnGap: 0.05,                                         // clearances below this are flagged
+  solarArches: {   // DESIGN PROPOSALS in stainless steel. Check against tape measurements before fabrication.
+    panel: { length: 0.895, width: 0.580, thick: 0.030, watts: 100, kg: 6.5 }, // [M] owner's panels; kg is [E]
+    panelCounts: [2, 3, 4],
+    panelGap: 0.015,        // [E] between neighbouring panels
+    pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
+    pipeWall: 0.002,        // [E] used for the weight estimate
+    backstaySlot: 0.09,     // half-width of the opening around the backstay in the split layout
+    warnGap: 0.05,          // clearances below this are flagged as tight
+    contactGap: 0.01,       // clearances below this are treated as contact
     ensign: { base: [0.10, 1.22, 1.02], tip: [-0.62, 2.08, 1.02] },  // moved under the panels
 
-    // To add a design, copy one entry and change its numbers. It appears in the page automatically.
-    // panels: [forward x, aft x, port z, starboard z]
+    // To add a design, copy one entry and change its numbers. It appears on the page automatically.
+    // fwdX is the forward edge of the panels. It must stay aft of the backstay unless layout is 'split'.
     designs: [
-      { id: 'lav', name: 'Lav bue', note: 'Lavest vekt og vindfang. Du må dukke deg under panelene ved akterstigen.',
+      { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },
-        aftStrut: { footX: 0.15, footHalf: 1.01, topX: -0.30 },
-        panelY: 2.315, panels: [[0.48, -0.54, -0.99, -0.015], [0.48, -0.54, 0.015, 0.99]] },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.48 },
 
-      { id: 'hoy', name: 'Ståhøyde', note: 'Du kan stå oppreist på akterdekket. Mer vekt og vind høyt oppe, så rammen må være stivere.',
+      { id: 'tall', name: 'Standing height', note: 'You can stand upright on the aft deck. More weight and windage up high, so the frame must be stiffer.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.62, topY: 2.99, half: 0.98, bend: 0.22 },
-        aftStrut: { footX: 0.15, footHalf: 1.01, topX: -0.20 },
-        panelY: 3.045, panels: [[0.74, -0.46, -0.99, -0.015], [0.74, -0.46, 0.015, 0.99]] },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.74 },
 
-      { id: 'delt', name: 'Delt rundt akterstaget', note: 'Størst panelareal i lav høyde. Panelene går forbi akterstaget på hver side, over kalesjen.',
+      { id: 'split', name: 'Split at backstay', note: 'Panels pass the backstay on each side and reach forward over the cockpit tent, which keeps the overhang short.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.345, half: 0.98, bend: 0.18 },
-        aftStrut: { footX: 0.15, footHalf: 1.01, topX: -0.26 },
-        foreStrut: { footX: 1.30, footHalf: 1.20 },
-        panelY: 2.40, panels: [[0.98, -0.46, -0.99, -0.09], [0.98, -0.46, 0.09, 0.99]] },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, foreStrut: { footX: 1.30, footHalf: 1.20 },
+        layout: 'split', fwdX: { 2: 0.80, 3: 0.98, 4: 0.98 } },
 
-      { id: 'davit', name: 'Med daviter', note: 'Middels høyde med to daviter for joller. Daviter og feste må dimensjoneres for jollens vekt.',
+      { id: 'davit', name: 'With davits', note: 'Medium height with two dinghy davits. The davits and their mounts must be sized for the weight of your dinghy.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.44, topY: 2.60, half: 0.98, bend: 0.20 },
-        aftStrut: { footX: 0.15, footHalf: 1.01, topX: -0.25 },
-        davits: { z: 0.72, tipX: -0.95, tipY: 2.20 },
-        panelY: 2.655, panels: [[0.60, -0.52, -0.99, -0.015], [0.60, -0.52, 0.015, 0.99]] },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, davits: { z: 0.72, tipX: -0.95, tipY: 2.20 }, fwdX: 0.60 },
     ],
   },
 
@@ -169,6 +169,7 @@ const SPEC = {
     stanchions: [0.524, 2.084, 3.784, 5.634, 7.564], // [D]
     height: 0.62, inset: 0.085, wires: [0.31, 0.60],
     pulpit: { aftX: 9.384, frontX: 10.964, topY: 1.87 },  // [D]
-    pushpit: { topY: 1.76, foreX: 0.524 },               // [D/P]
+    pushpit: { topY: 1.76, foreX: 0.524, tube: 0.025 },  // tube is [M]
+                    // [D/P]
   },
 };

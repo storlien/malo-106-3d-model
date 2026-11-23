@@ -175,12 +175,12 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   };
   [1, -1].forEach(s => {
     const line = stern(s);
-    tube(G.rails, line, .0135, mat.steel, false, 10);
-    tube(G.rails, line.map(p => [p[0], lerp(deckY(p[0], p[2]), yt, .52), p[2]]), .0105, mat.steel, false, 8);
-    line.forEach((p, i) => { if (i === 2 || i === 0 || i === 3) { const x = Math.max(p[0], HS.transomCurve*p[2]*p[2] + .05), z = p[2], b = [x, deckY(x, z), z]; rod(G.rails, b, [p[0], yt, p[2]], .0135, mat.steel); } });
+    tube(G.rails, line, Q.tube/2, mat.steel, false, 10);
+    tube(G.rails, line.map(p => [p[0], lerp(deckY(p[0], p[2]), yt, .52), p[2]]), Q.tube/2, mat.steel, false, 10);
+    line.forEach((p, i) => { if (i === 2 || i === 0 || i === 3) { const x = Math.max(p[0], HS.transomCurve*p[2]*p[2] + .05), z = p[2], b = [x, deckY(x, z), z]; rod(G.rails, b, [p[0], yt, p[2]], Q.tube/2, mat.steel); } });
     const g = line[3];
-    tube(G.rails, [[g[0], yt, g[2]], [g[0] - .012, yt + .05, g[2]*.6], [g[0] - .012, yt + .05, 0]], .01, mat.steel);
-    rod(G.rails, [g[0], yt - .34, g[2]], [g[0], yt - .34, 0], .0095, mat.steel);
+    tube(G.rails, [[g[0], yt, g[2]], [g[0] - .012, yt + .05, g[2]*.6], [g[0] - .012, yt + .05, 0]], Q.tube/2, mat.steel);
+    rod(G.rails, [g[0], yt - .34, g[2]], [g[0], yt - .34, 0], Q.tube/2, mat.steel);
   });
 })();
 

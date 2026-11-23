@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bundle model/ into one self-contained file: alizee.html in the repo root."""
+"""Bundle model/ into one self-contained static page: public/index.html."""
 import base64
 from pathlib import Path
 
@@ -13,6 +13,7 @@ parts += [p.read_text('utf-8') for p in sorted((here/'js').glob('*.js'))]
 html = (here/'template.html').read_text('utf-8')
 html = html.replace('/*THREE*/', safe((here/'vendor/three.min.js').read_text('utf-8')))
 html = html.replace('/*MODEL*/', safe('\n'.join(parts)))
-out = here.parent/'alizee.html'
+out = here.parent/'public/index.html'
+out.parent.mkdir(exist_ok=True)
 out.write_text(html, 'utf-8')
 print(f'{out} ({len(html)/1e6:.2f} MB)')
