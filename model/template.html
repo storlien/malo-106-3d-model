@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SY Alizée</title>
 <style>
-:root{--ink:#14275f;--ink2:#4d5b78;--panel:rgba(247,249,250,.9);--line:rgba(20,39,95,.16);--focus:#1d63d8;color-scheme:light}
+:root{--ink:#14275f;--ink2:#4d5b78;--panel:rgba(247,249,250,.9);--line:rgba(20,39,95,.16);--focus:#1d63d8;--panelSolid:rgba(247,249,250,.97);color-scheme:light}
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#c5dcea;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 #view{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
 .title{position:fixed;left:22px;top:16px;pointer-events:none}
@@ -16,12 +16,37 @@
 button{appearance:none;border:0;background:transparent;color:var(--ink2);font:500 14px/1 inherit;font-family:inherit;padding:9px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
 button:hover{color:var(--ink)}button[aria-pressed="true"]{background:var(--ink);color:#fff}
 button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.arch{position:fixed;right:16px;top:16px;width:318px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 150px);overflow:auto;padding:0;border-radius:16px;background:var(--panel);border:1px solid var(--line);box-shadow:0 8px 26px rgba(12,28,52,.16);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.arch summary{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:13px 16px;background:var(--panelSolid);cursor:pointer;font:italic 400 23px/1.1 Georgia,"Times New Roman",serif;list-style:none}
+.arch summary::-webkit-details-marker{display:none}.arch summary:focus-visible{outline:2px solid var(--focus);outline-offset:-2px;border-radius:16px}
+.arch summary span{font:500 13px/1.2 system-ui,sans-serif;color:var(--ink2);text-align:right}
+.arch-body{padding:0 16px 14px}
+.pick{border:0;margin:0;padding:0;display:grid;gap:3px}.pick legend{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.pick label{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;font-size:14px;font-weight:500;color:var(--ink2);cursor:pointer}
+.pick label:hover{background:rgba(20,39,95,.07);color:var(--ink)}.pick input{accent-color:var(--ink);margin:0}
+.pick label:has(input:checked){background:var(--ink);color:#fff}.pick label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:1px}
+.note{margin:10px 2px 4px;font-size:13px;line-height:1.45;color:var(--ink2)}
+.stats h2{margin:13px 2px 3px;font-size:12px;font-weight:600;color:var(--ink2)}
+.stats dl{margin:0}.stats dl div{display:flex;justify-content:space-between;gap:10px;padding:4px 2px;border-top:1px solid var(--line);font-size:13.5px}
+.stats dt{color:var(--ink2)}.stats dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stats dd.warn{color:#a4331f}.stats dd.warn::before{content:"Trangt  ";font-weight:500}
+.fine{margin:11px 2px 0;font-size:12px;line-height:1.4;color:var(--ink2)}
+@media (max-width:760px){.arch{top:auto;right:8px;left:8px;width:auto;max-width:none;bottom:calc(112px + env(safe-area-inset-bottom,0px));max-height:calc(100dvh - 210px)}}
 @media (max-width:620px){button{padding:9px 10px;font-size:13px}.title{left:16px}}
 </style>
 </head>
 <body>
 <canvas id="view" tabindex="0" aria-label="3D-modell av seilbåten Alizée. Dra for å snu, rull for å zoome."></canvas>
 <div class="title"><h1>Alizée</h1><p>Malö 36</p></div>
+<details class="arch" id="archPanel" open>
+  <summary>Solbue <span id="archCurrent"></span></summary>
+  <div class="arch-body">
+    <fieldset class="pick" id="archPick"><legend>Velg solbue</legend></fieldset>
+    <p class="note" id="archNote"></p>
+    <div class="stats" id="archStats" aria-live="polite"></div>
+    <p class="fine">Målt på 3D-modellen. Akterpartiet er anslått fra bilder, så kontroller med målebånd før bygging.</p>
+  </div>
+</details>
 <div class="bar">
   <div class="group" role="group" aria-label="Lag">
     <button data-layer="water" aria-pressed="true">Vann</button>
@@ -37,6 +62,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
     <button data-view="side">Side</button>
     <button data-view="full">Hele riggen</button>
     <button data-view="top">Ovenfra</button>
+    <button data-view="arch">Bue</button>
     <button data-view="aft">Hekk</button>
     <button data-view="bow">Baug</button>
   </div>

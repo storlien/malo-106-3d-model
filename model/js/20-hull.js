@@ -30,6 +30,8 @@ const deckY = (x, z) => { const B = Math.max(halfB(x), .01), f = smooth(x/.35); 
 const boat = new T.Group();
 const G = { hull: new T.Group(), deck: new T.Group(), canvas: new T.Group(), rig: new T.Group(), rails: new T.Group() };
 Object.values(G).forEach(g => boat.add(g));
+G.asBuilt = new T.Group(); G.rails.add(G.asBuilt);   // stern items the solar arch replaces
+G.arch = new T.Group(); boat.add(G.arch);
 
 /* Livery is painted per pixel in the shader, so stripes stay crisp at any zoom. */
 function hullMaterial() {

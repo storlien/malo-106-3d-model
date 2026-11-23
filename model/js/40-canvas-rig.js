@@ -184,6 +184,25 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   });
 })();
 
+function ensign(parent, base, tip) {
+  rod(parent, base, tip, .013, mat.teakDark);
+  const rows = [], W = .98, n = 22, uv = [];
+  for (let i = 0; i <= n; i++) {
+    const f = i/n, r = [];
+    for (let j = 0; j <= 6; j++) {
+      const q = lerp(.5, .985, j/6);
+      r.push([lerp(base[0], tip[0], q) - f*W, lerp(base[1], tip[1], q) - f*f*.10, base[2] + Math.sin(f*5.4 + j*.12)*.075*Math.min(1, f*3.2)]);
+      uv.push(f, j/6);
+    }
+    rows.push(r);
+  }
+  const g = gridGeo(rows); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); put(parent, g, mat.flag);
+}
+function antenna(parent, base, top) {
+  rod(parent, base, top, .018, mat.steel);
+  const d = put(parent, new T.SphereGeometry(.16, 26, 14), mat.white); d.position.set(top[0], top[1] + .09, top[2]); d.scale.y = .42;
+}
+
 /* ---------- Stern gear (photo of the haul-out) ---------- */
 (function sternGear() {
   const yP = .635, xB = .0;
@@ -210,24 +229,11 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   rod(G.hull, [ox - .03, .92, oz + .05], [ox - .34, .94, oz + .05], .014, mat.steel);
   rod(G.hull, [ox - .03, .92, oz - .05], [ox - .34, .94, oz - .05], .014, mat.steel);
   const cowl = put(G.hull, new T.SphereGeometry(.12, 18, 12), mat.dark); cowl.position.set(ox - .37, .98, oz); cowl.scale.set(1.25, .8, .85);
-  // ensign staff with the Norwegian flag, starboard quarter
-  const fz = .74, fx = .12, fy = deckY(fx, fz) + .02, tip = [-.34, 2.46, fz];
-  rod(G.rails, [fx, fy, fz], tip, .013, mat.teakDark);
-  const fl = [], W = .98, n = 22, staff = q => [lerp(fx, tip[0], q), lerp(fy, tip[1], q)];
-  for (let i = 0; i <= n; i++) {
-    const f = i/n, r = [];
-    for (let j = 0; j <= 6; j++) {
-      const q = lerp(.5, .985, j/6), [sx, sy] = staff(q);
-      r.push([sx - f*W, sy - f*f*.10, fz + Math.sin(f*5.4 + j*.12)*.075*Math.min(1, f*3.2)]);
-    }
-    fl.push(r);
-  }
-  const fg = gridGeo(fl), uv = []; fl.forEach((r, i) => r.forEach((_, j) => uv.push(i/n, j/6)));
-  fg.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); put(G.rails, fg, mat.flag);
-  // antenna post with radome, port quarter
-  const az = -.86, ax = .32, ay = deckY(ax, az) + .02;
-  rod(G.rails, [ax, ay, az], [ax - .05, 2.45, az], .018, mat.steel);
-  const dome = put(G.rails, new T.SphereGeometry(.16, 26, 14), mat.white); dome.position.set(ax - .05, 2.54, az); dome.scale.y = .42;
+  // ensign and antenna as they are today; the solar arch carries its own versions
+  const fx = .12, fz = .74;
+  ensign(G.asBuilt, [fx, deckY(fx, fz) + .02, fz], [-.34, 2.46, fz]);
+  const az = -.86, ax = .32;
+  antenna(G.asBuilt, [ax, deckY(ax, az) + .02, az], [ax - .05, 2.45, az]);
 })();
 
 /* ---------- Bow gear ---------- */

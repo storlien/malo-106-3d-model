@@ -66,6 +66,7 @@
     hero:   { th: .78, ph: 1.33, r: 21, tx: 0, ty: 2.7, tz: 0, ortho: false },
     deck:   { th: .62, ph: .92, r: 15.5, tx: -.2, ty: .9, tz: 0, ortho: false },
     stern:  { th: Math.PI*1.5 + 2.0, ph: 1.33, r: 13.5, tx: -2.5, ty: 1.15, tz: 0, ortho: false },
+    arch:   { th: -.82, ph: 1.14, r: 9.5, tx: -4.75, ty: 1.75, tz: 0, ortho: false },
     side:   { th: 0, ph: Math.PI/2, r: 60, tx: .15, ty: 1, tz: 0, ortho: true, span: 13.2 },
     full:   { th: 0, ph: Math.PI/2, r: 60, tx: .15, ty: 7.4, tz: 0, ortho: true, span: 20 },
     top:    { th: 0, ph: .0006, r: 60, tx: .15, ty: 0, tz: 0, ortho: true, span: 13.2 },
@@ -133,6 +134,7 @@
     if (name === 'canvas') G.canvas.visible = on;
     if (name === 'rig') G.rig.visible = on;
     if (name === 'rails') G.rails.visible = on;
+    if (name === 'arch') setArch(on ? lastArch : 'none');
     if (name === 'drawing') overlay.visible = on;
     const b = document.querySelector(`[data-layer="${name}"]`); if (b) b.setAttribute('aria-pressed', on);
     needs = 3;
@@ -157,10 +159,11 @@
     needs--;
     renderer.render(scene, placeCamera());
   }
-  resize(); setView('hero', true); requestAnimationFrame(frame);
+  initArchUI(() => { needs = 3; }); resize(); setView('hero', true); requestAnimationFrame(frame);
 
   // Small API for scripted renders and comparison against photos
   window.alizee = { SPEC, setView, setLayer, view, render() { resize(); renderer.render(scene, placeCamera()); }, hullHalf, sheerY, keelY, halfB,
+    archReport, setArch, archDesigns: () => SPEC.solarArches.designs.map(d => d.id),
     measure() {                        // true geometry, for checking the model against the spec
       boat.updateMatrixWorld(true); const inv = new T.Matrix4().copy(boat.matrixWorld).invert();
       const bb = list => { const b = new T.Box3(); list.forEach(m => { const q = m.geometry.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, m.matrixWorld)); q.computeBoundingBox(); b.union(q.boundingBox); }); return b; };

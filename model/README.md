@@ -14,11 +14,18 @@ Source tags in `spec.js`: `[B]` brochure data, `[D]` scale drawing, `[P]` photos
 
 The brochure drawing shows the optional 11.20 m reverse stern. Alizée has the standard 10.60 m stern, so the drawing's aft tip extends past her transom on purpose.
 
+## Solar arch designs
+
+Choose a design in the **Solbue** panel. Its heights, size, clearances, power and weight are measured from the finished geometry and shown in the panel.
+
+To add a design, copy an entry in `solarArches.designs` in `spec.js`, change its `id`, name and numbers, and rebuild. It appears in the panel automatically. Clearances under `warnGap` are flagged as tight. A link can point at one design with `alizee.html#bue=<id>`.
+
 ## Files
 
 - `spec.js`: all dimensions
 - `js/20-hull.js`: hull, livery, keel, rudder, propeller
 - `js/30-deck.js`: deck, cabin trunk, cockpit, windscreen, hatches, arch
 - `js/40-canvas-rig.js`: canvas, rig, rails, stern and bow gear
+- `js/45-solar-arch.js`: builds the solar arch designs and measures them
 - `js/50-scene.js`: light, water, cameras, controls
 - `make_overlays.py`: extracts the drawing overlays from the brochure
