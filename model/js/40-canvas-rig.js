@@ -39,9 +39,11 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
     if (d >= l1 + l2) { const q = (d - l1 - l2)/l3; return [lerp(K2[0], E[0], q), lerp(K2[1], E[1], q)]; }
     const q = (d - l1)/l2, u = 1 - q; return [u*u*K1[0] + 2*u*q*K[0] + q*q*K2[0], u*u*K1[1] + 2*u*q*K[1] + q*q*K2[1]];
   };
-  const halfAt = x => Math.min(TG.topHalf - .015, Math.max(roofHalf(x) - .03, .3));
+  // the bimini keeps its own plan width, tapering aft as on the marina photo
+  const canvasHalf = x => { const b = Math.max(.05, halfB(x) - HO.sideDeck), d = clamp((.664 - x)/.34, 0, 1); return Math.min(HO.maxHalf, b)*HO.tumble*Math.pow(1 - d*d*d, 1/3); };
+  const halfAt = x => Math.min(TG.topHalf - .015, Math.max(canvasHalf(x) - .03, .3));
   const sidePt = (t, v, s, off = 0) => {
-    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, roofHalf(bx) - .012), by = roofY(bx, wb) + .004;
+    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, canvasHalf(bx) - .012), by = roofY(bx, wb) + .004;
     return [lerp(bx, tx, v), lerp(by, ty, v), s*(lerp(wb, halfAt(tx), v) + off)];
   };
   const patch = (s, t0, t1, v0, v1, m) => {
@@ -271,7 +273,13 @@ const RADAR = (() => {
     const line = stern(s);
     tube(G.rails, line, Q.tube/2, mat.steel, false, 10);
     tube(G.rails, line.map(p => [p[0], lerp(deckY(p[0], p[2]), yt, .52), p[2]]), Q.tube/2, mat.steel, false, 10);
-    line.forEach((p, i) => { if (i === 2 || i === 0 || i === 3) { const x = Math.max(p[0], HS.transomCurve*p[2]*p[2] + .05), z = p[2], b = [x, deckY(x, z), z]; rod(G.rails, b, [p[0], yt, p[2]], Q.tube/2, mat.steel); } });
+    line.forEach((p, i) => {
+      if (i !== 0 && i !== 2 && i !== 3) return;
+      // aft legs stand on the wide stern toe rail, each on a round flange
+      const z = p[2], x = i ? HS.transomCurve*z*z + .05 : p[0], y = i ? sheerY(x) + SPEC.deck.toeRail.height : deckY(x, z);
+      rod(G.rails, [x, y, z], [p[0], yt, z], Q.tube/2, mat.steel);
+      const f = put(G.rails, new T.CylinderGeometry(.03, .036, .008, 18), mat.steel); f.position.set(x, y + .004, z);
+    });
     const g = line[3];
     tube(G.rails, [[g[0], yt, g[2]], [g[0] - .012, yt + .05, g[2]*.6], [g[0] - .012, yt + .05, 0]], Q.tube/2, mat.steel);
     rod(G.rails, [g[0], yt - .34, g[2]], [g[0], yt - .34, 0], Q.tube/2, mat.steel);

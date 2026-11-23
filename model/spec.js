@@ -86,25 +86,31 @@ const SPEC = {
   },
 
   house: {   // cabin trunk and cockpit coamings, one continuous moulding [D/P]
-    aft: 0.286, fwd: 7.984,     // [D] ends at deck level
-    topAft: 0.324, topFwd: 7.514, // [D] the raked front runs from topFwd down to fwd
+    aft: 0.37, fwd: 7.984,      // [D/P] coamings stop here; the bench runs on aft to the toe rail
+    topAft: 0.375, topFwd: 7.514, // [D] the raked front runs from topFwd down to fwd
     roof: 1.40,               // [D]
     roofCrown: 0.05,          // [E]
-    sideDeck: 0.46,           // [P] minimum side-deck width
+    sideDeck: 0.46,           // [P] side-deck width amidships
+    sideDeckAft: 0.30,        // [P] side deck narrows towards the stern
     maxHalf: 1.2,             // [P]
     tumble: 0.93,             // [P] top half-width / base half-width
     teakFrom: 4.284,           // [P] coachroof teak starts forward of the windscreen
-    band: { y0: 1.265, y1: 1.325, from: 0.286, to: 6.92 }, // [D] navy stripe
+    band: { y0: 1.265, y1: 1.325, from: 0.37, to: 6.92 }, // [D] navy stripe
     windows: [2.539, 3.444, 5.124, 6.574], // [D] port-light centres
     windowSize: [0.38, 0.135],          // [P]
     windowY: 1.235,                     // [D]
   },
 
-  cockpit: {   // [E/P] pending measurement
-    aft: 0.684, fwd: 3.584, halfWidth: 0.86,
-    footHalf: 0.40, footAft: 0.944, footFwd: 3.384,
+  cockpit: {   // from the brochure and broker photos [E/P], replace with tape measurements
+    benchDepth: 0.50,         // X: helm bench, from the inside of the stern toe rail to the footwell
+    aftRail: 0.12,            // Y: width of the toe rail across the stern
+    benchBack: 0.06,          // sloped cream back between the toe rail and the teak seat
+    aftCorner: 0.17,          // how far the rounded aft corners of the well reach forward
+    capWidth: 0.17,           // teak-topped coaming that carries the winches
+    fwd: 3.584, halfWidth: 0.86,
+    footHalf: 0.40, footFwd: 3.384,
     seat: 0.87, sole: 0.47,
-    wheel: { x: 1.384, y: 1.30, r: 0.42 },
+    wheel: { aheadOfBench: 0.25, y: 1.30, r: 0.42 },
     companionHalf: 0.40,
   },
 
