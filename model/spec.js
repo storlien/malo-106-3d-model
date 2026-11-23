@@ -133,7 +133,7 @@ const SPEC = {
   },
 
   solarArches: {   // DESIGN PROPOSALS in stainless steel. Check against tape measurements before fabrication.
-    panel: { length: 0.895, width: 0.580, thick: 0.030, watts: 100, kg: 6.5 }, // [M] owner's panels; kg is [E]
+    panel: { length: 0.895, width: 0.580, thick: 0.030, watts: 100, kg: 4.7 }, // [M] owner's panels
     panelCounts: [2, 3, 4],
     panelGap: 0.015,        // [E] between neighbouring panels
     pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
@@ -149,7 +149,7 @@ const SPEC = {
     designs: [
       { id: 'vertical', name: 'Vertical arch', note: 'Fore pipes stand vertical and the rear pipes mount on the transom. Medium height, so you still duck slightly on the aft deck.',
         hoop: { footX: 0.60, footHalf: 1.06, topX: 0.60, topY: 2.60, half: 0.98, bend: 0.20 },
-        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.60 },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06, straight: true }, fwdX: 0.60 },
 
       { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },

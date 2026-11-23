@@ -37,6 +37,11 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .stats dt{color:var(--ink2)}.stats dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stats dd.warn{color:#a4331f}.stats dd.warn::before{content:"Tight  ";font-weight:500}
 .stats dd.hit{color:#fff;background:#a4331f;padding:0 6px;border-radius:5px}
+.angle-svg{display:block;width:100%;height:auto;margin:2px 0 6px;border-radius:9px;background:rgba(20,39,95,.05)}
+.angle-svg line{stroke-linecap:round}.d-hull{stroke:var(--ink2);stroke-width:4}.d-frame{stroke:var(--ink);stroke-width:5}.d-pipe{stroke:var(--ink);stroke-width:4}
+.d-stub{stroke:var(--ink);stroke-width:3}.d-ref{stroke:var(--ink2);stroke-width:1.2;stroke-dasharray:4 3}.d-arc{fill:none;stroke:#b4471f;stroke-width:1.8}
+.d-lead{stroke:#b4471f;stroke-width:1}
+.d-val{fill:#a4331f;font-size:13px;font-weight:700}.d-tag{fill:var(--ink2);font-size:11px}
 .fine{margin:11px 2px 0;font-size:12px;line-height:1.4;color:var(--ink2)}
 @media (max-width:760px){.arch{top:auto;right:8px;left:8px;width:auto;max-width:none;bottom:calc(112px + env(safe-area-inset-bottom,0px));max-height:calc(100dvh - 210px)}}
 @media (max-width:620px){button{padding:9px 10px;font-size:13px}.title{left:16px}}
@@ -223,7 +228,7 @@ const SPEC = {
   },
 
   solarArches: {   // DESIGN PROPOSALS in stainless steel. Check against tape measurements before fabrication.
-    panel: { length: 0.895, width: 0.580, thick: 0.030, watts: 100, kg: 6.5 }, // [M] owner's panels; kg is [E]
+    panel: { length: 0.895, width: 0.580, thick: 0.030, watts: 100, kg: 4.7 }, // [M] owner's panels
     panelCounts: [2, 3, 4],
     panelGap: 0.015,        // [E] between neighbouring panels
     pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
@@ -239,7 +244,7 @@ const SPEC = {
     designs: [
       { id: 'vertical', name: 'Vertical arch', note: 'Fore pipes stand vertical and the rear pipes mount on the transom. Medium height, so you still duck slightly on the aft deck.',
         hoop: { footX: 0.60, footHalf: 1.06, topX: 0.60, topY: 2.60, half: 0.98, bend: 0.20 },
-        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.60 },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06, straight: true }, fwdX: 0.60 },
 
       { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },
@@ -1119,7 +1124,7 @@ function panelLayout(d, count, orient) {
 function buildArch(d, count, D, orient) {
   const group = new T.Group(), frame = new T.Group(), extras = new T.Group();
   group.add(frame, extras); group.visible = false; G.arch.add(group);
-  let steelKg = 0, steelM = 0;
+  let steelKg = 0, steelM = 0, rear = null;
   const kgPerM = Math.PI*(D - AC.pipeWall)*AC.pipeWall*7980;
   const pipe = (pts, seg = 12) => {
     for (let i = 0; i < pts.length - 1; i++) steelM += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2]);
@@ -1163,8 +1168,11 @@ function buildArch(d, count, D, orient) {
 
   [1, -1].forEach(s => {
     // aft strut stands off the transom, outside the pushpit
-    const tz = s*A.footHalf, tx = transomX(A.footY, tz), f = [tx - A.standoff, A.footY, tz];
-    pipe([f, [strutTop, yRail, s*halfW]]);
+    // a 'straight' rear pipe stays in one fore-and-aft plane and lands on the aft cross tube
+    const tz = s*(A.straight ? Math.min(A.footHalf, halfW) : A.footHalf), tx = transomX(A.footY, tz), f = [tx - A.standoff, A.footY, tz];
+    const strutEnd = [strutTop, yRail, A.straight ? tz : s*halfW];
+    pipe([f, strutEnd]);
+    if (s === 1) rear = { foot: f, top: strutEnd };
     pipe([[tx, A.footY, tz], f], 10);
     const plate = put(frame, new T.CylinderGeometry(.055, .055, .01, 22), mat.steel); plate.rotation.z = Math.PI/2; plate.position.set(tx - .004, A.footY, tz);
     footPlate([H.footX, fy, s*H.footHalf]);
@@ -1188,7 +1196,7 @@ function buildArch(d, count, D, orient) {
   const az = -halfW - .04;
   rod(extras, [railFwd, yRail, -halfW], [railFwd, yRail, az], .012, mat.steel);
   antenna(extras, [railFwd, yRail, az], [railFwd, yRail + .42, az]);
-  return { d, group, frame, count, D, area: count*AC.panel.length*AC.panel.width, steelKg, steelM };
+  return { d, group, frame, count, D, rear, area: count*AC.panel.length*AC.panel.width, steelKg, steelM };
 }
 
 /* ---------- Measurements ----------
@@ -1269,15 +1277,61 @@ function measureArch(b) {
     boom = Math.min(boom, Math.hypot(Math.max(0, Math.hypot(x - B.fwd, z) - reach), Math.max(0, Math.abs(y - B.y) - B.h/2)));   // full swing
     if (Math.abs(z) < .45 && x > 0 && x < .75) head = Math.min(head, y - deckY(x, z));
   }
-  const cells = toCells(clear), panelKg = b.count*AC.panel.kg;
+  const cells = toCells(clear), panelKg = b.count*AC.panel.kg, rear = rearAngles(b.rear);
   b.clear = clear; b.cells = cells;
   return b.report = {
     panelTopAboveWater: top - HS.floatSink, panelTopAboveDeck: top - deckY(.3, 0), headroom: head,
     width: maxZ - minZ, length: maxX - minX, overhang: Math.max(0, -minX), lengthWithArch: L + Math.max(0, -minX), pastHull: Math.max(0, past),
     panels: b.count, watts: b.count*AC.panel.watts, panelArea: b.area, pipeMm: b.D*1000, steelM: b.steelM, steelKg: b.steelKg, panelKg, totalKg: b.steelKg + panelKg,
-    backstayGap: stay - .0045, railGap: surfaceGap(clear, cells, obstacles.rails, obstacles.railCells),
+    rear, backstayGap: stay - .0045, railGap: surfaceGap(clear, cells, obstacles.rails, obstacles.railCells),
     canvasGap: surfaceGap(clear, cells, obstacles.canvas, obstacles.canvasCells), boomGap: boom,
   };
+}
+
+/* Rear pipe angles, from its real end points and the transom surface at its foot. */
+function rearAngles({ foot, top }) {
+  const deg = v => v*180/Math.PI, dx = top[0] - foot[0], dy = top[1] - foot[1], dz = top[2] - foot[2], len = Math.hypot(dx, dy, dz);
+  const k = HS.transomRake, c = HS.transomCurve, side = Math.hypot(dx, dy), ul = Math.hypot(k, 1);
+  const n = [1, k, -2*c*foot[2]], nl = Math.hypot(...n);
+  return {
+    foot, top, length: len,
+    topForward: deg(Math.atan2(Math.abs(dy), Math.abs(dx))),
+    transomSide: deg(Math.acos(clamp((dx*-k + dy)/(side*ul), -1, 1))),
+    transomTrue: deg(Math.asin(clamp(Math.abs(dx*n[0] + dy*n[1] + dz*n[2])/(len*nl), 0, 1))),
+    transomCurve: deg(Math.atan(2*c*Math.abs(foot[2]))),
+    sideways: deg(Math.atan2(Math.abs(dz), Math.abs(dx))),
+    fromVertical: deg(Math.atan2(Math.abs(dx), Math.abs(dy))),
+  };
+}
+/* True-scale side view of the rear pipe, bow to the right. */
+function angleDiagram(a) {
+  const W = 286, H = 200, k0 = HS.transomRake, [fx, fy] = a.foot, [tx, ty] = a.top;
+  const x0 = Math.min(fx, tx) - .08, x1 = Math.max(fx, tx) + .46, y0 = fy - .13, y1 = ty + .1, s = Math.min((W - 12)/(x1 - x0), (H - 12)/(y1 - y0));
+  const ox = (W - (x1 - x0)*s)/2, X = x => +(ox + (x - x0)*s).toFixed(1), Y = y => +(H - 6 - (y - y0)*s).toFixed(1);
+  const tr = y => transomX(y, a.foot[2]);
+  const arc = (cx, cy, u, v, r) => {
+    const su = [u[0], -u[1]], sv = [v[0], -v[1]], sweep = su[0]*sv[1] - su[1]*sv[0] > 0 ? 1 : 0;
+    return `M${(cx + su[0]*r).toFixed(1)} ${(cy + su[1]*r).toFixed(1)}A${r} ${r} 0 0 ${sweep} ${(cx + sv[0]*r).toFixed(1)} ${(cy + sv[1]*r).toFixed(1)}`;
+  };
+  const unit = (p, q) => { const l = Math.hypot(p, q); return [p/l, q/l]; };
+  const down = unit(fx - tx, fy - ty), up = unit(tx - fx, ty - fy), face = unit(-k0, 1), fwd = [1, 0];
+  const mid = (u, v) => unit(u[0] + v[0], u[1] + v[1]), tm = mid(fwd, down), fm = mid(face, up);
+  const cx = X(tx), cy = Y(ty), bx = X(fx), by = Y(fy), yTop = Math.min(ty, sheerY(0));
+  const label = `Side view of the rear pipe. ${num(a.topForward, 1)} degrees at the top frame and ${num(a.transomSide, 1)} degrees at the transom.`;
+  return `<svg class="angle-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}">
+    <line class="d-hull" x1="${X(tr(fy - .12))}" y1="${Y(fy - .12)}" x2="${X(tr(yTop))}" y2="${Y(yTop)}"/>
+    <line class="d-frame" x1="${cx}" y1="${cy}" x2="${X(Math.min(x1, tx + .55))}" y2="${cy}"/>
+    <line class="d-ref" x1="${bx}" y1="${by}" x2="${(bx + face[0]*62).toFixed(1)}" y2="${(by - face[1]*62).toFixed(1)}"/>
+    <line class="d-stub" x1="${X(tr(fy))}" y1="${by}" x2="${bx}" y2="${by}"/>
+    <line class="d-pipe" x1="${bx}" y1="${by}" x2="${cx}" y2="${cy}"/>
+    <path class="d-arc" d="${arc(cx, cy, fwd, down, 30)}"/><path class="d-arc" d="${arc(bx, by, face, up, 50)}"/>
+    <line class="d-lead" x1="${(bx + fm[0]*50).toFixed(1)}" y1="${(by - fm[1]*50).toFixed(1)}" x2="${(bx + 29).toFixed(1)}" y2="${(by - 46).toFixed(1)}"/>
+    <text class="d-val" x="${(cx + tm[0]*40 + 4).toFixed(1)}" y="${(cy - tm[1]*40 + 4).toFixed(1)}">${num(a.topForward, 1)}°</text>
+    <text class="d-val" x="${(bx + 32).toFixed(1)}" y="${(by - 42).toFixed(1)}">${num(a.transomSide, 1)}°</text>
+    <text class="d-tag" x="${X(Math.min(x1, tx + .55))}" y="${cy - 6}" text-anchor="end">Panel frame</text>
+    <text class="d-tag" x="${(X(tr(fy)) + 7).toFixed(1)}" y="${(by + 13).toFixed(1)}">Transom</text>
+    <text class="d-tag" x="${(cx - 5).toFixed(1)}" y="${(cy + (by - cy)*.55).toFixed(1)}" text-anchor="end">Rear pipe</text>
+  </svg>`;
 }
 
 /* ---------- Panels hung along the lifelines ---------- */
@@ -1341,8 +1395,10 @@ const fmtM = v => `${num(v, 2)} m`, fmtCm = v => `${num(v*100, 0)} cm`;
 const gapRow = (label, v, byDesign) => v < (byDesign ? 0 : AC.contactGap) ? [label, 'Contact', 'hit'] : [label, fmtCm(v), !byDesign && v < AC.warnGap ? 'warn' : ''];
 
 function renderArchStats(r, q) {
-  const groups = [];
+  const groups = [], deg = v => `${num(v, 1)}°`;
   if (r) groups.push(
+    ['Rear pipe angles', [['Top frame, forward side', deg(r.rear.topForward)], ['Top frame, aft side', deg(180 - r.rear.topForward)], ['Transom face, side view', deg(r.rear.transomSide)],
+      ['Transom face, true angle', deg(r.rear.transomTrue)], ['Transom curve at mount', deg(r.rear.transomCurve)], ['Sideways from ship’s line', deg(r.rear.sideways)], ['Rear pipe length', fmtM(r.rear.length)]], angleDiagram(r.rear)],
     ['Height', [['Panel top above water', fmtM(r.panelTopAboveWater)], ['Panel top above deck', fmtM(r.panelTopAboveDeck)], ['Headroom on aft deck', fmtM(r.headroom)]]],
     ['Size', [['Width', fmtM(r.width)], ['Length', fmtM(r.length)], ['Overhang past transom', fmtM(r.overhang)], ['Past hull side', fmtM(r.pastHull)], ['Boat length with arch', fmtM(r.lengthWithArch)]]],
     ['Clearance', [gapRow('Backstay', r.backstayGap), gapRow('Rails and pushpit', r.railGap), gapRow('Canvas', r.canvasGap), gapRow('Boom, full swing', r.boomGap)]]);
@@ -1359,10 +1415,10 @@ function renderArchStats(r, q) {
   if (q) rows.push(['Lifeline panels', `${q.panels} × ${AC.panel.watts} W = ${q.watts} W`]);
   if (r || q) rows.push(['Total rated power', `${topW + sideW} W`]);
   if (r) rows.push([`Pipe, ${num(r.pipeMm, 0)} mm`, `${num(r.steelM, 1)} m`], ['Steel weight (est.)', `${num(r.steelKg, 0)} kg`]);
-  if (r || q) rows.push(['Panel weight (est.)', `${num((r ? r.panelKg : 0) + (q ? q.kg : 0), 0)} kg`], ['Total weight (est.)', `${num((r ? r.totalKg : 0) + (q ? q.kg : 0), 0)} kg`]);
+  if (r || q) rows.push(['Panel weight', `${num((r ? r.panelKg : 0) + (q ? q.kg : 0), 0)} kg`], ['Total weight (est.)', `${num((r ? r.totalKg : 0) + (q ? q.kg : 0), 0)} kg`]);
   if (rows.length) groups.push(['Power and materials', rows]);
-  document.getElementById('archStats').innerHTML = groups.map(([h, list]) =>
-    `<h2>${h}</h2><dl>${list.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
+  document.getElementById('archStats').innerHTML = groups.map(([h, list, before]) =>
+    `<h2>${h}</h2>${before || ''}<dl>${list.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
 }
 function setArch(id, opts = {}) {
   if (opts.panels && AC.panelCounts.includes(opts.panels)) archState.panels = opts.panels;
