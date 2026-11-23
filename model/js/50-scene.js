@@ -143,6 +143,7 @@
     if (name === 'canvas') G.canvas.visible = on;
     if (name === 'rig') G.rig.visible = on;
     if (name === 'sail') { G.mainsail.visible = on; G.sailCover.visible = !on; }
+    if (name === 'genoa') { G.genoa.visible = on; G.furledGenoa.visible = !on; }
     if (name === 'rails') G.rails.visible = on;
     if (name === 'arch') setArch(on ? lastArch : 'none');
     if (name === 'drawing') overlay.visible = on;

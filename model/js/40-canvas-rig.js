@@ -111,7 +111,7 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   const st = RG.stem, head = [mx + .1, RG.mastTop - .02, 0], foot2 = [st[0], st[1], 0];
   rod(G.rig, foot2, head, .005, mat.wire, 6);
   const dir = new V3(head[0] - st[0], head[1] - st[1], 0), at = f => [st[0] + dir.x*f, st[1] + dir.y*f, 0];
-  rod(G.rig, at(.022), at(.965), RG.furlerR, mat.blue, 14, RG.furlerR*.42);
+  G.furledGenoa = rod(G.rig, at(.022), at(.965), RG.furlerR, mat.navy, 14, RG.furlerR*.42);
   rod(G.rig, at(0), at(.022), .05, mat.steel, 18);
   rod(G.rig, at(.965), at(.982), .02, mat.steel);
   box(G.rig, [(mx + RG.backstayTop[0])/2, RG.backstayTop[1], 0], [mx - RG.backstayTop[0] + .06, .03, .05], mat.alu);   // masthead crane

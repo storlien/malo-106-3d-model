@@ -162,6 +162,8 @@ const SPEC = {
       // Scanstrut SC20 mast mount [B]: pin = mast fixing pin, holes are measured forward from the pins
       mount: { name: 'Scanstrut SC20', length: 0.395, width: 0.263, pinSpacing: 0.105, armDrop: 0.112, height: 0.232, holeX: [0.159, 0.3005], holeWidth: 0.233 } },
     mainsail: { headBelowTop: 0.20, clewInset: 0.14, headWidth: 0.16, roach: 0.22, camber: 0.05, battens: [0.23, 0.44, 0.64, 0.83], logoV: 0.69 }, // [P] owner's photo
+    // 140 % roller genoa [M owner]: LP (clew square to the luff) = 1.40 x J (forestay foot to the mast). Trim and shape are [P]
+    genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6 },
     stem: [10.564, 1.32],      // [D] forestay foot
     backstayTop: [5.864, 15.79], // [P] on a short masthead crane aft of the mast, which lets the sail head clear it
     backstay: [0.10, 1.16],   // [D]
