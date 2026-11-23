@@ -1,72 +1,70 @@
 /* Navy canvas, rig, guard rails, stern gear and bow gear. */
 
-/* Sprayhood between the windscreen and the arch, and the cockpit tent aft of it. */
+/* Navy sprayhood forward of the arch; bimini with a closed side enclosure aft of it. */
+mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: true, opacity: .3, depthWrite: false });
 (function canvasWork() {
-  const top = SC.top, last = top[top.length - 1];
-  const edge = x => {                       // half-width of the hood at station x, along the screen's top line
-    for (let i = 0; i < top.length - 1; i++) {
-      const [x0, z0] = top[i], [x1, z1] = top[i + 1];
-      if (x <= x0 && x >= x1 && x0 !== x1) return lerp(z0, z1, (x0 - x)/(x0 - x1));
-    }
-    return x > top[1][0] ? top[1][1] : last[1];
+  const Q = SPEC.canvas, top = SC.top, frontX = top[0][0], archX = TG.topX - .015;
+  const edge = x => {
+    for (let i = 0; i < top.length - 1; i++) { const [x0, z0] = top[i], [x1, z1] = top[i + 1]; if (x <= x0 && x >= x1 && x0 !== x1) return lerp(z0, z1, (x0 - x)/(x0 - x1)); }
+    return x > top[1][0] ? top[1][1] : top[top.length - 1][1];
   };
-  const hoodSec = (x, w, yEdge, yCrown) => {
-    const r = [];
-    for (let k = 0; k <= 28; k++) {
-      const f = -1 + 2*k/28, a = Math.pow(Math.abs(f), 3.2);
-      r.push([x, yEdge + (yCrown - yEdge)*(1 - a), Math.sign(f)*w*Math.pow(Math.abs(f), .9)]);
-    }
-    return r;
-  };
-  const rows = [];
-  for (let i = 0; i <= 44; i++) {
-    const f = i/44, x = lerp(top[1][0] + .0, TG.topX - .015, f), w = Math.min(lerp(edge(x), TG.topHalf - .01, smooth(f)*.5), TG.topHalf - .015);
-    rows.push(hoodSec(x, w, lerp(SC.topY, TG.topY - .1, f), lerp(SC.topY + .1, TG.topY + .012, Math.pow(f, .8))));
-  }
-  // front lip back to the screen's top bar
-  const front = rows[0].map(p => [top[0][0], SC.topY + (p[1] - SC.topY)*.12, p[2]*.98]);
-  grid(G.canvas, [front, ...rows], mat.canvas);
+  const clearPane = (rows) => { const m = grid(G.canvas, rows, mat.clearCanvas, { noShadow: true }); m.renderOrder = 2; m.castShadow = false; };
+  const range = (a, b, n) => Array.from({ length: n + 1 }, (_, i) => lerp(a, b, i/n));
 
-  // lower valance: canvas from the side top rail down over the aft part of the side glass
+  /* Sprayhood */
+  const hx = f => lerp(frontX, archX, f), hy = f => lerp(Q.hoodFrontY, TG.topY + .005, smooth(f));
+  const hoodSide = (f, v, s) => { const x = hx(f), w = Math.min(edge(x), TG.topHalf - .012); return [x, lerp(SC.topY, hy(f) - .035, v), s*w*lerp(1.004, .975, v)]; };
+  const hoodF = [...range(0, 1, 44), (frontX - top[2][0])/(frontX - archX)].sort((a, b) => a - b);
+  grid(G.canvas, hoodF.map(f => { const x = hx(f), w = Math.min(edge(x), TG.topHalf - .012)*.975, y = hy(f); return range(-1, 1, 28).map(q => [x, y - .035*Math.pow(Math.abs(q), 3.4), q*w]); }), mat.canvas);
+  grid(G.canvas, range(-1, 1, 28).map(q => { const w = edge(frontX)*.975; return [[frontX, SC.topY, q*w], [frontX + .004, Q.hoodFrontY - .035*Math.pow(Math.abs(q), 3.4), q*w]]; }), mat.canvas);
+  const H = Q.hoodWindow, hoodPatch = (s, f0, f1, v0, v1, m) => {
+    const fs = [...range(f0, f1, 18), ...hoodF.filter(f => f > f0 && f < f1)].sort((a, b) => a - b), rows = fs.map(f => range(v0, v1, 3).map(v => hoodSide(f, v, s)));
+    m ? grid(G.canvas, rows, m) : clearPane(rows);
+  };
   [1, -1].forEach(s => {
-    const a = [], n = 18;
-    for (let i = 0; i <= n; i++) {
-      const f = i/n, x = lerp(last[0] + .02, TG.baseX + .16, f), z = s*lerp(last[1] + .005, TG.baseHalf - .03, f);
-      const yT = lerp(SC.topY, TG.topY - .25, f), yB = lerp(SC.topY - .13, SC.baseY + .22, f);
-      a.push([[x, yT + .015, z], [x, yB, z]]);
-    }
-    grid(G.canvas, a, mat.canvas);
-    // side band under the glass line, as on the real hood
-    const b = [];
-    for (let i = 0; i <= n; i++) {
-      const f = i/n, x = lerp(top[2][0] + .1, TG.baseX + .06, f), z = s*lerp(top[2][1] + .1, TG.baseHalf - .005, f);
-      b.push([[x, lerp(SC.baseY + .04, SC.baseY + .13, f), z], [x, SC.baseY - .02, z*1.003]]);
-    }
-    grid(G.canvas, b, mat.canvasD);
+    hoodPatch(s, 0, 1, 0, H.v[0], mat.canvas); hoodPatch(s, 0, 1, H.v[1], 1, mat.canvas);
+    hoodPatch(s, 0, H.f[0], H.v[0], H.v[1], mat.canvas); hoodPatch(s, H.f[1], 1, H.v[0], H.v[1], mat.canvas);
+    hoodPatch(s, H.f[0], H.f[1], H.v[0], H.v[1], null);
+    // stainless grab rail along the top of the glass
+    tube(G.canvas, range(.02, .98, 14).map(f => { const p = hoodSide(f, 0, s); return [p[0], SC.topY + .03, p[2] + s*.016]; }), .009, mat.steel);
   });
 
-  // cockpit tent, from the arch to the aft coaming
-  const A = SPEC.aftCanvas, tent = [], nT = 44, tW = x => Math.min(TG.topHalf - .015, Math.max(roofHalf(x) - .035, .3));
-  for (let i = 0; i <= nT; i++) {
-    const f = i/nT, x = lerp(TG.topX - .02, A.x1 + .06, f), w = tW(x)*lerp(.97, .86, smooth(f));
-    const yC = lerp(TG.topY + .015, A.y1 + .62, Math.pow(f, 1.5)), yE = lerp(TG.topY - .15, A.y1 + .24, f);
-    tent.push(hoodSec(x, w, yE, yC));
-  }
-  grid(G.canvas, tent, mat.canvas);
-  [1, -1].forEach(s => {                    // tent sides with a clear window
-    const a = [], b = [];
-    for (let i = 0; i <= nT; i++) {
-      const f = i/nT, x = lerp(TG.topX - .02, A.x1 + .06, f), w = tW(x)*lerp(.97, .86, smooth(f)), yE = lerp(TG.topY - .15, A.y1 + .24, f);
-      const zB = s*Math.min(roofHalf(x) - .02, w + .06), yB = roofY(x, zB) + .004;
-      a.push([[x, yE + .004, s*w], [x, yB, zB]]);
-      if (x > .62 && x < 1.56) { const q = (x - .62)/.94, h = Math.sin(q*Math.PI); b.push([[x, lerp(yB, yE, .78), lerp(zB, s*w, .78) + s*.004], [x, lerp(yB, yE, .24 + .1*(1 - h)), lerp(zB, s*w, .24) + s*.004]]); }
-    }
-    grid(G.canvas, a, mat.canvas);
-    if (b.length > 2) { const w = grid(G.canvas, b, mat.glass, { noShadow: true }); w.renderOrder = 2; }
+  /* Bimini roof line in side view: arch, knee, raked aft end */
+  const A = [TG.topX - .02, TG.topY + .012], K = [Q.kneeX, Q.kneeY], E = [Q.aftX, Q.aftY], r = .14;
+  const toward = (a, b, d) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]); return [a[0] + (b[0] - a[0])*d/l, a[1] + (b[1] - a[1])*d/l]; };
+  const K1 = toward(K, A, r), K2 = toward(K, E, r), l1 = Math.hypot(K1[0] - A[0], K1[1] - A[1]), l3 = Math.hypot(E[0] - K2[0], E[1] - K2[1]), l2 = r*1.7, total = l1 + l2 + l3;
+  const prof = t => {
+    const d = t*total;
+    if (d <= l1) return [lerp(A[0], K1[0], d/l1), lerp(A[1], K1[1], d/l1)];
+    if (d >= l1 + l2) { const q = (d - l1 - l2)/l3; return [lerp(K2[0], E[0], q), lerp(K2[1], E[1], q)]; }
+    const q = (d - l1)/l2, u = 1 - q; return [u*u*K1[0] + 2*u*q*K[0] + q*q*K2[0], u*u*K1[1] + 2*u*q*K[1] + q*q*K2[1]];
+  };
+  const halfAt = x => Math.min(TG.topHalf - .015, Math.max(roofHalf(x) - .03, .3));
+  const sidePt = (t, v, s, off = 0) => {
+    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, roofHalf(bx) - .012), by = roofY(bx, wb) + .004;
+    return [lerp(bx, tx, v), lerp(by, ty, v), s*(lerp(wb, halfAt(tx), v) + off)];
+  };
+  const patch = (s, t0, t1, v0, v1, m) => {
+    const rows = range(t0, t1, Math.max(4, Math.ceil((t1 - t0)*70))).map(t => range(v0, v1, 3).map(v => sidePt(t, v, s, m ? 0 : .002)));
+    m ? grid(G.canvas, rows, m) : clearPane(rows);
+  };
+  const ts = range(0, 1, 70), roof = ts.map(t => { const [x, y] = prof(t), w = halfAt(x); return range(-1, 1, 30).map(q => [x, y + Q.crown*(1 - Math.pow(Math.abs(q), 2.6)), q*w]); });
+  grid(G.canvas, roof, mat.canvas);
+  const last = roof[roof.length - 1];                   // closed aft wall down to the coaming
+  grid(G.canvas, [last, last.map(p => [Q.aftX + .002, roofY(Q.aftX, p[2]*.9) + .004, p[2]*.985])], mat.canvasD);
+  const [vA, vB] = Q.windowV, [w1, w2] = Q.windows;
+  [1, -1].forEach(s => {
+    patch(s, 0, 1, 0, vA, mat.canvas); patch(s, 0, 1, vB, 1, mat.canvas);
+    patch(s, 0, w1[0], vA, vB, mat.canvas); patch(s, w1[1], w2[0], vA, vB, mat.canvas); patch(s, w2[1], 1, vA, vB, mat.canvas);
+    patch(s, w1[0], w1[1], vA, vB, null); patch(s, w2[0], w2[1], vA, vB, null);
+    // snap rail along the coaming
+    tube(G.canvas, range(.01, .99, 22).map(t => { const p = sidePt(t, .025, s, .008); return p; }), .006, mat.steel);
+    for (let i = 0; i < 9; i++) { const p = sidePt(.05 + i*.11, .065, s, .006), b = put(G.canvas, new T.SphereGeometry(.009, 8, 6), mat.steel); b.position.set(p[0], p[1], p[2]); }
   });
-  // tent's aft wall
-  const e = tent[nT], low = e.map(p => [A.x1 + .04, roofY(.6, p[2]*.7) + .004, p[2]*.98]);
-  grid(G.canvas, [e, low], mat.canvasD);
+  // stainless bow inside the enclosure, visible through the windows
+  const bowT = .27, bow = [...range(-1, 1, 14).map(q => { const [x, y] = prof(bowT), w = halfAt(x) - .03; return [x, y + (Q.crown - .03)*(1 - q*q) - .012, q*w]; })];
+  tube(G.canvas, bow, .009, mat.steel);
+  [1, -1].forEach(k => { const p = sidePt(bowT, 1, k, -.03), b = sidePt(.14, .03, k, -.03); rod(G.canvas, [p[0], p[1] - .012, p[2]], b, .009, mat.steel); });
 })();
 
 /* ---------- Rig ---------- */
@@ -105,7 +103,8 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   rod(G.rig, at(.022), at(.965), RG.furlerR, mat.blue, 14, RG.furlerR*.42);
   rod(G.rig, at(0), at(.022), .05, mat.steel, 18);
   rod(G.rig, at(.965), at(.982), .02, mat.steel);
-  rod(G.rig, top, [RG.backstay[0], RG.backstay[1], 0], .0045, mat.wire, 6);        // backstay
+  box(G.rig, [(mx + RG.backstayTop[0])/2, RG.backstayTop[1], 0], [mx - RG.backstayTop[0] + .06, .03, .05], mat.alu);   // masthead crane
+  rod(G.rig, [RG.backstayTop[0], RG.backstayTop[1], 0], [RG.backstay[0], RG.backstay[1], 0], .0045, mat.wire, 6);        // backstay
   box(G.rig, [RG.backstay[0], RG.backstay[1] - .02, 0], [.05, .05, .03], mat.steel);
 
   // boom
@@ -117,6 +116,7 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   rod(G.rig, [b.fwd - .75, b.y - b.h/2, 0], [mx + .05, foot + .2, 0], .021, mat.alu);            // kicker
   rod(G.rig, [b.aft + .34, b.y - b.h/2, 0], [TG.topX - .02, TG.topY + .03, 0], .006, mat.white);  // mainsheet
 
+  const coverGroup = G.sailCover = new T.Group(); G.rig.add(coverGroup);
   // sail cover: tall at the mast, tapering aft, with lashing straps
   const nC = 40, cover = [], cY = b.y + b.h/2 - .02;
   for (let i = 0; i <= nC; i++) {
@@ -128,10 +128,10 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
     r.unshift([x, cY - .07, -w*.82]); r.push([x, cY - .07, w*.82]);
     cover.push(r);
   }
-  grid(G.rig, cover, mat.canvas);
-  grid(G.rig, [cover[0], cover[0].map(p => [p[0] + .01, cY + .1, 0])], mat.canvasD);
-  grid(G.rig, [cover[nC], cover[nC].map(p => [p[0] - .02, cY + .05, 0])], mat.canvasD);
-  [.2, .45, .7].forEach(f => { const r = cover[Math.round(f*nC)]; tube(G.rig, r.map(p => [p[0], p[1], p[2]*1.035]).filter((_, k) => k%2 === 0), .005, mat.dark); });
+  grid(coverGroup, cover, mat.canvas);
+  grid(coverGroup, [cover[0], cover[0].map(p => [p[0] + .01, cY + .1, 0])], mat.canvasD);
+  grid(coverGroup, [cover[nC], cover[nC].map(p => [p[0] - .02, cY + .05, 0])], mat.canvasD);
+  [.2, .45, .7].forEach(f => { const r = cover[Math.round(f*nC)]; tube(coverGroup, r.map(p => [p[0], p[1], p[2]*1.035]).filter((_, k) => k%2 === 0), .005, mat.dark); });
 })();
 
 /* Lowrance 3G radome on a bracket, on the front of the mast just above the lower spreaders. */

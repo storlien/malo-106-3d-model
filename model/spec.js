@@ -118,7 +118,12 @@ const SPEC = {
     baseX: 1.684, topX: 2.224, baseHalf: 1.0, topHalf: 0.88, topY: 2.17, width: 0.11, depth: 0.05,
   },
 
-  aftCanvas: { x1: 0.324, y1: 1.46 },  // [P] where the cockpit tent meets the aft coaming
+  canvas: {    // navy sprayhood and bimini with side enclosure, from the owner's marina photo [P]
+    hoodFrontY: 2.09,                       // hood height at the top of the windscreen
+    hoodWindow: { f: [0.14, 0.86], v: [0.18, 0.84] },
+    kneeX: 1.02, kneeY: 2.12, aftX: 0.40, aftY: 1.50, crown: 0.045,   // bimini roof line in side view
+    windows: [[0.03, 0.50], [0.60, 0.93]], windowV: [0.43, 0.90],     // side windows along the enclosure
+  },
 
   hatches: [   // [x, z, length, width] [P]
     [5.084, -0.44, 0.50, 0.50], [5.084, 0.44, 0.50, 0.50], [7.214, 0, 0.56, 0.56], [9.004, 0, 0.46, 0.46],
@@ -134,7 +139,9 @@ const SPEC = {
     boom: { fwd: 6.064, aft: 1.984, y: 2.45, h: 0.155, w: 0.09 }, // [D]
     coverAft: 2.684,           // [P] sail cover end
     radar: { name: 'Lowrance 3G', diameter: 0.488, height: 0.28, kg: 7.4, aboveSpreader: 0.12, mastGap: 0.035 }, // [B] maker's data; position is the owner's choice
+    mainsail: { headBelowTop: 0.20, clewInset: 0.14, headWidth: 0.16, roach: 0.22, camber: 0.05, battens: [0.23, 0.44, 0.64, 0.83], logoV: 0.69 }, // [P] owner's photo
     stem: [10.564, 1.32],      // [D] forestay foot
+    backstayTop: [5.864, 15.79], // [P] on a short masthead crane aft of the mast, which lets the sail head clear it
     backstay: [0.10, 1.16],   // [D]
     furlerR: 0.05,           // [P] furled genoa in its blue UV strip
   },
@@ -161,7 +168,7 @@ const SPEC = {
 
       { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },
-        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.48 },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.46 },
 
       { id: 'tall', name: 'Standing height', note: 'You can stand upright on the aft deck. More weight and windage up high, so the frame must be stiffer.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.62, topY: 2.99, half: 0.98, bend: 0.22 },

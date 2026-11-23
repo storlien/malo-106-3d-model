@@ -68,7 +68,8 @@ function buildArch(d, count, D, orient, rearAngle = 0) {
   const panels = panelLayout(d, count, orient), yRail = H.topY + D, panelY = yRail + D/2 + AC.panel.thick/2;
   const fwd = Math.max(...panels.map(q => q[0])), aft = Math.min(...panels.map(q => q[1]));
   const halfW = Math.max(...panels.flatMap(q => [Math.abs(q[2]), Math.abs(q[3])]));
-  const frameHalf = straight ? Math.max(halfW, A.footHalf) : halfW, footX = transomX(A.footY, A.footHalf) - A.standoff;
+  const frameHalf = straight ? Math.max(halfW, A.footHalf) : d.foreStrut ? Math.max(halfW, H.half) : halfW,   // fore struts must land outside the bimini
+     footX = transomX(A.footY, A.footHalf) - A.standoff;
   // a chosen rear angle fixes where the pipe reaches the frame; the frame extends aft to meet it
   const strutTop = straight && rearAngle ? footX - (yRail - A.footY)/Math.tan(rearAngle*Math.PI/180) : Math.min(aft, -.04);
   const railFwd = Math.max(fwd, straight ? H.topX : H.topX + .01), railAft = Math.min(aft, strutTop);
@@ -106,7 +107,7 @@ function buildArch(d, count, D, orient, rearAngle = 0) {
     } else footPlate([H.footX, fy, s*H.footHalf]);
     if (d.foreStrut) {
       const q = d.foreStrut, b = [q.footX, deckY(q.footX, q.footHalf), s*q.footHalf];
-      pipe([b, [railFwd, yRail, s*Math.min(halfW, H.half)]]); footPlate(b);   // stays inboard of the lifelines
+      pipe([b, [railFwd, yRail, s*Math.min(frameHalf, H.half)]]); footPlate(b);   // stays inboard of the lifelines
     }
   });
   steelKg = steelM*kgPerM;
@@ -192,7 +193,7 @@ function measureArch(b) {
   ensureObstacles();
   const pts = surfacePoints(b.frame), clear = [];                    // clear = above the deck sockets
   const R = SPEC.rig, B = R.boom, reach = B.fwd - B.aft;
-  const s0 = [R.backstay[0], R.backstay[1]], ax = R.mastX + .02 - s0[0], ay = R.mastTop - .03 - s0[1], ll = ax*ax + ay*ay;
+  const s0 = [R.backstay[0], R.backstay[1]], ax = R.backstayTop[0] - s0[0], ay = R.backstayTop[1] - s0[1], ll = ax*ax + ay*ay;
   let past = -9, stay = 9, boom = 9, head = 9, top = -9, minX = 9, maxX = -9, minZ = 9, maxZ = -9;
   for (let i = 0; i < pts.length; i += 3) {
     const x = pts[i], y = pts[i + 1], z = pts[i + 2];
