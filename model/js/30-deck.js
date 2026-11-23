@@ -42,7 +42,7 @@ const endSamples = (a, b, n = 40) => { const o = []; for (let i = 0; i <= n; i++
 /* Deck: two strips from the trunk (or centreline) out to the rail. */
 (function deck() {
   const ex = [...endSamples(HO.aft + 1e-3, HO.fwd), ...frontStations(HO.fwd), HO.aft, HO.aft + 1e-3]; for (let i = 0; i <= 24; i++) ex.push(.45*(i/24)*(i/24), CP.aftRail + CP.aftCorner*(i/24)*(i/24));
-  const xs = stations(0, L, .035, ex);
+  const xs = stations(SPEC.deck.toeRail.sternCapTo, L, .035, ex);
   [1, -1].forEach(s => {
     const rows = xs.map(x => {
       const o = deckHalf(x), a = Math.min(x <= HO.aft ? cockpitHalf(x) : Math.max(houseHalf(x) - .006, 0), o), r = [];
@@ -70,7 +70,7 @@ mat.toeRail = (() => {
   for (let x = c*zc*zc + .05; x < L - .01; x += .05) line.push([x, halfB(x)]);
   line.push([L, 0]);
   const h = SPEC.deck.toeRail.height, side = SPEC.deck.toeRail.width, cornerX = c*zc*zc;
-  const widthAt = x => lerp(CP.aftRail, side, smooth((x - cornerX)/.42));   // wide across the stern, narrow along the sides
+  const widthAt = () => side;                      // the wide stern part is its own plank, built with the cockpit
   [1, -1].forEach(s => {
     const rows = line.map((p, i) => {
       const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)];
@@ -86,7 +86,7 @@ mat.toeRail = (() => {
 
 /* Trunk walls: a loop from aft around to the front, on each side. */
 const wallPt = (x, s, h) => {
-  const z0 = houseHalf(x), y0 = deckY(x, z0) - .01, tx = toTopX(x), z1 = z0*HO.tumble, y1 = roofY(tx, z1);
+  const z0 = houseHalf(x), y0 = deckLevel(x, z0) - .01, tx = toTopX(x), z1 = z0*HO.tumble, y1 = roofY(tx, z1);
   const k = h < .86 ? h/.86*.86 : h;                    // straight wall, rounded shoulder
   return [lerp(x, tx, k), lerp(y0, y1, h), s*(lerp(z0, z1, k) - .012*Math.pow(Math.max(0, h - .9)/.1, 2))];
 };
@@ -97,7 +97,7 @@ const wallPt = (x, s, h) => {
     grid(G.deck, rows, mat.gel);
     // navy stripe around the wall
     const b = HO.band, band = xs.filter(x => x >= b.from && x <= b.to).map(x => {
-      const z0 = houseHalf(x), y0 = deckY(x, z0), tx = toTopX(x), y1 = roofY(tx, z0*HO.tumble), r = [];
+      const z0 = houseHalf(x), y0 = deckLevel(x, z0), tx = toTopX(x), y1 = roofY(tx, z0*HO.tumble), r = [];
       for (let k = 0; k <= 2; k++) {
         const y = lerp(b.y0, b.y1, k/2), h = clamp((y - y0)/(y1 - y0), 0, 1);
         const p = wallPt(x, s, h), nx = x < HO.aft + .34 ? -.004 : 0; r.push([p[0] + nx, y, p[2] + s*.003]);
@@ -147,6 +147,22 @@ const footAft = CP.aftRail + CP.benchDepth, benchY = sheerY(0) + SPEC.deck.toeRa
   [1, -1].forEach(s => {
     grid(G.deck, xs.map(x => { const z = cockpitHalf(x); return [[x, wallTop(x, z), s*z], [x, CP.seat, s*z]]; }), mat.gelDeck);
     grid(G.deck, arc.map(z => { const x = aftEdge(z); return [[x, deckY(x, z) + .002, s*z], [x + back, benchY, s*z]]; }), mat.gelDeck);   // sloped back up to the toe rail
+    // wide solid teak toe rail: one plank across the stern, mitred at the coaming corner to one along each side
+    const capTo = SPEC.deck.toeRail.sternCapTo, c = HS.transomCurve; let hz = 1; for (let k = 0; k < 30; k++) hz = halfB(c*hz*hz);
+    const Cx = HO.aft, Cz = houseHalf(HO.aft + 1e-3) - .004, Hx = c*hz*hz, inX = z => z < W ? aftEdge(z) : z <= Cz ? HO.aft : lerp(HO.aft, Hx, (z - Cz)/(hz - Cz));
+    const zs = [...arc, W + 1e-4, ...Array.from({ length: 9 }, (_, i) => lerp(W + 2e-4, Cz, (i + 1)/9)), ...Array.from({ length: 14 }, (_, i) => lerp(Cz, hz, (i + 1)/14))];
+    const aftRows = zs.map(z => Array.from({ length: 5 }, (_, k) => { const x = lerp(c*z*z, inX(z), k/4); return [x, deckY(x, z), s*z]; }));
+    const plank = (rows, uvAt) => { const g = gridGeo(rows), uv = []; rows.forEach(r => r.forEach(q => uv.push(...uvAt(q)))); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); put(G.deck, g, mat.toeRail); };
+    plank(aftRows, q => [Math.abs(q[2])/2.4, q[0]/.3]);
+    const inner = x => x <= HO.aft ? Cz : houseHalf(x) - .004, outer = x => deckHalf(x);
+    const sideRows = Array.from({ length: 41 }, (_, t) => Array.from({ length: 9 }, (_, j) => {
+      const k = j/8, mx = lerp(Cx, Hx, k), mz = lerp(Cz, hz, k), q0 = clamp((mz - inner(mx))/(outer(mx) - inner(mx)), 0, 1), x = lerp(mx, capTo, t/40), q = lerp(q0, k, t/40), z = t ? lerp(inner(x), outer(x), q) : mz;
+      return [x, deckY(Math.min(x, capTo - 1e-4), z), s*z];
+    }));
+    plank(sideRows, q => [q[0]/2.4, Math.abs(q[2])/.3]);
+    rod(G.deck, [Cx, deckY(Cx, Cz) + .001, s*Cz], [Hx, deckY(Hx, hz) + .001, s*hz], .0018, mat.dark, 5);               // mitre joint
+    const endRows = Array.from({ length: 13 }, (_, i) => { const z = lerp(inner(capTo), outer(capTo), i/12); return [[capTo, deckY(capTo - 1e-4, z), s*z], [capTo, deckLevel(capTo, z) - .003, s*z]]; });
+    plank(endRows, q => [Math.abs(q[2])/2.4, q[1]/.3]);
     // square end of the coaming, where the bench runs past it to the stern
     const endX = HO.aft + 1e-3, endZ = cockpitHalf(endX);
     grid(G.deck, Array.from({ length: 11 }, (_, i) => i/10).map(h => { const p = wallPt(endX, s, h); return [p, [p[0], p[1], s*endZ]]; }), mat.gelDeck);
@@ -201,7 +217,7 @@ function placeLogo(loaded) {
   const fGeo = new T.ExtrudeGeometry(fShape, { depth: .012, bevelEnabled: false, curveSegments: 6 });
   const gGeo = new T.ShapeGeometry(hole, 6);
   [1, -1].forEach(s => HO.windows.forEach(x => {
-    const z0 = houseHalf(x), y0 = deckY(x, z0), y1 = roofY(toTopX(x), z0*HO.tumble), hh = (HO.windowY - y0)/(y1 - y0);
+    const z0 = houseHalf(x), y0 = deckLevel(x, z0), y1 = roofY(toTopX(x), z0*HO.tumble), hh = (HO.windowY - y0)/(y1 - y0);
     const c = new V3(...wallPt(x, s, hh)), a = new V3(...wallPt(x + .02, s, hh)).sub(c).normalize();
     const up = new V3(...wallPt(x, s, Math.min(1, hh + .08))).sub(c).normalize(), n = new V3().crossVectors(a, up).normalize();
     if (n.z*s < 0) n.negate();
@@ -246,7 +262,7 @@ function winch(parent, x, y, z, k = 1) {
   [1, -1].forEach(s => {
     [.914, 2.384].forEach(x => { const q = (cockpitHalf(x) + roofHalf(x))/2; winch(G.deck, x, roofY(x, q) - .002, s*q, x < 1.7 ? 1.05 : .9); });
     winch(G.deck, 4.714, roofY(4.714, .84), s*.84, .62);
-    [[.30, .96], [6.064, 1.36], [9.944, .17]].forEach(([x, q]) => {           // mooring cleats
+    [[.50, 1.04], [6.064, 1.36], [9.944, .17]].forEach(([x, q]) => {           // mooring cleats
       const zz = s*Math.min(q, deckHalf(x) - .12), y = deckY(x, zz);
       rod(G.deck, [x - .09, y + .035, zz], [x + .09, y + .035, zz], .012, mat.steel);
       [-.04, .04].forEach(d => rod(G.deck, [x + d, y, zz], [x + d, y + .035, zz], .012, mat.steel));

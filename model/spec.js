@@ -94,7 +94,7 @@ const SPEC = {
   deck: {
     crown: 0.07,              // [E] camber at the centreline
     plank: 0.056,             // [P] teak plank + caulking pitch
-    toeRail: { height: 0.05, width: 0.05 }, // [P]
+    toeRail: { height: 0.05, width: 0.05, sternCapTo: 1.00 }, // [P] aft of sternCapTo there is no lowered deck, only a wide solid teak toe rail
   },
 
   house: {   // cabin trunk and cockpit coamings, one continuous moulding [D/P]

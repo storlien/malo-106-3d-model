@@ -25,7 +25,8 @@ function transomStart(t) {
   return x;
 }
 const deckHalf = x => x <= 0 ? 0 : Math.min(halfB(x), Math.sqrt(x/HS.transomCurve));
-const deckY = (x, z) => { const B = Math.max(halfB(x), .01), f = smooth(x/.35); return sheerY(x) + SPEC.deck.crown*f*Math.max(0, 1 - (z/B)*(z/B)); };
+const deckLevel = (x, z) => { const B = Math.max(halfB(x), .01), f = smooth(x/.35); return sheerY(x) + SPEC.deck.crown*f*Math.max(0, 1 - (z/B)*(z/B)); };   // the lowered teak deck
+const deckY = (x, z) => x < SPEC.deck.toeRail.sternCapTo ? sheerY(x) + SPEC.deck.toeRail.height + .001 : deckLevel(x, z);        // what you stand on: the wide stern toe rail, then the deck
 
 const boat = new T.Group();
 const G = { hull: new T.Group(), deck: new T.Group(), canvas: new T.Group(), rig: new T.Group(), rails: new T.Group() };
