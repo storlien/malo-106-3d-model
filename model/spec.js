@@ -25,13 +25,14 @@ const SPEC = {
     draft: 1.58,          // [B]
     floatSink: 0.10,      // [P] real boat floats this much below the drawing's design waterline
     transomRake: 0.05,    // [P] top of transom aft of bottom, m per m of height
+    transomArc: 2.00,     // [M 2026-11-23] around the curve of the transom, at the top of the navy band
     transomCurve: 0.12,   // [P] plan curvature of transom: x = curve * z^2
 
     // [x, height of sheer]. [D] blended with [P]: photos show a little more spring forward
     sheer: [[0, 1.095], [1.16, 1.085], [2.56, 1.075], [4.56, 1.075], [5.86, 1.09], [7.91, 1.135], [9.26, 1.175], [10.60, 1.235]],
 
     // [x, half-breadth at sheer] [D], normalised to the published beam
-    halfBreadth: [[0, 1.07], [0.524, 1.21], [1.194, 1.39], [1.864, 1.495], [2.539, 1.58], [3.214, 1.64], [3.884, 1.668],
+    halfBreadth: [[0, 0.9229], [0.524, 1.21], [1.194, 1.39], [1.864, 1.495], [2.539, 1.58], [3.214, 1.64], [3.884, 1.668],
       [4.554, 1.675], [5.224, 1.635], [5.894, 1.56], [6.574, 1.45], [7.244, 1.28], [7.914, 1.06], [8.584, 0.81], [9.254, 0.585], [9.934, 0.28], [10.60, 0]],
 
     // [x, height of canoe-body centreline, up the stem to the sheer] [D]
@@ -104,7 +105,7 @@ const SPEC = {
     roof: 1.40,               // [D]
     roofCrown: 0.05,          // [E]
     sideDeck: 0.46,           // [P] side-deck width amidships
-    sideDeckAft: 0.30,        // [P] side deck narrows towards the stern
+    aftHalf: 0.73,            // [M 2026-11-23] raised coaming structure is 1.46 m wide at its aft end
     maxHalf: 1.2,             // [P]
     tumble: 0.93,             // [P] top half-width / base half-width
     teakFrom: 4.284,           // [P] coachroof teak starts forward of the windscreen
@@ -115,9 +116,10 @@ const SPEC = {
   },
 
   cockpit: {   // from the brochure and broker photos [E/P], replace with tape measurements
-    benchDepth: 0.50,         // X: helm bench, from the inside of the stern toe rail to the footwell
-    aftRail: 0.12,            // Y: width of the toe rail across the stern
-    benchBack: 0.06,          // sloped cream back between the toe rail and the teak seat
+    benchDepth: 0.38,         // [M 2026-11-23] helm bench, from the inside of the stern toe rail to the footwell
+    aftRail: 0.15,            // [M 2026-11-23] width of the toe rail across the stern
+    benchBelowRail: 0.10,     // [M 2026-11-23] bench surface below the top of the toe rail
+    benchBack: 0.025,         // sloped cream back between the toe rail and the teak seat
     aftCorner: 0.17,          // how far the rounded aft corners of the well reach forward
     capWidth: 0.17,           // teak-topped coaming that carries the winches
     fwd: 3.584, halfWidth: 0.86,
@@ -134,13 +136,13 @@ const SPEC = {
   },
 
   targa: {     // Malö's moulded mainsheet arch [D/P]
-    baseX: 1.684, topX: 2.224, baseHalf: 1.0, topHalf: 0.88, topY: 2.17, width: 0.11, depth: 0.05,
+    baseX: 1.684, topX: 2.224, baseHalf: 1.0, topHalf: 0.88, topY: 2.238, width: 0.11, depth: 0.05,
   },
 
   canvas: {    // navy sprayhood and bimini with side enclosure, from the owner's marina photo [P]
     hoodFrontY: 2.09,                       // hood height at the top of the windscreen
     hoodWindow: { f: [0.14, 0.86], v: [0.18, 0.84] },
-    kneeX: 1.02, kneeY: 2.12, aftX: 0.40, aftY: 1.50, crown: 0.045,   // bimini roof line in side view
+    kneeX: 1.02, kneeY: 2.188, aftX: 0.40, aftY: 1.50, crown: 0.045,   // bimini roof line in side view
     windows: [[0.03, 0.52]], windowV: [0.43, 0.90],                   // one side window each side
     aftWindow: { afterKnee: 0.04, end: 0.95, halfWidth: 0.84 },       // large clear window in the flat, raked aft side
   },
@@ -179,13 +181,13 @@ const SPEC = {
     rearAngles: [0, 60],    // selectable rear pipe angles at the top frame, degrees; 0 = pipe meets the aft panel edge. Add values here to test more.
     // vertical arch heights: y is the top of the fore pipes above the design waterline; 'fit' is solved so the panels fill the frame
     archHeights: [{ id: 'fit', name: 'Closes gap' }, { id: 'current', name: 'Current', y: 2.60 }, { id: 'lower', name: 'Lower', y: 2.40 }],
-    foreLimitX: 0.22,       // furthest aft the fore pipes can stand, just forward of the pushpit's aft rail
+    foreLimitX: 0.25,       // furthest aft the fore pipes can stand, just forward of the pushpit's aft rail
     minFitY: 2.20,          // 'Closes gap' never goes below this height
     pipeWall: 0.002,        // [E] used for the weight estimate
     backstaySlot: 0.09,     // half-width of the opening around the backstay in the split layout
     warnGap: 0.05,          // clearances below this are flagged as tight
     contactGap: 0.01,       // clearances below this are treated as contact
-    sidePanels: { counts: [0, 1, 2], startX: 0.60, standoff: 0.065, topAboveWire: 0.06 },  // hung outside the lifelines, just forward of the pushpit
+    sidePanels: { counts: [0, 1, 2], startX: 0.84, standoff: 0.065, topAboveWire: 0.06 },  // hung outside the lifelines, just forward of the pushpit
     ensign: { base: [0.10, 1.22, 1.02], tip: [-0.62, 2.08, 1.02] },  // moved under the panels
 
     // To add a design, copy one entry and change its numbers. It appears on the page automatically.
@@ -212,10 +214,10 @@ const SPEC = {
   },
 
   rails: {
-    stanchions: [0.524, 2.084, 3.784, 5.634, 7.564], // [D]
+    stanchions: [2.084, 3.784, 5.634, 7.564], // [D]
     height: 0.62, inset: 0.085, wires: [0.31, 0.60],
     pulpit: { aftX: 9.384, frontX: 10.964, topY: 1.87 },  // [D]
-    pushpit: { topY: 1.76, foreX: 0.524, tube: 0.025 },  // tube is [M]
+    pushpit: { tube: 0.025, topAboveRail: 0.62, opening: 0.42, aftSide: 0.80, foreTop: 0.26, foreBottom: 0.60, footInset: 0.075 },  // [M 2026-11-23] except footInset [P]
                     // [D/P]
   },
 };

@@ -121,7 +121,7 @@ function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current') {
     pipe([[tx, A.footY, tz], f], 10);
     const plate = put(frame, new T.CylinderGeometry(.055, .055, .01, 22), mat.steel); plate.rotation.z = Math.PI/2; plate.position.set(tx - .004, A.footY, tz);
     if (straight) {
-      const base = [H.topX, deckY(H.topX, tz), tz];
+      const onRail = H.topX < HS.transomCurve*tz*tz + SPEC.cockpit.aftRail, base = [H.topX, onRail ? PP.railTop : deckY(H.topX, tz), tz];
       pipe([base, [H.topX, yRail, tz]]); footPlate(base); foreLength = yRail - base[1];
     } else footPlate([H.footX, fy, s*H.footHalf]);
     if (d.foreStrut) {
@@ -204,7 +204,7 @@ function ensureObstacles() {
   const near = (x, y) => x < 2.6 && y > 1.1 && y < 3.7;
   const notRail = m => { for (let q = m; q; q = q.parent) if (q === G.asBuilt || q === G.sidePanels) return true; return false; };
   const canvas = surfacePoints(G.canvas, null, near), rails = surfacePoints(G.rails, notRail, near), pushpit = [];
-  for (let i = 0; i < rails.length; i += 3) if (rails[i] < .56) pushpit.push(rails[i], rails[i + 1], rails[i + 2]);
+  for (let i = 0; i < rails.length; i += 3) if (rails[i] < PP.foot[0] + .03) pushpit.push(rails[i], rails[i + 1], rails[i + 2]);
   return obstacles = { canvas, rails, pushpit, canvasCells: toCells(canvas), railCells: toCells(rails), pushpitCells: toCells(pushpit) };
 }
 function measureArch(b) {
@@ -289,8 +289,8 @@ function buildSidePanels(count) {
   group.visible = false; G.sidePanels.add(group);
   [1, -1].forEach(s => {
     // the lifeline span from the pushpit to the next stanchion, the same line the wires follow
-    const zA = s*(deckHalf(Q.foreX) - R.inset)*.985, xB = R.stanchions[1], zB = s*(deckHalf(xB) - R.inset), yB = deckY(xB, zB);
-    const wire = h => { const k = h/R.height; return [[Q.foreX, lerp(deckY(Q.foreX, zA), Q.topY - .02, k), zA], [xB, lerp(yB, yB + R.height, k), zB*.985]]; };
+    const xB = R.stanchions[0], zB = s*(deckHalf(xB) - R.inset), yB = deckY(xB, zB);
+    const wire = h => { const k = h/R.height; return [PP.leg(s, k), [xB, lerp(yB, yB + R.height, k), zB*.985]]; };
     const [A, B] = wire(R.wires[1]), [A2, B2] = wire(R.wires[0]);
     const a = new V3(B[0] - A[0], B[1] - A[1], B[2] - A[2]), span = a.length(); a.normalize();
     const out = new V3().crossVectors(a, new V3(0, 1, 0)).normalize(); if (out.z*s < 0) out.negate();

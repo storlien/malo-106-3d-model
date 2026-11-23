@@ -43,7 +43,7 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
   const canvasHalf = x => { const b = Math.max(.05, halfB(x) - HO.sideDeck), d = clamp((.664 - x)/.34, 0, 1); return Math.min(HO.maxHalf, b)*HO.tumble*Math.pow(1 - d*d*d, 1/3); };
   const halfAt = x => Math.min(TG.topHalf - .015, Math.max(canvasHalf(x) - .03, .3));
   const sidePt = (t, v, s, off = 0) => {
-    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, canvasHalf(bx) - .012), by = roofY(bx, wb) + .004;
+    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, canvasHalf(bx) - .012, roofHalf(bx) - .012), by = roofY(bx, wb) + .004;
     return [lerp(bx, tx, v), lerp(by, ty, v), s*(lerp(wb, halfAt(tx), v) + off)];
   };
   const patch = (s, t0, t1, v0, v1, m) => {
@@ -104,7 +104,7 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
       };
       grid(G.rig, [ring(0, .01), ring(0), ...Array.from({ length: 12 }, (_, i) => ring((i + 1)/12)), ring(1, .01)], mat.alu);
       box(G.rig, [mx, y, s*(mW/2 + .022)], [SB.rootChord + .024, SB.rootThick + .022, .05], mat.alu);       // root socket on the mast
-      box(G.rig, [t[0], y, t[2]], [SB.tipChord + .008, SB.tipThick + .012, .035], mat.dark);                // tip end cap, where the shroud passes
+      const cap = put(G.rig, new T.SphereGeometry(1, 24, 14), mat.dark); cap.position.set(t[0], y, t[2]); cap.scale.set(SB.tipChord/2 + .006, SB.tipThick/2 + .007, .03);   // rounded tip, where the shroud passes
       return t;
     });
     const cp = chainplate(mx, s), fl = chainplate(mx + .62, s), al = chainplate(mx - .62, s);
@@ -239,6 +239,19 @@ const RADAR = (() => {
 })();
 
 /* ---------- Guard rails ---------- */
+/* Pushpit, from tape measurements: two halves either side of the backstay, each a single bent tube. */
+const PP = (() => {
+  const R = SPEC.rails, Q = R.pushpit, c = HS.transomCurve, railTop = sheerY(0) + SPEC.deck.toeRail.height, yt = railTop + Q.topAboveRail - Q.tube/2;
+  const aftX = z => c*z*z + Q.footInset, z0 = Q.opening/2 + Q.tube/2, curve = [[aftX(z0), z0]];
+  let left = Q.aftSide - Q.tube/2, z = z0;
+  while (left > 0) { const dz = Math.min(.004, left/Math.hypot(1, 2*c*z)); left -= dz*Math.hypot(1, 2*c*z); z += dz; curve.push([aftX(z), z]); if (dz < 1e-5) break; }
+  const corner = curve[curve.length - 1], edge = x => deckHalf(x) - R.inset; let lo = corner[0], hi = corner[0] + Q.foreBottom;
+  for (let i = 0; i < 40; i++) { const m = (lo + hi)/2; if (Math.hypot(m - corner[0], edge(m) - corner[1]) < Q.foreBottom) lo = m; else hi = m; }
+  const fx = (lo + hi)/2, fz = edge(fx), l = Math.hypot(fx - corner[0], fz - corner[1]), dir = [(fx - corner[0])/l, (fz - corner[1])/l];
+  const foot = [fx, deckY(fx, fz), fz], top = [corner[0] + dir[0]*Q.foreTop, yt, corner[1] + dir[1]*Q.foreTop];
+  const leg = (s, k) => [lerp(foot[0], top[0], k), lerp(foot[1], top[1], k), s*lerp(foot[2], top[2], k)];   // k from deck to top along the sloped fore leg
+  return { railTop, yt, aftX, z0, curve, corner, foot, top, leg };
+})();
 (function rails() {
   const R = SPEC.rails, P = R.pulpit, Q = R.pushpit, rail = (x, s) => { const z = s*(deckHalf(x) - R.inset); return [x, deckY(x, z), z]; };
   const posts = [];
@@ -251,9 +264,8 @@ const RADAR = (() => {
     });
     posts.push(list);
     const pulpitAft = [P.aftX, deckY(P.aftX, 0) + R.height + .03, s*(deckHalf(P.aftX) - R.inset)];
-    const pushFwd = [Q.foreX, Q.topY - .02, s*(deckHalf(Q.foreX) - R.inset)*.985];
     R.wires.forEach(h => {
-      const k = h/R.height, seq = [[pushFwd[0], lerp(deckY(Q.foreX, pushFwd[2]), pushFwd[1], k), pushFwd[2]], ...list.slice(1).map(q => [q.b[0], lerp(q.b[1], q.t[1], k), q.t[2]]), [pulpitAft[0], lerp(deckY(P.aftX, pulpitAft[2]), pulpitAft[1], k), pulpitAft[2]]];
+      const k = h/R.height, seq = [PP.leg(s, k), ...list.map(q => [q.b[0], lerp(q.b[1], q.t[1], k), q.t[2]]), [pulpitAft[0], lerp(deckY(P.aftX, pulpitAft[2]), pulpitAft[1], k), pulpitAft[2]]];
       for (let i = 0; i < seq.length - 1; i++) rod(G.rails, seq[i], seq[i + 1], .0032, mat.wire, 5);
     });
   });
@@ -272,25 +284,24 @@ const RADAR = (() => {
     rod(G.rails, [9.644, deckY(9.644, s*.2), s*.2], [9.924, P.topY - .03, s*.45], .011, mat.steel);
   });
 
-  // pushpit: double rail across the stern with a central boarding gate
-  const yt = Q.topY, stern = s => {
-    const z = s*(deckHalf(Q.foreX) - R.inset)*.985, xs = [[Q.foreX, z], [.30, s*1.04], [.13, s*.92], [.07, s*.46]];
-    return xs.map(([x, q]) => [x, yt, q]);
+  // pushpit: each half runs from its leg at the centre opening, around the corner, to a sloped fore leg
+  const round = (p, a, b, r) => {                     // rounds the corner at p between neighbours a and b
+    const to = (q, d) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]), k = Math.min(d, l*.45)/l; return p.map((v, i) => v + (q[i] - v)*k); };
+    const u = to(a, r), w = to(b, r), o = [];
+    for (let i = 0; i <= 8; i++) { const t = i/8, m = 1 - t; o.push(p.map((v, j) => m*m*u[j] + 2*m*t*v + t*t*w[j])); }
+    return o;
   };
+  const flange = (x, y, z) => { const f = put(G.rails, new T.CylinderGeometry(.03, .036, .008, 18), mat.steel); f.position.set(x, y + .004, z); };
   [1, -1].forEach(s => {
-    const line = stern(s);
-    tube(G.rails, line, Q.tube/2, mat.steel, false, 10);
-    tube(G.rails, line.map(p => [p[0], lerp(deckY(p[0], p[2]), yt, .52), p[2]]), Q.tube/2, mat.steel, false, 10);
-    line.forEach((p, i) => {
-      if (i !== 0 && i !== 2 && i !== 3) return;
-      // aft legs stand on the wide stern toe rail, each on a round flange
-      const z = p[2], x = i ? HS.transomCurve*z*z + .05 : p[0], y = i ? sheerY(x) + SPEC.deck.toeRail.height : deckY(x, z);
-      rod(G.rails, [x, y, z], [p[0], yt, z], Q.tube/2, mat.steel);
-      const f = put(G.rails, new T.CylinderGeometry(.03, .036, .008, 18), mat.steel); f.position.set(x, y + .004, z);
-    });
-    const g = line[3];
-    tube(G.rails, [[g[0], yt, g[2]], [g[0] - .012, yt + .05, g[2]*.6], [g[0] - .012, yt + .05, 0]], Q.tube/2, mat.steel);
-    rod(G.rails, [g[0], yt - .34, g[2]], [g[0], yt - .34, 0], Q.tube/2, mat.steel);
+    const zs = PP.curve.filter((_, i) => i%12 === 0 || i === PP.curve.length - 1), yl = lerp(PP.railTop, PP.yt, .52), at = (q, y) => [q[0], y, s*q[1]];
+    const first = at(PP.curve[0], PP.railTop), head = at(PP.curve[0], PP.yt), arc = zs.slice(1, -1).map(q => at(q, PP.yt)), c = at(PP.corner, PP.yt), top = [PP.top[0], PP.yt, s*PP.top[2]], end = PP.leg(s, 0);
+    const main = [first, [first[0], lerp(PP.railTop, PP.yt, .6), first[2]], ...round(head, first, arc[0], .055), ...arc.slice(1, -1), ...round(c, arc[arc.length - 1], top, .09), ...round(top, c, end, .06), PP.leg(s, .45), end];
+    tube(G.rails, main, Q.tube/2, mat.steel, false, 10);
+    const kl = (yl - PP.foot[1])/(PP.yt - PP.foot[1]), low = PP.leg(s, kl), cl = at(PP.corner, yl), larc = zs.slice(1, -1).map(q => at(q, yl));
+    tube(G.rails, [at(PP.curve[0], yl), ...larc.slice(0, -1), ...round(cl, larc[larc.length - 1], low, .09), low], Q.tube/2, mat.steel, false, 10);
+    const mid = PP.curve[Math.round(PP.curve.length*.52)];
+    rod(G.rails, at(mid, PP.railTop), at(mid, PP.yt), Q.tube/2, mat.steel);
+    flange(first[0], PP.railTop, first[2]); flange(mid[0], PP.railTop, s*mid[1]); flange(end[0], end[1], end[2]);
   });
 })();
 
@@ -403,7 +414,7 @@ function antenna(parent, base, top) {
   const out = put(G.hull, new T.TorusGeometry(.04, .011, 8, 24), mat.steel); out.position.set(ex2, ey2, ez2);
   const hole = put(G.hull, new T.CircleGeometry(.04, 20), mat.dark, false); hole.position.set(ex2, ey2, ez2 - .001);
   // ensign and antenna as they are today; the solar arch carries its own versions
-  const fx = .12, fz = .74;
+  const fx = .10, fz = .74;
   ensign(G.asBuilt, [fx, deckY(fx, fz) + .02, fz], [-.34, 2.46, fz]);
   const az = -.86, ax = .32;
   antenna(G.asBuilt, [ax, deckY(ax, az) + .02, az], [ax - .05, 2.45, az]);
