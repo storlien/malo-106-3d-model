@@ -122,7 +122,8 @@ const SPEC = {
     hoodFrontY: 2.09,                       // hood height at the top of the windscreen
     hoodWindow: { f: [0.14, 0.86], v: [0.18, 0.84] },
     kneeX: 1.02, kneeY: 2.12, aftX: 0.40, aftY: 1.50, crown: 0.045,   // bimini roof line in side view
-    windows: [[0.03, 0.50], [0.60, 0.93]], windowV: [0.43, 0.90],     // side windows along the enclosure
+    windows: [[0.03, 0.52]], windowV: [0.43, 0.90],                   // one side window each side
+    aftWindow: { afterKnee: 0.04, end: 0.95, halfWidth: 0.84 },       // large clear window in the flat, raked aft side
   },
 
   hatches: [   // [x, z, length, width] [P]
@@ -138,7 +139,9 @@ const SPEC = {
     chainplateInset: 0.13,    // [P] from the sheer
     boom: { fwd: 6.064, aft: 1.984, y: 2.45, h: 0.155, w: 0.09 }, // [D]
     coverAft: 2.684,           // [P] sail cover end
-    radar: { name: 'Lowrance 3G', diameter: 0.488, height: 0.28, kg: 7.4, aboveSpreader: 0.12, mastGap: 0.035 }, // [B] maker's data; position is the owner's choice
+    radar: { name: 'Lowrance 3G', diameter: 0.489, height: 0.28, kg: 7.4, aboveSpreader: 0.23, mastGap: 0.015,  // [B] maker's drawing; position is the owner's choice
+      // Scanstrut SC20 mast mount [B]: pin = mast fixing pin, holes are measured forward from the pins
+      mount: { name: 'Scanstrut SC20', length: 0.395, width: 0.263, pinSpacing: 0.105, armDrop: 0.112, height: 0.232, holeX: [0.159, 0.3005], holeWidth: 0.233 } },
     mainsail: { headBelowTop: 0.20, clewInset: 0.14, headWidth: 0.16, roach: 0.22, camber: 0.05, battens: [0.23, 0.44, 0.64, 0.83], logoV: 0.69 }, // [P] owner's photo
     stem: [10.564, 1.32],      // [D] forestay foot
     backstayTop: [5.864, 15.79], // [P] on a short masthead crane aft of the mast, which lets the sail head clear it

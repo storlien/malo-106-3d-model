@@ -48,15 +48,24 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
     const rows = range(t0, t1, Math.max(4, Math.ceil((t1 - t0)*70))).map(t => range(v0, v1, 3).map(v => sidePt(t, v, s, m ? 0 : .002)));
     m ? grid(G.canvas, rows, m) : clearPane(rows);
   };
-  const ts = range(0, 1, 70), roof = ts.map(t => { const [x, y] = prof(t), w = halfAt(x); return range(-1, 1, 30).map(q => [x, y + Q.crown*(1 - Math.pow(Math.abs(q), 2.6)), q*w]); });
-  grid(G.canvas, roof, mat.canvas);
-  const last = roof[roof.length - 1];                   // closed aft wall down to the coaming
-  grid(G.canvas, [last, last.map(p => [Q.aftX + .002, roofY(Q.aftX, p[2]*.9) + .004, p[2]*.985])], mat.canvasD);
-  const [vA, vB] = Q.windowV, [w1, w2] = Q.windows;
+  // roof and flat aft side, with the large clear window in the aft side
+  const tK = (l1 + l2)/total, roofPt = (t, q) => {
+    const [x, y] = prof(t), c = Q.crown*(1 - smooth((t - tK + .08)/.1));
+    return [x, y + c*(1 - Math.pow(Math.abs(q), 2.6)), q*halfAt(x)];
+  };
+  const roofPatch = (t0, t1, q0, q1, m) => {
+    const rows = range(t0, t1, Math.max(3, Math.ceil((t1 - t0)*70))).map(t => range(q0, q1, Math.max(2, Math.ceil((q1 - q0)*15))).map(q => roofPt(t, q)));
+    m ? grid(G.canvas, rows, m) : clearPane(rows);
+  };
+  const W = Q.aftWindow, wA = tK + W.afterKnee, wB = W.end, wq = W.halfWidth;
+  roofPatch(0, wA, -1, 1, mat.canvas); roofPatch(wB, 1, -1, 1, mat.canvas);
+  roofPatch(wA, wB, -1, -wq, mat.canvas); roofPatch(wA, wB, wq, 1, mat.canvas); roofPatch(wA, wB, -wq, wq, null);
+  const last = range(-1, 1, 30).map(q => roofPt(1, q));   // closed band below the window, down to the coaming
+  const [vA, vB] = Q.windowV, [w1] = Q.windows;
   [1, -1].forEach(s => {
     patch(s, 0, 1, 0, vA, mat.canvas); patch(s, 0, 1, vB, 1, mat.canvas);
-    patch(s, 0, w1[0], vA, vB, mat.canvas); patch(s, w1[1], w2[0], vA, vB, mat.canvas); patch(s, w2[1], 1, vA, vB, mat.canvas);
-    patch(s, w1[0], w1[1], vA, vB, null); patch(s, w2[0], w2[1], vA, vB, null);
+    patch(s, 0, w1[0], vA, vB, mat.canvas); patch(s, w1[1], 1, vA, vB, mat.canvas);
+    patch(s, w1[0], w1[1], vA, vB, null);
     // snap rail along the coaming
     tube(G.canvas, range(.01, .99, 22).map(t => { const p = sidePt(t, .025, s, .008); return p; }), .006, mat.steel);
     for (let i = 0; i < 9; i++) { const p = sidePt(.05 + i*.11, .065, s, .006), b = put(G.canvas, new T.SphereGeometry(.009, 8, 6), mat.steel); b.position.set(p[0], p[1], p[2]); }
@@ -134,19 +143,53 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   [.2, .45, .7].forEach(f => { const r = cover[Math.round(f*nC)]; tube(coverGroup, r.map(p => [p[0], p[1], p[2]*1.035]).filter((_, k) => k%2 === 0), .005, mat.dark); });
 })();
 
-/* Lowrance 3G radome on a bracket, on the front of the mast just above the lower spreaders. */
+/* Lowrance 3G radome on a Scanstrut SC20 mount, on the front of the mast just above the lower spreaders. */
 const RADAR = (() => {
-  const q = RG.radar, r = q.diameter/2, mx = RG.mastX, front = mx + RG.mastSize[0]/2, cx = front + q.mastGap + r, y0 = RG.spreaders[0][0] + q.aboveSpreader;
-  const profile = [[0, 0], [r*.94, 0], [r, .018], [r, q.height*.62], [r*.97, q.height*.76], [r*.86, q.height*.88], [r*.62, q.height*.965], [r*.3, q.height*.995], [0, q.height]].map(([a, b]) => new T.Vector2(a, b));
-  const dome = put(G.rig, new T.LatheGeometry(new T.SplineCurve(profile).getPoints(48), 48), mat.white); dome.position.set(cx, y0, 0);
-  const seam = put(G.rig, new T.CylinderGeometry(r + .002, r + .002, .012, 48, 1, true), mat.dark); seam.position.set(cx, y0 + q.height*.22, 0);
-  box(G.rig, [cx - .03, y0 - .009, 0], [q.diameter*.82, .012, .26], mat.steel);    // platform
-  box(G.rig, [front + .004, y0 - .05, 0], [.008, .24, .12], mat.steel);            // mast plate
+  const q = RG.radar, m = q.mount, k = q.diameter/.489, mx = RG.mastX, nose = mx + RG.mastSize[0]/2, cx0 = (m.holeX[0] + m.holeX[1])/2;
+  const pinX = nose + q.mastGap + q.diameter/2 - cx0, y0 = RG.spreaders[0][0] + q.aboveSpreader, cx = pinX + cx0, g = new T.Group();
+  g.position.set(pinX, y0, 0); G.rig.add(g);                 // local x = forward from the pins, y = 0 on the top of the plate
+
+  // radome outline from the maker's dimension drawing: [radius, height]
+  const outline = [[0, 0], [.160, 0], [.190, .010], [.222, .030], [.240, .047], [.2445, .058], [.2425, .080], [.207, .250], [.203, .258], [.196, .266], [.183, .272], [.120, .277], [0, .280]].map(([r, y]) => [r*k, y*q.height/.28]);
+  const radiusAt = y => { for (let i = 5; i < outline.length - 1; i++) if (y <= outline[i + 1][1]) return lerp(outline[i][0], outline[i + 1][0], (y - outline[i][1])/(outline[i + 1][1] - outline[i][1])); return 0; };
+  const dome = put(g, new T.LatheGeometry(outline.map(([r, y]) => new T.Vector2(r, y)), 64), mat.white); dome.position.set(cx0, 0, 0);
+  // cover joint, lower at the front than at the back as in the drawing
+  const joint = []; for (let i = 0; i <= 64; i++) { const a = i/64*Math.PI*2, y = .066 - .017*Math.cos(a), r = (y < .058 ? lerp(.240, .2445, (y - .047)/.011)*k : radiusAt(y)) + .0015; joint.push([cx0 + r*Math.cos(a), y, r*Math.sin(a)]); }
+  tube(g, joint, .0022, mat.dark, true, 6);
+
+  // LOWRANCE in blue on port and starboard
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 180;
+  const t = c.getContext('2d'); t.fillStyle = '#1558b0'; t.font = 'italic 900 138px Arial Black, Arial, sans-serif'; t.textAlign = 'center'; t.textBaseline = 'middle'; t.fillText('LOWRANCE', 512, 94, 990);
+  const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 12;
+  const logoMat = new T.MeshStandardMaterial({ map: tex, transparent: true, roughness: .4, depthWrite: false, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
   [1, -1].forEach(s => {
-    rod(G.rig, [front + .006, y0 - .012, s*.05], [cx + .12, y0 - .012, s*.1], .011, mat.steel, 8);
-    rod(G.rig, [front + .006, y0 - .16, s*.05], [cx + .04, y0 - .016, s*.1], .009, mat.steel, 8);
+    const span = .68, yA = .135, yB = .185, rows = [], uv = [];
+    for (let j = 0; j <= 2; j++) { const y = lerp(yA, yB, j/2), r = radiusAt(y) + .0012, row = []; for (let i = 0; i <= 24; i++) { const a = (i/24 - .5)*span; row.push([cx0 + r*Math.sin(a), y, s*r*Math.cos(a)]); uv.push(s > 0 ? i/24 : 1 - i/24, j/2); } rows.push(row); }
+    const d = gridGeo(rows); d.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); const q2 = put(g, d, logoMat, false); q2.renderOrder = 3;
   });
-  return { bottom: y0, top: y0 + q.height, spreaderGap: q.aboveSpreader - .026, mastGap: q.mastGap, name: q.name, kg: q.kg };
+
+  // SC20 plate: narrow at the mast, round at the forward end
+  const W = m.width/2, R = W, tip = m.length - R, h = m.pinSpacing/2, plate = new T.Shape();
+  plate.moveTo(0, h + .012); plate.bezierCurveTo(.07, h + .018, .13, W - .03, tip, W); plate.absarc(tip, 0, R, Math.PI/2, -Math.PI/2, true); plate.bezierCurveTo(.13, -W + .03, .07, -h - .018, 0, -h - .012); plate.closePath();
+  const pg = new T.Mesh(new T.ExtrudeGeometry(plate, { depth: .006, bevelEnabled: false, curveSegments: 18 }), mat.white); pg.rotation.x = -Math.PI/2; pg.position.y = -.006; pg.castShadow = true; g.add(pg);
+  m.holeX.forEach(x => [1, -1].forEach(s => { const b = put(g, new T.CylinderGeometry(.0095, .0095, .012, 10), mat.steel); b.position.set(x, -.012, s*m.holeWidth/2); }));
+
+  const yPad = (m.height - m.armDrop)/2;
+  [1, -1].forEach(s => {
+    const z = s*h, lo = [0, -m.armDrop, z];
+    rod(g, lo, [m.length - .03, -.008, s*.05], .012, mat.white, 10, .005);                 // lower arm running out under the plate
+    tube(g, [[.012, -m.armDrop + .006, z], [.045, -.085, s*.05], [.052, -.04, s*.05], [.085, -.008, s*.055]], .005, mat.white, false, 6);
+    rod(g, [.03, -m.armDrop + .012, z], [.17, -.008, s*(W - .022)], .008, mat.white, 8, .004);   // side web
+    [0, -m.armDrop].forEach(y => {                                                         // mast fittings
+      const pad = new T.Shape(); pad.moveTo(0, yPad); pad.lineTo(.018, .012); pad.lineTo(.018, -.012); pad.lineTo(0, -yPad); pad.lineTo(-.018, -.012); pad.lineTo(-.018, .012); pad.closePath();
+      const f = put(g, new T.ExtrudeGeometry(pad, { depth: .016, bevelEnabled: false }), mat.dark); f.position.set(-.018, y, z - .008);
+      const pin = put(g, new T.CylinderGeometry(.0065, .0065, .026, 10), mat.steel); pin.rotation.x = Math.PI/2; pin.position.set(0, y, z);
+      const zM = s*Math.min(h, RG.mastSize[1]/2 - .004), xM = (mx - pinX) + (RG.mastSize[0]/2)*Math.sqrt(Math.max(0, 1 - Math.pow(zM/(RG.mastSize[1]/2), 2)));
+      rod(g, [-.012, y, z], [xM, y, zM], .009, mat.steel, 8);                              // link back to the mast wall
+    });
+  });
+  const bottom = y0, mountBottom = y0 - m.armDrop - yPad;
+  return { bottom, top: y0 + q.height, spreaderGap: mountBottom - (RG.spreaders[0][0] + .026), mastGap: cx - q.diameter/2 - nose, name: q.name, mount: m.name, kg: q.kg, diameter: q.diameter, height: q.height };
 })();
 
 /* ---------- Guard rails ---------- */

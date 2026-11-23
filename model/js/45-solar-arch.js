@@ -346,7 +346,7 @@ function renderArchStats(r, q) {
   if (r) rows.push([`Pipe, ${num(r.pipeMm, 0)} mm`, `${num(r.steelM, 1)} m`], ['Arch steel weight (est.)', `${num(r.steelKg, 1)} kg`]);
   if (r) rows.push(['Arch panel weight', `${num(r.panelKg, 1)} kg`], ['Arch total weight (est.)', `${num(r.totalKg, 1)} kg`]);
   if (rows.length) groups.push(['Power and materials', rows]);
-  groups.push([RADAR.name + ' radar', [['Top above water', fmtM(RADAR.top - HS.floatSink)], ['Bottom above water', fmtM(RADAR.bottom - HS.floatSink)], ['Gap above spreaders', fmtCm(RADAR.spreaderGap)], ['Gap to mast', fmtCm(RADAR.mastGap)], ['Radar weight', `${num(RADAR.kg, 1)} kg`]]]);
+  groups.push([RADAR.name + ' radar', [['Top above water', fmtM(RADAR.top - HS.floatSink)], ['Bottom above water', fmtM(RADAR.bottom - HS.floatSink)], ['Size', `Ø${num(RADAR.diameter*1000, 0)} × ${num(RADAR.height*1000, 0)} mm`], ['Mast mount', RADAR.mount], ['Mount above spreaders', fmtCm(RADAR.spreaderGap)], ['Radome to mast', `${num(RADAR.mastGap*100, 1)} cm`], ['Radar weight', `${num(RADAR.kg, 1)} kg`]]]);
   document.getElementById('archStats').innerHTML = groups.map(([h, list, before]) =>
     `<h2>${h}</h2>${before || ''}<dl>${list.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
 }
