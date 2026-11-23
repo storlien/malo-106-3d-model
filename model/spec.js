@@ -105,7 +105,6 @@ const SPEC = {
     roof: 1.40,               // [D]
     roofCrown: 0.05,          // [E]
     sideDeck: 0.46,           // [P] side-deck width amidships
-    aftHalf: 0.73,            // [M 2026-11-23] raised coaming structure is 1.46 m wide at its aft end
     maxHalf: 1.2,             // [P]
     tumble: 0.93,             // [P] top half-width / base half-width
     teakFrom: 4.284,           // [P] coachroof teak starts forward of the windscreen
@@ -120,8 +119,9 @@ const SPEC = {
     aftRail: 0.15,            // [M 2026-11-23] width of the toe rail across the stern
     benchBelowRail: 0.10,     // [M 2026-11-23] bench surface below the top of the toe rail
     benchBack: 0.025,         // sloped cream back between the toe rail and the teak seat
-    aftCorner: 0.17,          // how far the rounded aft corners of the well reach forward
-    capWidth: 0.17,           // teak-topped coaming that carries the winches
+    aftInnerHalf: 0.73,       // [M 2026-11-23] inner width between the coamings at their aft end, and so the bench, is 1.46 m
+    aftCorner: 0.10,          // how far the rounded aft corners of the well reach forward
+    capWidth: 0.15,           // teak-topped coaming that carries the winches
     fwd: 3.584, halfWidth: 0.86,
     footHalf: 0.40, footFwd: 3.384,
     seat: 0.87, sole: 0.47,
@@ -129,10 +129,11 @@ const SPEC = {
     companionHalf: 0.40,
   },
 
-  screen: {    // fixed windscreen on its moulded base [D/P]
-    base: [[4.384, 0], [4.384, 0.46], [3.884, 0.92], [1.964, 1.02]],  // plan polyline at the roof, [x, z]
-    top: [[3.744, 0], [3.744, 0.42], [3.484, 0.74], [2.184, 0.88]],
-    baseY: 1.47, topY: 1.97,
+  screen: {    // fixed windscreen on its moulded base, read from the brochure drawing and photos [D/P]
+    base: [[4.16, 0], [4.16, 0.46], [3.36, 0.94], [1.964, 1.02]],  // plan polyline at the base of the glass, [x, z]
+    top: [[3.56, 0], [3.56, 0.42], [3.10, 0.80], [2.184, 0.88]],   // one wide centre pane, angled corner panes, long side panes
+    baseY: [[1.964, 1.50], [3.36, 1.585], [4.16, 1.55]],           // [x, height]: the base rises towards the corner mullion
+    topY: [[2.184, 1.82], [3.10, 1.93], [3.56, 2.00]],             // [x, height]: the top edge rises towards the front
   },
 
   targa: {     // Malö's moulded mainsheet arch [D/P]

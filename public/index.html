@@ -205,7 +205,6 @@ const SPEC = {
     roof: 1.40,               // [D]
     roofCrown: 0.05,          // [E]
     sideDeck: 0.46,           // [P] side-deck width amidships
-    aftHalf: 0.73,            // [M 2026-11-23] raised coaming structure is 1.46 m wide at its aft end
     maxHalf: 1.2,             // [P]
     tumble: 0.93,             // [P] top half-width / base half-width
     teakFrom: 4.284,           // [P] coachroof teak starts forward of the windscreen
@@ -220,8 +219,9 @@ const SPEC = {
     aftRail: 0.15,            // [M 2026-11-23] width of the toe rail across the stern
     benchBelowRail: 0.10,     // [M 2026-11-23] bench surface below the top of the toe rail
     benchBack: 0.025,         // sloped cream back between the toe rail and the teak seat
-    aftCorner: 0.17,          // how far the rounded aft corners of the well reach forward
-    capWidth: 0.17,           // teak-topped coaming that carries the winches
+    aftInnerHalf: 0.73,       // [M 2026-11-23] inner width between the coamings at their aft end, and so the bench, is 1.46 m
+    aftCorner: 0.10,          // how far the rounded aft corners of the well reach forward
+    capWidth: 0.15,           // teak-topped coaming that carries the winches
     fwd: 3.584, halfWidth: 0.86,
     footHalf: 0.40, footFwd: 3.384,
     seat: 0.87, sole: 0.47,
@@ -229,10 +229,11 @@ const SPEC = {
     companionHalf: 0.40,
   },
 
-  screen: {    // fixed windscreen on its moulded base [D/P]
-    base: [[4.384, 0], [4.384, 0.46], [3.884, 0.92], [1.964, 1.02]],  // plan polyline at the roof, [x, z]
-    top: [[3.744, 0], [3.744, 0.42], [3.484, 0.74], [2.184, 0.88]],
-    baseY: 1.47, topY: 1.97,
+  screen: {    // fixed windscreen on its moulded base, read from the brochure drawing and photos [D/P]
+    base: [[4.16, 0], [4.16, 0.46], [3.36, 0.94], [1.964, 1.02]],  // plan polyline at the base of the glass, [x, z]
+    top: [[3.56, 0], [3.56, 0.42], [3.10, 0.80], [2.184, 0.88]],   // one wide centre pane, angled corner panes, long side panes
+    baseY: [[1.964, 1.50], [3.36, 1.585], [4.16, 1.55]],           // [x, height]: the base rises towards the corner mullion
+    topY: [[2.184, 1.82], [3.10, 1.93], [3.56, 2.00]],             // [x, height]: the top edge rises towards the front
   },
 
   targa: {     // Malö's moulded mainsheet arch [D/P]
@@ -622,7 +623,8 @@ const teakUV = p => [p[0]/3.4, p[2]/(SPEC.deck.plank*8)];
 /* Plan outline of the trunk at deck level, with rounded ends. */
 function houseSide(x) {
   const side = x > 5.66 ? HO.sideDeck*(1 + (x - 5.66)*.06) : HO.sideDeck, normal = Math.min(HO.maxHalf, Math.max(.05, halfB(x) - side));
-  return lerp(HO.aftHalf, normal, 1 - Math.pow(1 - clamp((x - HO.aft)/(1.6 - HO.aft), 0, 1), 2.2));     // measured width at the aft end, blending into the side decks
+  const aftW = (CP.aftInnerHalf + CP.capWidth)/HO.tumble;
+  return lerp(aftW, Math.max(normal, aftW), 1 - Math.pow(1 - clamp((x - HO.aft)/(1.6 - HO.aft), 0, 1), 2.2));     // measured width at the aft end, blending into the side decks
 }
 function houseHalf(x) {
   if (x <= HO.aft || x >= HO.fwd) return 0;
@@ -669,6 +671,16 @@ const endSamples = (a, b, n = 40) => { const o = []; for (let i = 0; i <= n; i++
   });
 })();
 
+/* Solid teak plank for the toe rail: warm, with the grain running along its length. */
+mat.toeRail = (() => {
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 128;
+  const g = c.getContext('2d'), r = rng(73); g.fillStyle = '#a97c4a'; g.fillRect(0, 0, 2048, 128);
+  for (let i = 0; i < 520; i++) { g.strokeStyle = `rgba(${r() < .62 ? '74,46,22' : '214,170,116'},${.05 + r()*.14})`; g.lineWidth = .6 + r()*1.6;
+    const y = r()*128, x = r()*2048, l = 140 + r()*620, a = r()*6; g.beginPath(); g.moveTo(x, y); for (let q = 0; q <= l; q += 28) g.lineTo(x + q, y + Math.sin(q*.009 + a)*2.2); g.stroke(); }
+  const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.encoding = T.sRGBEncoding; t.anisotropy = 12;
+  return M('#ffffff', { map: t, roughness: .62 });
+})();
+
 /* Toe rail, following the sheer and across the transom. */
 (function toeRail() {
   const c = HS.transomCurve; let zc = 1; for (let k = 0; k < 30; k++) zc = halfB(c*zc*zc);
@@ -684,7 +696,9 @@ const endSamples = (a, b, n = 40) => { const o = []; for (let i = 0; i <= n; i++
       const w = widthAt(p[0]), y = sheerY(p[0]), at = (o, dy) => [p[0] + nx*o, y + dy, s*(p[1] + nz*o)];
       return [at(.006, -.022), at(.008, h - .012), at(0, h), at(-w + .008, h - .004), at(-w, .004), at(-w, -.005)];
     });
-    grid(G.deck, rows, mat.teakRail);
+    const geo = gridGeo(rows), uv = []; let run = 0;
+    rows.forEach((q, i) => { if (i) run += Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]); q.forEach((_, k) => uv.push(run/2.4, k/(q.length - 1))); });
+    geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); put(G.deck, geo, mat.toeRail);
   });
 })();
 
@@ -777,8 +791,8 @@ const footAft = CP.aftRail + CP.benchDepth, benchY = sheerY(0) + SPEC.deck.toeRa
   for (let i = 0; i < 5; i++) box(G.deck, [cx - .035, CP.seat + .07 + i*.095, 0], [.012, .085, ch*2 - .05], mat.teakDark);
   [-1, 1].forEach(s => rod(G.deck, [cx - .035, CP.seat, s*ch], [cx - .035, HO.roof, s*ch], .014, mat.teakDark));
   // sliding hatch garage on the roof ahead of the companionway
-  const gx = CP.fwd + .34, gy = roofY(gx, 0);
-  box(G.deck, [gx, gy + .03, 0], [.72, .05, ch*2 + .12], mat.gelDeck);
+  const gEnd = SPEC.screen.base[0][0] - .06, gx = (CP.fwd + gEnd)/2, gy = roofY(gx, 0);
+  box(G.deck, [gx, gy + .03, 0], [gEnd - CP.fwd, .05, ch*2 + .12], mat.gelDeck);
 })();
 
 /* Malö Yachts logo, following the curved, raked front of the trunk. */
@@ -877,33 +891,31 @@ function winch(parent, x, y, z, k = 1) {
   rod(G.deck, [ex + .1, ey, ez - .02], [ex + .1, ey + .13, ez - .075], .009, mat.dark);
 })();
 
-/* Fixed windscreen on its moulded base with the navy stripe, framed in stainless. */
+/* Fixed windscreen on its moulded base with the navy stripe, in slim anodised frames. */
 const SC = SPEC.screen;
-function mirrored(line) { return [...line.slice(1).reverse().map(p => [p[0], -p[1]]), ...line]; }
+const tableY = (t, x) => { if (x <= t[0][0]) return t[0][1]; for (let i = 0; i < t.length - 1; i++) if (x <= t[i + 1][0]) return lerp(t[i][1], t[i + 1][1], (x - t[i][0])/(t[i + 1][0] - t[i][0])); return t[t.length - 1][1]; };
+const screenTop = x => tableY(SC.topY, x), screenBase = x => tableY(SC.baseY, x);
 (function windscreen() {
-  const base = mirrored(SC.base), top = mirrored(SC.top);
-  // moulded base: a low cream plinth from the roof up to the glass line
-  const plinth = base.map(([x, z]) => [[x + .08, roofY(Math.min(x + .08, 6.66), z*1.05) - .005, z*1.05], [x, SC.baseY - .035, z], [x - .02, SC.baseY, z*.985]]);
+  const loop = l => [...l.slice(1).reverse().map(p => [p[0], -p[1]]), ...l.slice(1)], base = loop(SC.base), top = loop(SC.top), dense = [];
+  for (let i = 0; i < base.length - 1; i++) for (let k = i ? 1 : 0; k <= 14; k++) dense.push([lerp(base[i][0], base[i + 1][0], k/14), lerp(base[i][1], base[i + 1][1], k/14)]);
+  const low = ([x, z]) => { const q = Math.min(x + .08, 6.66); return [q, roofY(q, z*1.05) - .005, z*1.05]; }, up = ([x, z]) => [x, screenBase(x) - .035, z];
+  // moulded base: a cream plinth from the roof up to the glass line
+  const plinth = dense.map(p => { const b = screenBase(p[0]); return [low(p), up(p), [p[0] - .02, b, p[1]*.985]]; });
   grid(G.deck, plinth[0].map((_, k) => plinth.map(r => r[k])), mat.gel);
-  const stripe = base.map(([x, z]) => [[x + .036, SC.baseY - .03 - .022, z*1.024], [x + .018, SC.baseY - .03 + .008, z*1.009]]);
+  const onFace = (p, f) => { const a = low(p), c = up(p); return [lerp(a[0], c[0], f) + .004, lerp(a[1], c[1], f) + .001, lerp(a[2], c[2], f)*1.004]; };
+  const stripe = dense.map(p => [onFace(p, .42), onFace(p, .82)]);
   grid(G.deck, stripe[0].map((_, k) => stripe.map(r => r[k])), mat.navy, { noShadow: true });
-  // close plinth top under the glass
-  const inner = base.map(([x, z]) => [x - .02, SC.baseY, z*.985]);
-  grid(G.deck, [inner, inner.map(p => [Math.max(p[0] - .12, 1.964), SC.baseY - .004, p[2]*.86])], mat.gelDeck);
-  // glass panes
-  for (let i = 0; i < base.length - 1; i++) {
-    const a = [base[i][0] - .02, SC.baseY, base[i][1]*.985], b = [base[i + 1][0] - .02, SC.baseY, base[i + 1][1]*.985];
-    const c = [top[i][0], SC.topY, top[i][1]], d = [top[i + 1][0], SC.topY, top[i + 1][1]];
-    const m = grid(G.deck, [[a, b], [c, d]], mat.clear, { noShadow: true }); m.renderOrder = 3; m.castShadow = false;
-    rod(G.deck, a, c, .013, mat.steel);
+  // close the plinth top under the glass
+  const inner = dense.map(([x, z]) => [x - .02, screenBase(x), z*.985]);
+  grid(G.deck, [inner, inner.map(p => [Math.max(p[0] - .12, 1.964), p[1] - .004, p[2]*.86])], mat.gelDeck);
+  // five panes: side, corner, one wide centre, corner, side
+  const B = base.map(([x, z]) => [x - .02, screenBase(x), z*.985]), Tp = top.map(([x, z]) => [x, screenTop(x), z]);
+  for (let i = 0; i < B.length - 1; i++) {
+    const m = grid(G.deck, [[B[i], B[i + 1]], [Tp[i], Tp[i + 1]]], mat.clear, { noShadow: true }); m.renderOrder = 3; m.castShadow = false;
+    rod(G.deck, Tp[i], Tp[i + 1], .015, mat.alu, 12);
+    rod(G.deck, [B[i][0], B[i][1] + .008, B[i][2]], [B[i + 1][0], B[i + 1][1] + .008, B[i + 1][2]], .012, mat.alu, 12);
   }
-  const l = base.length - 1;
-  rod(G.deck, [base[l][0] - .02, SC.baseY, base[l][1]*.985], [top[l][0], SC.topY, top[l][1]], .013, mat.steel);
-  rod(G.deck, [base[0][0] - .02, SC.baseY, base[0][1]*.985], [top[0][0], SC.topY, top[0][1]], .013, mat.steel);
-  for (let i = 0; i < top.length - 1; i++) {
-    rod(G.deck, [top[i][0], SC.topY, top[i][1]], [top[i + 1][0], SC.topY, top[i + 1][1]], .014, mat.steel);
-    rod(G.deck, [base[i][0] - .02, SC.baseY + .01, base[i][1]*.985], [base[i + 1][0] - .02, SC.baseY + .01, base[i + 1][1]*.985], .012, mat.steel);
-  }
+  B.forEach((p, i) => { rod(G.deck, p, Tp[i], .014, mat.alu, 12); const j = put(G.deck, new T.SphereGeometry(.017, 12, 8), mat.alu); j.position.set(...Tp[i]); });
 })();
 
 /* The moulded TARGA arch that carries the mainsheet. */
@@ -942,10 +954,10 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
 
   /* Sprayhood */
   const hx = f => lerp(frontX, archX, f), hy = f => lerp(Q.hoodFrontY, TG.topY + .005, smooth(f));
-  const hoodSide = (f, v, s) => { const x = hx(f), w = Math.min(edge(x), TG.topHalf - .012); return [x, lerp(SC.topY, hy(f) - .035, v), s*w*lerp(1.004, .975, v)]; };
+  const hoodSide = (f, v, s) => { const x = hx(f), w = Math.min(edge(x), TG.topHalf - .012); return [x, lerp(screenTop(x), hy(f) - .035, v), s*w*lerp(1.004, .975, v)]; };
   const hoodF = [...range(0, 1, 44), (frontX - top[2][0])/(frontX - archX)].sort((a, b) => a - b);
   grid(G.canvas, hoodF.map(f => { const x = hx(f), w = Math.min(edge(x), TG.topHalf - .012)*.975, y = hy(f); return range(-1, 1, 28).map(q => [x, y - .035*Math.pow(Math.abs(q), 3.4), q*w]); }), mat.canvas);
-  grid(G.canvas, range(-1, 1, 28).map(q => { const w = edge(frontX)*.975; return [[frontX, SC.topY, q*w], [frontX + .004, Q.hoodFrontY - .035*Math.pow(Math.abs(q), 3.4), q*w]]; }), mat.canvas);
+  grid(G.canvas, range(-1, 1, 28).map(q => { const w = edge(frontX)*.975; return [[frontX, screenTop(frontX), q*w], [frontX + .004, Q.hoodFrontY - .035*Math.pow(Math.abs(q), 3.4), q*w]]; }), mat.canvas);
   const H = Q.hoodWindow, hoodPatch = (s, f0, f1, v0, v1, m) => {
     const fs = [...range(f0, f1, 18), ...hoodF.filter(f => f > f0 && f < f1)].sort((a, b) => a - b), rows = fs.map(f => range(v0, v1, 3).map(v => hoodSide(f, v, s)));
     m ? grid(G.canvas, rows, m) : clearPane(rows);
@@ -955,7 +967,7 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
     hoodPatch(s, 0, H.f[0], H.v[0], H.v[1], mat.canvas); hoodPatch(s, H.f[1], 1, H.v[0], H.v[1], mat.canvas);
     hoodPatch(s, H.f[0], H.f[1], H.v[0], H.v[1], null);
     // stainless grab rail along the top of the glass
-    tube(G.canvas, range(.02, .98, 14).map(f => { const p = hoodSide(f, 0, s); return [p[0], SC.topY + .03, p[2] + s*.016]; }), .009, mat.steel);
+    tube(G.canvas, range(.02, .98, 14).map(f => { const p = hoodSide(f, 0, s); return [p[0], screenTop(p[0]) + .03, p[2] + s*.016]; }), .009, mat.steel);
   });
 
   /* Bimini roof line in side view: arch, knee, raked aft end */
@@ -970,9 +982,9 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
   };
   // the bimini keeps its own plan width, tapering aft as on the marina photo
   const canvasHalf = x => { const b = Math.max(.05, halfB(x) - HO.sideDeck), d = clamp((.664 - x)/.34, 0, 1); return Math.min(HO.maxHalf, b)*HO.tumble*Math.pow(1 - d*d*d, 1/3); };
-  const halfAt = x => Math.min(TG.topHalf - .015, Math.max(canvasHalf(x) - .03, .3));
+  const halfAt = x => Math.min(TG.topHalf - .015, Math.max(canvasHalf(x) - .03, .3, Math.min(cockpitHalf(x) + .02, roofHalf(x) - .02)));   // lands on the coaming, outside the 1.46 m well
   const sidePt = (t, v, s, off = 0) => {
-    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, canvasHalf(bx) - .012, roofHalf(bx) - .012), by = roofY(bx, wb) + .004;
+    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, roofHalf(bx) - .012), by = roofY(bx, wb) + .004;
     return [lerp(bx, tx, v), lerp(by, ty, v), s*(lerp(wb, halfAt(tx), v) + off)];
   };
   const patch = (s, t0, t1, v0, v1, m) => {
@@ -1336,8 +1348,6 @@ function antenna(parent, base, top) {
   // transom fittings from the photo
   const ring = (y, z, r) => { const x = transomX(y, z) - .004, m = put(G.hull, new T.TorusGeometry(r, r*.26, 8, 22), mat.steel); m.position.set(x, y, z); m.rotation.y = Math.PI/2; const d = put(G.hull, new T.CircleGeometry(r, 18), mat.dark, false); d.position.set(x + .001, y, z); d.rotation.y = -Math.PI/2; };
   ring(.985, -.86, .024); ring(.985, -.72, .024);
-  const disc = put(G.hull, new T.CylinderGeometry(.062, .066, .018, 28), mat.white); disc.rotation.z = Math.PI/2; disc.position.set(transomX(.89, .06) - .008, .89, .06);
-  const discIn = put(G.hull, new T.TorusGeometry(.034, .004, 6, 24), M('#b9bcb8')); discIn.rotation.y = Math.PI/2; discIn.position.set(transomX(.89, .06) - .019, .89, .06);
   // exhaust outlet on the starboard quarter
   const ex2 = .24, ey2 = .36, ez2 = hullHalf(ex2, ey2) + .004;
   const out = put(G.hull, new T.TorusGeometry(.04, .011, 8, 24), mat.steel); out.position.set(ex2, ey2, ez2);

@@ -13,10 +13,10 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
 
   /* Sprayhood */
   const hx = f => lerp(frontX, archX, f), hy = f => lerp(Q.hoodFrontY, TG.topY + .005, smooth(f));
-  const hoodSide = (f, v, s) => { const x = hx(f), w = Math.min(edge(x), TG.topHalf - .012); return [x, lerp(SC.topY, hy(f) - .035, v), s*w*lerp(1.004, .975, v)]; };
+  const hoodSide = (f, v, s) => { const x = hx(f), w = Math.min(edge(x), TG.topHalf - .012); return [x, lerp(screenTop(x), hy(f) - .035, v), s*w*lerp(1.004, .975, v)]; };
   const hoodF = [...range(0, 1, 44), (frontX - top[2][0])/(frontX - archX)].sort((a, b) => a - b);
   grid(G.canvas, hoodF.map(f => { const x = hx(f), w = Math.min(edge(x), TG.topHalf - .012)*.975, y = hy(f); return range(-1, 1, 28).map(q => [x, y - .035*Math.pow(Math.abs(q), 3.4), q*w]); }), mat.canvas);
-  grid(G.canvas, range(-1, 1, 28).map(q => { const w = edge(frontX)*.975; return [[frontX, SC.topY, q*w], [frontX + .004, Q.hoodFrontY - .035*Math.pow(Math.abs(q), 3.4), q*w]]; }), mat.canvas);
+  grid(G.canvas, range(-1, 1, 28).map(q => { const w = edge(frontX)*.975; return [[frontX, screenTop(frontX), q*w], [frontX + .004, Q.hoodFrontY - .035*Math.pow(Math.abs(q), 3.4), q*w]]; }), mat.canvas);
   const H = Q.hoodWindow, hoodPatch = (s, f0, f1, v0, v1, m) => {
     const fs = [...range(f0, f1, 18), ...hoodF.filter(f => f > f0 && f < f1)].sort((a, b) => a - b), rows = fs.map(f => range(v0, v1, 3).map(v => hoodSide(f, v, s)));
     m ? grid(G.canvas, rows, m) : clearPane(rows);
@@ -26,7 +26,7 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
     hoodPatch(s, 0, H.f[0], H.v[0], H.v[1], mat.canvas); hoodPatch(s, H.f[1], 1, H.v[0], H.v[1], mat.canvas);
     hoodPatch(s, H.f[0], H.f[1], H.v[0], H.v[1], null);
     // stainless grab rail along the top of the glass
-    tube(G.canvas, range(.02, .98, 14).map(f => { const p = hoodSide(f, 0, s); return [p[0], SC.topY + .03, p[2] + s*.016]; }), .009, mat.steel);
+    tube(G.canvas, range(.02, .98, 14).map(f => { const p = hoodSide(f, 0, s); return [p[0], screenTop(p[0]) + .03, p[2] + s*.016]; }), .009, mat.steel);
   });
 
   /* Bimini roof line in side view: arch, knee, raked aft end */
@@ -41,9 +41,9 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
   };
   // the bimini keeps its own plan width, tapering aft as on the marina photo
   const canvasHalf = x => { const b = Math.max(.05, halfB(x) - HO.sideDeck), d = clamp((.664 - x)/.34, 0, 1); return Math.min(HO.maxHalf, b)*HO.tumble*Math.pow(1 - d*d*d, 1/3); };
-  const halfAt = x => Math.min(TG.topHalf - .015, Math.max(canvasHalf(x) - .03, .3));
+  const halfAt = x => Math.min(TG.topHalf - .015, Math.max(canvasHalf(x) - .03, .3, Math.min(cockpitHalf(x) + .02, roofHalf(x) - .02)));   // lands on the coaming, outside the 1.46 m well
   const sidePt = (t, v, s, off = 0) => {
-    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, canvasHalf(bx) - .012, roofHalf(bx) - .012), by = roofY(bx, wb) + .004;
+    const [tx, ty] = prof(t), bx = lerp(TG.baseX + .04, Q.aftX, t), wb = Math.min(halfAt(bx) + .012, roofHalf(bx) - .012), by = roofY(bx, wb) + .004;
     return [lerp(bx, tx, v), lerp(by, ty, v), s*(lerp(wb, halfAt(tx), v) + off)];
   };
   const patch = (s, t0, t1, v0, v1, m) => {
@@ -407,8 +407,6 @@ function antenna(parent, base, top) {
   // transom fittings from the photo
   const ring = (y, z, r) => { const x = transomX(y, z) - .004, m = put(G.hull, new T.TorusGeometry(r, r*.26, 8, 22), mat.steel); m.position.set(x, y, z); m.rotation.y = Math.PI/2; const d = put(G.hull, new T.CircleGeometry(r, 18), mat.dark, false); d.position.set(x + .001, y, z); d.rotation.y = -Math.PI/2; };
   ring(.985, -.86, .024); ring(.985, -.72, .024);
-  const disc = put(G.hull, new T.CylinderGeometry(.062, .066, .018, 28), mat.white); disc.rotation.z = Math.PI/2; disc.position.set(transomX(.89, .06) - .008, .89, .06);
-  const discIn = put(G.hull, new T.TorusGeometry(.034, .004, 6, 24), M('#b9bcb8')); discIn.rotation.y = Math.PI/2; discIn.position.set(transomX(.89, .06) - .019, .89, .06);
   // exhaust outlet on the starboard quarter
   const ex2 = .24, ey2 = .36, ez2 = hullHalf(ex2, ey2) + .004;
   const out = put(G.hull, new T.TorusGeometry(.04, .011, 8, 24), mat.steel); out.position.set(ex2, ey2, ez2);

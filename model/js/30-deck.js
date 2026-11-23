@@ -5,7 +5,8 @@ const teakUV = p => [p[0]/3.4, p[2]/(SPEC.deck.plank*8)];
 /* Plan outline of the trunk at deck level, with rounded ends. */
 function houseSide(x) {
   const side = x > 5.66 ? HO.sideDeck*(1 + (x - 5.66)*.06) : HO.sideDeck, normal = Math.min(HO.maxHalf, Math.max(.05, halfB(x) - side));
-  return lerp(HO.aftHalf, normal, 1 - Math.pow(1 - clamp((x - HO.aft)/(1.6 - HO.aft), 0, 1), 2.2));     // measured width at the aft end, blending into the side decks
+  const aftW = (CP.aftInnerHalf + CP.capWidth)/HO.tumble;
+  return lerp(aftW, Math.max(normal, aftW), 1 - Math.pow(1 - clamp((x - HO.aft)/(1.6 - HO.aft), 0, 1), 2.2));     // measured width at the aft end, blending into the side decks
 }
 function houseHalf(x) {
   if (x <= HO.aft || x >= HO.fwd) return 0;
@@ -52,6 +53,16 @@ const endSamples = (a, b, n = 40) => { const o = []; for (let i = 0; i <= n; i++
   });
 })();
 
+/* Solid teak plank for the toe rail: warm, with the grain running along its length. */
+mat.toeRail = (() => {
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 128;
+  const g = c.getContext('2d'), r = rng(73); g.fillStyle = '#a97c4a'; g.fillRect(0, 0, 2048, 128);
+  for (let i = 0; i < 520; i++) { g.strokeStyle = `rgba(${r() < .62 ? '74,46,22' : '214,170,116'},${.05 + r()*.14})`; g.lineWidth = .6 + r()*1.6;
+    const y = r()*128, x = r()*2048, l = 140 + r()*620, a = r()*6; g.beginPath(); g.moveTo(x, y); for (let q = 0; q <= l; q += 28) g.lineTo(x + q, y + Math.sin(q*.009 + a)*2.2); g.stroke(); }
+  const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.encoding = T.sRGBEncoding; t.anisotropy = 12;
+  return M('#ffffff', { map: t, roughness: .62 });
+})();
+
 /* Toe rail, following the sheer and across the transom. */
 (function toeRail() {
   const c = HS.transomCurve; let zc = 1; for (let k = 0; k < 30; k++) zc = halfB(c*zc*zc);
@@ -67,7 +78,9 @@ const endSamples = (a, b, n = 40) => { const o = []; for (let i = 0; i <= n; i++
       const w = widthAt(p[0]), y = sheerY(p[0]), at = (o, dy) => [p[0] + nx*o, y + dy, s*(p[1] + nz*o)];
       return [at(.006, -.022), at(.008, h - .012), at(0, h), at(-w + .008, h - .004), at(-w, .004), at(-w, -.005)];
     });
-    grid(G.deck, rows, mat.teakRail);
+    const geo = gridGeo(rows), uv = []; let run = 0;
+    rows.forEach((q, i) => { if (i) run += Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]); q.forEach((_, k) => uv.push(run/2.4, k/(q.length - 1))); });
+    geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); put(G.deck, geo, mat.toeRail);
   });
 })();
 
@@ -160,8 +173,8 @@ const footAft = CP.aftRail + CP.benchDepth, benchY = sheerY(0) + SPEC.deck.toeRa
   for (let i = 0; i < 5; i++) box(G.deck, [cx - .035, CP.seat + .07 + i*.095, 0], [.012, .085, ch*2 - .05], mat.teakDark);
   [-1, 1].forEach(s => rod(G.deck, [cx - .035, CP.seat, s*ch], [cx - .035, HO.roof, s*ch], .014, mat.teakDark));
   // sliding hatch garage on the roof ahead of the companionway
-  const gx = CP.fwd + .34, gy = roofY(gx, 0);
-  box(G.deck, [gx, gy + .03, 0], [.72, .05, ch*2 + .12], mat.gelDeck);
+  const gEnd = SPEC.screen.base[0][0] - .06, gx = (CP.fwd + gEnd)/2, gy = roofY(gx, 0);
+  box(G.deck, [gx, gy + .03, 0], [gEnd - CP.fwd, .05, ch*2 + .12], mat.gelDeck);
 })();
 
 /* Malö Yachts logo, following the curved, raked front of the trunk. */
@@ -260,33 +273,31 @@ function winch(parent, x, y, z, k = 1) {
   rod(G.deck, [ex + .1, ey, ez - .02], [ex + .1, ey + .13, ez - .075], .009, mat.dark);
 })();
 
-/* Fixed windscreen on its moulded base with the navy stripe, framed in stainless. */
+/* Fixed windscreen on its moulded base with the navy stripe, in slim anodised frames. */
 const SC = SPEC.screen;
-function mirrored(line) { return [...line.slice(1).reverse().map(p => [p[0], -p[1]]), ...line]; }
+const tableY = (t, x) => { if (x <= t[0][0]) return t[0][1]; for (let i = 0; i < t.length - 1; i++) if (x <= t[i + 1][0]) return lerp(t[i][1], t[i + 1][1], (x - t[i][0])/(t[i + 1][0] - t[i][0])); return t[t.length - 1][1]; };
+const screenTop = x => tableY(SC.topY, x), screenBase = x => tableY(SC.baseY, x);
 (function windscreen() {
-  const base = mirrored(SC.base), top = mirrored(SC.top);
-  // moulded base: a low cream plinth from the roof up to the glass line
-  const plinth = base.map(([x, z]) => [[x + .08, roofY(Math.min(x + .08, 6.66), z*1.05) - .005, z*1.05], [x, SC.baseY - .035, z], [x - .02, SC.baseY, z*.985]]);
+  const loop = l => [...l.slice(1).reverse().map(p => [p[0], -p[1]]), ...l.slice(1)], base = loop(SC.base), top = loop(SC.top), dense = [];
+  for (let i = 0; i < base.length - 1; i++) for (let k = i ? 1 : 0; k <= 14; k++) dense.push([lerp(base[i][0], base[i + 1][0], k/14), lerp(base[i][1], base[i + 1][1], k/14)]);
+  const low = ([x, z]) => { const q = Math.min(x + .08, 6.66); return [q, roofY(q, z*1.05) - .005, z*1.05]; }, up = ([x, z]) => [x, screenBase(x) - .035, z];
+  // moulded base: a cream plinth from the roof up to the glass line
+  const plinth = dense.map(p => { const b = screenBase(p[0]); return [low(p), up(p), [p[0] - .02, b, p[1]*.985]]; });
   grid(G.deck, plinth[0].map((_, k) => plinth.map(r => r[k])), mat.gel);
-  const stripe = base.map(([x, z]) => [[x + .036, SC.baseY - .03 - .022, z*1.024], [x + .018, SC.baseY - .03 + .008, z*1.009]]);
+  const onFace = (p, f) => { const a = low(p), c = up(p); return [lerp(a[0], c[0], f) + .004, lerp(a[1], c[1], f) + .001, lerp(a[2], c[2], f)*1.004]; };
+  const stripe = dense.map(p => [onFace(p, .42), onFace(p, .82)]);
   grid(G.deck, stripe[0].map((_, k) => stripe.map(r => r[k])), mat.navy, { noShadow: true });
-  // close plinth top under the glass
-  const inner = base.map(([x, z]) => [x - .02, SC.baseY, z*.985]);
-  grid(G.deck, [inner, inner.map(p => [Math.max(p[0] - .12, 1.964), SC.baseY - .004, p[2]*.86])], mat.gelDeck);
-  // glass panes
-  for (let i = 0; i < base.length - 1; i++) {
-    const a = [base[i][0] - .02, SC.baseY, base[i][1]*.985], b = [base[i + 1][0] - .02, SC.baseY, base[i + 1][1]*.985];
-    const c = [top[i][0], SC.topY, top[i][1]], d = [top[i + 1][0], SC.topY, top[i + 1][1]];
-    const m = grid(G.deck, [[a, b], [c, d]], mat.clear, { noShadow: true }); m.renderOrder = 3; m.castShadow = false;
-    rod(G.deck, a, c, .013, mat.steel);
+  // close the plinth top under the glass
+  const inner = dense.map(([x, z]) => [x - .02, screenBase(x), z*.985]);
+  grid(G.deck, [inner, inner.map(p => [Math.max(p[0] - .12, 1.964), p[1] - .004, p[2]*.86])], mat.gelDeck);
+  // five panes: side, corner, one wide centre, corner, side
+  const B = base.map(([x, z]) => [x - .02, screenBase(x), z*.985]), Tp = top.map(([x, z]) => [x, screenTop(x), z]);
+  for (let i = 0; i < B.length - 1; i++) {
+    const m = grid(G.deck, [[B[i], B[i + 1]], [Tp[i], Tp[i + 1]]], mat.clear, { noShadow: true }); m.renderOrder = 3; m.castShadow = false;
+    rod(G.deck, Tp[i], Tp[i + 1], .015, mat.alu, 12);
+    rod(G.deck, [B[i][0], B[i][1] + .008, B[i][2]], [B[i + 1][0], B[i + 1][1] + .008, B[i + 1][2]], .012, mat.alu, 12);
   }
-  const l = base.length - 1;
-  rod(G.deck, [base[l][0] - .02, SC.baseY, base[l][1]*.985], [top[l][0], SC.topY, top[l][1]], .013, mat.steel);
-  rod(G.deck, [base[0][0] - .02, SC.baseY, base[0][1]*.985], [top[0][0], SC.topY, top[0][1]], .013, mat.steel);
-  for (let i = 0; i < top.length - 1; i++) {
-    rod(G.deck, [top[i][0], SC.topY, top[i][1]], [top[i + 1][0], SC.topY, top[i + 1][1]], .014, mat.steel);
-    rod(G.deck, [base[i][0] - .02, SC.baseY + .01, base[i][1]*.985], [base[i + 1][0] - .02, SC.baseY + .01, base[i + 1][1]*.985], .012, mat.steel);
-  }
+  B.forEach((p, i) => { rod(G.deck, p, Tp[i], .014, mat.alu, 12); const j = put(G.deck, new T.SphereGeometry(.017, 12, 8), mat.alu); j.position.set(...Tp[i]); });
 })();
 
 /* The moulded TARGA arch that carries the mainsheet. */
