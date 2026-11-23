@@ -155,6 +155,7 @@ const SPEC = {
     mastSize: [0.195, 0.125], // [E] fore-aft, athwart
     spreaders: [[7.05, 1.14], [11.65, 0.80]], // [D/E] height, half-length
     spreaderSweep: 0.10,      // [E]
+    spreaderBlade: { rootChord: 0.15, tipChord: 0.105, rootThick: 0.03, tipThick: 0.02 },   // [P] wide, flat aluminium blades, from the owner's photo
     chainplateInset: 0.13,    // [P] from the sheer
     boom: { fwd: 6.064, aft: 1.984, y: 2.45, h: 0.155, w: 0.09 }, // [D]
     coverAft: 2.684,           // [P] sail cover end

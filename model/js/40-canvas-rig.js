@@ -96,7 +96,15 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   [1, -1].forEach(s => {
     const tips = RG.spreaders.map(([y, l]) => {
       const t = [mx - RG.spreaderSweep*l, y, s*l];
-      rod(G.rig, [mx, y, s*mW/2], t, .026, mat.alu, 10, .012);
+      // flat blade: wide fore and aft, thin vertically, tapering a little to the tip
+      const SB = RG.spreaderBlade, a = [mx, y, s*mW/2], ring = (f, k = 1) => {
+        const c = lerp(SB.rootChord, SB.tipChord, f)/2*k, h = lerp(SB.rootThick, SB.tipThick, f)/2*k, o = [lerp(a[0], t[0], f), y, lerp(a[2], t[2], f)], q = [];
+        for (let i = 0; i <= 20; i++) { const w = i/20*Math.PI*2, cw = Math.cos(w), sw = Math.sin(w); q.push([o[0] + c*Math.sign(cw)*Math.pow(Math.abs(cw), .45), o[1] + h*Math.sign(sw)*Math.pow(Math.abs(sw), .7), o[2]]); }
+        return q;
+      };
+      grid(G.rig, [ring(0, .01), ring(0), ...Array.from({ length: 12 }, (_, i) => ring((i + 1)/12)), ring(1, .01)], mat.alu);
+      box(G.rig, [mx, y, s*(mW/2 + .022)], [SB.rootChord + .024, SB.rootThick + .022, .05], mat.alu);       // root socket on the mast
+      box(G.rig, [t[0], y, t[2]], [SB.tipChord + .008, SB.tipThick + .012, .035], mat.dark);                // tip end cap, where the shroud passes
       return t;
     });
     const cp = chainplate(mx, s), fl = chainplate(mx + .62, s), al = chainplate(mx - .62, s);
@@ -227,7 +235,7 @@ const RADAR = (() => {
     });
   });
   const bottom = y0, mountBottom = y0 - m.armDrop - yPad;
-  return { bottom, top: y0 + q.height, spreaderGap: mountBottom - (RG.spreaders[0][0] + .026), mastGap: cx - q.diameter/2 - nose, name: q.name, mount: m.name, kg: q.kg, diameter: q.diameter, height: q.height };
+  return { bottom, top: y0 + q.height, spreaderGap: mountBottom - (RG.spreaders[0][0] + RG.spreaderBlade.rootThick/2 + .011), mastGap: cx - q.diameter/2 - nose, name: q.name, mount: m.name, kg: q.kg, diameter: q.diameter, height: q.height };
 })();
 
 /* ---------- Guard rails ---------- */
