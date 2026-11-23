@@ -8,6 +8,8 @@
   renderer.toneMappingExposure = .92;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;           // the boat stands still, so shadows are redrawn only when she changes
+  renderer.shadowMap.needsUpdate = true;
 
   const scene = new T.Scene();
   scene.fog = new T.Fog(0xcfe0e8, 70, 520);
@@ -43,6 +45,12 @@
   ng.putImageData(img, 0, 0);
   const nt = new T.CanvasTexture(nc); nt.wrapS = nt.wrapT = T.RepeatWrapping; nt.repeat.set(95, 95); nt.anisotropy = 8;
   const water = new T.Mesh(new T.CircleGeometry(800, 64), new T.MeshStandardMaterial({ color: C('#123f4b'), roughness: .2, metalness: .1, normalMap: nt, normalScale: new T.Vector2(.1, .1), transparent: true, opacity: .93 }));
+  const waterT = { a: { value: new T.Vector2() }, b: { value: new T.Vector2() } };
+  water.material.onBeforeCompile = sh => {            // two ripple layers drifting across each other
+    sh.uniforms.uDriftA = waterT.a; sh.uniforms.uDriftB = waterT.b;
+    sh.fragmentShader = 'uniform vec2 uDriftA;uniform vec2 uDriftB;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>',
+      T.ShaderChunk.normal_fragment_maps.replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0', 'vec3 mapN = normalize(texture2D(normalMap, vUv + uDriftA).xyz*2.0 - 1.0 + texture2D(normalMap, vUv*1.73 + uDriftB).xyz*2.0 - 1.0)'));
+  };
   water.rotation.x = -Math.PI/2; water.receiveShadow = true; scene.add(water);
 
   /* Hard-stand ground used when the water is hidden, so the keel can be inspected. */
@@ -136,6 +144,7 @@
     if (name === 'rails') G.rails.visible = on;
     if (name === 'arch') setArch(on ? lastArch : 'none');
     if (name === 'drawing') overlay.visible = on;
+    renderer.shadowMap.needsUpdate = true;
     const b = document.querySelector(`[data-layer="${name}"]`); if (b) b.setAttribute('aria-pressed', on);
     needs = 3;
   }
@@ -145,7 +154,7 @@
     if (b.dataset.layer === 'drawing' && on && !view.ortho) setView('side');
   }));
 
-  let last = performance.now();
+  let last = performance.now(), lastWave = 0;
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(.05, (now - last)/1000); last = now;
@@ -154,12 +163,16 @@
       ['th', 'ph', 'r', 'tx', 'ty', 'tz', 'span'].forEach(q => { const d = goal[q] - view[q]; view[q] += d*k; rest += Math.abs(d); });
       if (rest < .002) anim = false; needs = 2;
     }
-    if (water.visible && !reduced && !view.ortho) { nt.offset.x = now*.000006; nt.offset.y = now*.000004; needs = Math.max(needs, 1); }
+    if (!reduced && now - lastWave > 33) {             // water and flag at about 30 fps; the boat itself never moves
+      lastWave = now; const t = now/1000;
+      waterT.a.value.set(t*.011, t*.007); waterT.b.value.set(-t*.009, t*.013);
+      waveFlags(t); needs = Math.max(needs, 1);
+    }
     if (needs <= 0) return;
     needs--;
     renderer.render(scene, placeCamera());
   }
-  initArchUI(() => { needs = 3; }); resize(); setView('hero', true); requestAnimationFrame(frame);
+  initArchUI(() => { needs = 3; renderer.shadowMap.needsUpdate = true; }); resize(); setView('hero', true); requestAnimationFrame(frame);
 
   // Small API for scripted renders and comparison against photos
   window.alizee = { SPEC, setView, setLayer, view, render() { resize(); renderer.render(scene, placeCamera()); }, hullHalf, sheerY, keelY, halfB,

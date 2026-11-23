@@ -17,7 +17,7 @@ button{appearance:none;border:0;background:transparent;color:var(--ink2);font:50
 button:hover{color:var(--ink)}button[aria-pressed="true"]{background:var(--ink);color:#fff}
 button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .arch{position:fixed;right:16px;top:16px;width:318px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 150px);overflow:auto;padding:0;border-radius:16px;background:var(--panel);border:1px solid var(--line);box-shadow:0 8px 26px rgba(12,28,52,.16);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
-.arch summary{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:13px 16px;background:var(--panelSolid);cursor:pointer;font:italic 400 23px/1.1 Georgia,"Times New Roman",serif;list-style:none}
+.arch summary{white-space:nowrap;position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:13px 16px;background:var(--panelSolid);cursor:pointer;font:italic 400 23px/1.1 Georgia,"Times New Roman",serif;list-style:none}
 .arch summary::-webkit-details-marker{display:none}.arch summary:focus-visible{outline:2px solid var(--focus);outline-offset:-2px;border-radius:16px}
 .arch summary span{font:500 13px/1.2 system-ui,sans-serif;color:var(--ink2);text-align:right}
 .arch-body{padding:0 16px 14px}
@@ -54,6 +54,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
       <fieldset class="seg"><legend>Panel orientation</legend><div id="archOrientPick"></div></fieldset>
       <fieldset class="seg"><legend>Pipe diameter</legend><div id="archPipePick"></div></fieldset>
     </div>
+    <fieldset class="seg"><legend>Panels along lifelines</legend><div id="archSidePick"></div></fieldset>
     <p class="note" id="archNote"></p>
     <div class="stats" id="archStats" aria-live="polite"></div>
     <p class="fine">Measured on the 3D model. The stern is estimated from photos, so check with a tape measure before building.</p>
@@ -230,11 +231,16 @@ const SPEC = {
     backstaySlot: 0.09,     // half-width of the opening around the backstay in the split layout
     warnGap: 0.05,          // clearances below this are flagged as tight
     contactGap: 0.01,       // clearances below this are treated as contact
+    sidePanels: { counts: [0, 1, 2], startX: 0.60, standoff: 0.065, topAboveWire: 0.06 },  // hung outside the lifelines, just forward of the pushpit
     ensign: { base: [0.10, 1.22, 1.02], tip: [-0.62, 2.08, 1.02] },  // moved under the panels
 
     // To add a design, copy one entry and change its numbers. It appears on the page automatically.
     // fwdX is the forward edge of the panels. It must stay aft of the backstay unless layout is 'split'.
     designs: [
+      { id: 'vertical', name: 'Vertical arch', note: 'Fore pipes stand vertical and the rear pipes mount on the transom. Medium height, so you still duck slightly on the aft deck.',
+        hoop: { footX: 0.60, footHalf: 1.06, topX: 0.60, topY: 2.60, half: 0.98, bend: 0.20 },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.60 },
+
       { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },
         aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.48 },
@@ -248,9 +254,6 @@ const SPEC = {
         aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, foreStrut: { footX: 1.30, footHalf: 1.20 },
         layout: 'split', fwdX: { 2: 0.80, 3: 0.98, 4: 0.98 }, fwdXFore: 0.80, centreX: 0.48 },
 
-      { id: 'davit', name: 'With davits', note: 'Medium height with two dinghy davits. The davits and their mounts must be sized for the weight of your dinghy.',
-        hoop: { footX: 0.72, footHalf: 1.06, topX: 0.44, topY: 2.60, half: 0.98, bend: 0.20 },
-        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, davits: { z: 0.72, tipX: -0.95, tipY: 2.20 }, fwdX: 0.60 },
     ],
   },
 
@@ -983,6 +986,21 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   });
 })();
 
+/* Flags are animated in place; nothing else on the boat moves. */
+const FLAGS = [];
+function waveFlags(t) {
+  FLAGS.forEach(F => {
+    for (let q = F.mesh; q; q = q.parent) if (!q.visible) return;
+    const p = F.mesh.geometry.attributes.position, { base, tip, W, n } = F;
+    let o = 0;
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= 6; j++, o++) {
+      const f = i/n, h = lerp(.5, .985, j/6), amp = .095*Math.min(1, f*2.6)*(.75 + .25*Math.sin(t*.43));
+      const w = Math.sin(f*6.2 - t*3.1 + j*.13) + .35*Math.sin(f*11.5 - t*4.7 + j*.3);
+      p.setXYZ(o, lerp(base[0], tip[0], h) - f*W*(.97 + .02*Math.sin(t*1.1 + f*3)), lerp(base[1], tip[1], h) - f*f*.1 + .018*f*Math.sin(f*4.5 - t*2.3), base[2] + amp*w);
+    }
+    p.needsUpdate = true; F.mesh.geometry.computeVertexNormals();
+  });
+}
 function ensign(parent, base, tip) {
   rod(parent, base, tip, .013, mat.teakDark);
   const rows = [], W = .98, n = 22, uv = [];
@@ -995,7 +1013,8 @@ function ensign(parent, base, tip) {
     }
     rows.push(r);
   }
-  const g = gridGeo(rows); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); put(parent, g, mat.flag);
+  const g = gridGeo(rows); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.attributes.position.setUsage(T.DynamicDrawUsage);
+  FLAGS.push({ mesh: put(parent, g, mat.flag, false), base, tip, W, n });
 }
 function antenna(parent, base, top) {
   rod(parent, base, top, .018, mat.steel);
@@ -1153,12 +1172,6 @@ function buildArch(d, count, D, orient) {
       const q = d.foreStrut, b = [q.footX, deckY(q.footX, q.footHalf), s*q.footHalf];
       pipe([b, [railFwd, yRail, s*Math.min(halfW, H.half)]]); footPlate(b);   // stays inboard of the lifelines
     }
-    if (d.davits) {
-      const v = d.davits, z = s*v.z, a = [H.topX, H.topY - .01, z], m = [lerp(H.topX, v.tipX, .55), lerp(H.topY, v.tipY, .3), z], t = [v.tipX, v.tipY, z];
-      pipe([a, m, [lerp(v.tipX, H.topX, .08), v.tipY + .05, z], t]);
-      pipe([m, [lerp(f[0], strutTop, .72), lerp(f[1], yRail, .72), s*lerp(A.footHalf, halfW, .72)]]);
-      const sheave = put(frame, new T.CylinderGeometry(.04, .04, .025, 18), mat.dark); sheave.rotation.x = Math.PI/2; sheave.position.set(v.tipX, v.tipY - .035, z);
-    }
   });
   steelKg = steelM*kgPerM;
 
@@ -1230,14 +1243,17 @@ function surfaceGap(pa, ca, pb, cb) {
   return best;
 }
 let obstacles = null;
+function ensureObstacles() {
+  if (obstacles) return obstacles;
+  const near = (x, y) => x < 2.6 && y > 1.1 && y < 3.7;
+  const notRail = m => { for (let q = m; q; q = q.parent) if (q === G.asBuilt || q === G.sidePanels) return true; return false; };
+  const canvas = surfacePoints(G.canvas, null, near), rails = surfacePoints(G.rails, notRail, near), pushpit = [];
+  for (let i = 0; i < rails.length; i += 3) if (rails[i] < .56) pushpit.push(rails[i], rails[i + 1], rails[i + 2]);
+  return obstacles = { canvas, rails, pushpit, canvasCells: toCells(canvas), railCells: toCells(rails), pushpitCells: toCells(pushpit) };
+}
 function measureArch(b) {
   if (b.report) return b.report;
-  const near = (x, y) => x < 2.3 && y > 1.15 && y < 3.7;
-  if (!obstacles) {
-    const inAsBuilt = m => { for (let q = m; q; q = q.parent) if (q === G.asBuilt) return true; return false; };
-    const canvas = surfacePoints(G.canvas, null, near), rails = surfacePoints(G.rails, inAsBuilt, near);
-    obstacles = { canvas, rails, canvasCells: toCells(canvas), railCells: toCells(rails) };
-  }
+  ensureObstacles();
   const pts = surfacePoints(b.frame), clear = [];                    // clear = above the deck sockets
   const R = SPEC.rig, B = R.boom, reach = B.fwd - B.aft;
   const s0 = [R.backstay[0], R.backstay[1]], ax = R.mastX + .02 - s0[0], ay = R.mastTop - .03 - s0[1], ll = ax*ax + ay*ay;
@@ -1254,6 +1270,7 @@ function measureArch(b) {
     if (Math.abs(z) < .45 && x > 0 && x < .75) head = Math.min(head, y - deckY(x, z));
   }
   const cells = toCells(clear), panelKg = b.count*AC.panel.kg;
+  b.clear = clear; b.cells = cells;
   return b.report = {
     panelTopAboveWater: top - HS.floatSink, panelTopAboveDeck: top - deckY(.3, 0), headroom: head,
     width: maxZ - minZ, length: maxX - minX, overhang: Math.max(0, -minX), lengthWithArch: L + Math.max(0, -minX), pastHull: Math.max(0, past),
@@ -1263,48 +1280,122 @@ function measureArch(b) {
   };
 }
 
+/* ---------- Panels hung along the lifelines ---------- */
+G.sidePanels = new T.Group(); G.rails.add(G.sidePanels);
+function buildSidePanels(count) {
+  const R = SPEC.rails, Q = R.pushpit, S = AC.sidePanels, { length: P, width: W, thick } = AC.panel, group = new T.Group();
+  group.visible = false; G.sidePanels.add(group);
+  [1, -1].forEach(s => {
+    // the lifeline span from the pushpit to the next stanchion, the same line the wires follow
+    const zA = s*(deckHalf(Q.foreX) - R.inset)*.985, xB = R.stanchions[1], zB = s*(deckHalf(xB) - R.inset), yB = deckY(xB, zB);
+    const wire = h => { const k = h/R.height; return [[Q.foreX, lerp(deckY(Q.foreX, zA), Q.topY - .02, k), zA], [xB, lerp(yB, yB + R.height, k), zB*.985]]; };
+    const [A, B] = wire(R.wires[1]), [A2, B2] = wire(R.wires[0]);
+    const a = new V3(B[0] - A[0], B[1] - A[1], B[2] - A[2]), span = a.length(); a.normalize();
+    const out = new V3().crossVectors(a, new V3(0, 1, 0)).normalize(); if (out.z*s < 0) out.negate();
+    const up = new V3().crossVectors(out, a).normalize(); if (up.y < 0) up.negate();
+    const q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(a, up, new V3().crossVectors(a, up)));
+    const d0 = (S.startX - A[0])/a.x;
+    for (let i = 0; i < count; i++) {
+      const d = d0 + i*(P + AC.panelGap) + P/2;
+      const c = new V3(...A).addScaledVector(a, d).addScaledVector(out, S.standoff).addScaledVector(up, S.topAboveWire - W/2);
+      const body = put(group, new T.BoxGeometry(P, W, thick), mat.alu); body.quaternion.copy(q); body.position.copy(c);
+      const face = put(group, new T.PlaneGeometry(P - .03, W - .03), mat.cell, false); face.quaternion.copy(q); face.position.copy(c).addScaledVector(out, thick/2 + .001);
+      [-.32, .32].forEach(k => {                                       // clips onto the upper and lower wire
+        const e = d + k*P, f = e/span;
+        const t = new V3(...A).addScaledVector(a, e), l = new V3(lerp(A2[0], B2[0], f), lerp(A2[1], B2[1], f), lerp(A2[2], B2[2], f));
+        [t, l].forEach(p => { rod(group, p.toArray(), p.clone().addScaledVector(out, S.standoff).toArray(), .006, mat.steel, 8).userData.clip = true; });
+      });
+    }
+  });
+  return { group, count, gaps: {} };
+}
+function measureSides(sb, b) {
+  const key = b ? b.key : 'none';
+  if (sb.gaps[key]) return sb.gaps[key];
+  ensureObstacles();
+  if (!sb.pts) {
+    sb.pts = surfacePoints(sb.group, m => m.userData.clip); sb.cells = toCells(sb.pts);
+    let toe = 9, past = -9;
+    for (let i = 0; i < sb.pts.length; i += 3) {
+      const x = sb.pts[i], y = sb.pts[i + 1], z = sb.pts[i + 2];
+      toe = Math.min(toe, y - (sheerY(x) + SPEC.deck.toeRail.height)); past = Math.max(past, Math.abs(z) - halfB(x));
+    }
+    sb.toeGap = toe; sb.pastHull = Math.max(0, past);
+    sb.pushpitGap = surfaceGap(sb.pts, sb.cells, obstacles.pushpit, obstacles.pushpitCells);
+    sb.wireGap = surfaceGap(sb.pts, sb.cells, obstacles.rails, obstacles.railCells);
+  }
+  return sb.gaps[key] = {
+    perSide: sb.count, panels: sb.count*2, watts: sb.count*2*AC.panel.watts, kg: sb.count*2*AC.panel.kg,
+    toeGap: sb.toeGap, pushpitGap: sb.pushpitGap, wireGap: sb.wireGap, pastHull: sb.pastHull,
+    archGap: b ? surfaceGap(sb.pts, sb.cells, b.clear, b.cells) : null,
+  };
+}
+
 /* ---------- Selection and page panel ---------- */
-const archBuilt = {};
-const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1], orient: 'across' };
-let currentArch = 'none', lastArch = AC.designs[0].id, archKick = () => {};
+const archBuilt = {}, sideBuilt = {};
+const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1], orient: 'across', sides: 0 };
+let currentArch = 'none', lastArch = AC.designs[0].id, currentBuilt = null, currentSide = null, archKick = () => {};
 const archById = id => AC.designs.find(d => d.id === id);
 const num = (v, n) => v.toLocaleString('en-GB', { minimumFractionDigits: n, maximumFractionDigits: n });
 const fmtM = v => `${num(v, 2)} m`, fmtCm = v => `${num(v*100, 0)} cm`;
-const gapRow = (label, v) => v < AC.contactGap ? [label, 'Contact', 'hit'] : [label, fmtCm(v), v < AC.warnGap ? 'warn' : ''];
+const gapRow = (label, v, byDesign) => v < (byDesign ? 0 : AC.contactGap) ? [label, 'Contact', 'hit'] : [label, fmtCm(v), !byDesign && v < AC.warnGap ? 'warn' : ''];
 
-function renderArchStats(r) {
-  const groups = [
+function renderArchStats(r, q) {
+  const groups = [];
+  if (r) groups.push(
     ['Height', [['Panel top above water', fmtM(r.panelTopAboveWater)], ['Panel top above deck', fmtM(r.panelTopAboveDeck)], ['Headroom on aft deck', fmtM(r.headroom)]]],
     ['Size', [['Width', fmtM(r.width)], ['Length', fmtM(r.length)], ['Overhang past transom', fmtM(r.overhang)], ['Past hull side', fmtM(r.pastHull)], ['Boat length with arch', fmtM(r.lengthWithArch)]]],
-    ['Clearance', [gapRow('Backstay', r.backstayGap), gapRow('Rails and pushpit', r.railGap), gapRow('Canvas', r.canvasGap), gapRow('Boom, full swing', r.boomGap)]],
-    ['Power and materials', [['Solar power', `${r.panels} × ${AC.panel.watts} W = ${r.watts} W`], ['Panel area', `${num(r.panelArea, 2)} m²`], [`Pipe, ${num(r.pipeMm, 0)} mm`, `${num(r.steelM, 1)} m`], ['Steel weight (est.)', `${num(r.steelKg, 0)} kg`], ['Panel weight (est.)', `${num(r.panelKg, 0)} kg`], ['Total weight (est.)', `${num(r.totalKg, 0)} kg`]]],
-  ];
-  document.getElementById('archStats').innerHTML = groups.map(([h, rows]) =>
-    `<h2>${h}</h2><dl>${rows.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
+    ['Clearance', [gapRow('Backstay', r.backstayGap), gapRow('Rails and pushpit', r.railGap), gapRow('Canvas', r.canvasGap), gapRow('Boom, full swing', r.boomGap)]]);
+  if (q) groups.push(['Lifeline panels', [
+    ['Panels', `${q.perSide} per side`],
+    ...(q.archGap === null ? [] : [gapRow('Gap to arch', q.archGap)]),
+    gapRow('Gap to pushpit', q.pushpitGap),
+    gapRow('Gap to wires, stanchions', q.wireGap, true),
+    gapRow('Height above toe rail', q.toeGap),
+    ['Past hull side', fmtM(q.pastHull)],
+  ]]);
+  const topW = r ? r.watts : 0, sideW = q ? q.watts : 0, rows = [];
+  if (r) rows.push(['Arch panels', `${r.panels} × ${AC.panel.watts} W = ${r.watts} W`]);
+  if (q) rows.push(['Lifeline panels', `${q.panels} × ${AC.panel.watts} W = ${q.watts} W`]);
+  if (r || q) rows.push(['Total rated power', `${topW + sideW} W`]);
+  if (r) rows.push([`Pipe, ${num(r.pipeMm, 0)} mm`, `${num(r.steelM, 1)} m`], ['Steel weight (est.)', `${num(r.steelKg, 0)} kg`]);
+  if (r || q) rows.push(['Panel weight (est.)', `${num((r ? r.panelKg : 0) + (q ? q.kg : 0), 0)} kg`], ['Total weight (est.)', `${num((r ? r.totalKg : 0) + (q ? q.kg : 0), 0)} kg`]);
+  if (rows.length) groups.push(['Power and materials', rows]);
+  document.getElementById('archStats').innerHTML = groups.map(([h, list]) =>
+    `<h2>${h}</h2><dl>${list.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
 }
 function setArch(id, opts = {}) {
   if (opts.panels && AC.panelCounts.includes(opts.panels)) archState.panels = opts.panels;
   if (opts.pipe && AC.pipes.includes(opts.pipe)) archState.pipe = opts.pipe;
   if (opts.orient === 'across' || opts.orient === 'fore') archState.orient = opts.orient;
+  if (AC.sidePanels.counts.includes(opts.sides)) archState.sides = opts.sides;
   const d = archById(id);
   if (!d) id = 'none';
   Object.values(archBuilt).forEach(b => { b.group.visible = false; });
-  currentArch = id; G.asBuilt.visible = !d;
+  Object.values(sideBuilt).forEach(b => { b.group.visible = false; });
+  currentArch = id; G.asBuilt.visible = !d; currentBuilt = null;
   document.getElementById('archOptions').hidden = !d;
-  const stats = document.getElementById('archStats');
   if (d) {
     lastArch = id; archState.design = id;
-    const key = `${id}|${archState.panels}|${archState.pipe}|${archState.orient}`, b = archBuilt[key] || (archBuilt[key] = buildArch(d, archState.panels, archState.pipe, archState.orient));
-    b.group.visible = true; currentBuilt = b; renderArchStats(measureArch(b));
-  } else { stats.innerHTML = ''; currentBuilt = null; }
-  document.getElementById('archCurrent').textContent = d ? `${d.name}, ${archState.panels} panels` : 'No arch';
+    const key = `${id}|${archState.panels}|${archState.pipe}|${archState.orient}`;
+    const b = archBuilt[key] || (archBuilt[key] = Object.assign(buildArch(d, archState.panels, archState.pipe, archState.orient), { key }));
+    b.group.visible = true; currentBuilt = b;
+  }
+  const n = archState.sides;
+  currentSide = n ? (sideBuilt[n] || (sideBuilt[n] = buildSidePanels(n))) : null;
+  if (currentSide) currentSide.group.visible = true;
+  const r = currentBuilt ? measureArch(currentBuilt) : null, q = currentSide ? measureSides(currentSide, currentBuilt) : null;
+  renderArchStats(r, q);
+  document.getElementById('archCurrent').textContent = d ? `${d.name}, ${n ? `${archState.panels} + ${n*2}` : archState.panels} panels` : n ? `No arch, ${n*2} panels` : 'No arch';
   document.getElementById('archNote').textContent = d ? d.note : 'The boat as she is today, with the ensign staff and antenna in their original places.';
-  [['archDesign', id], ['archPanels', archState.panels], ['archOrient', archState.orient], ['archPipe', archState.pipe]].forEach(([n, v]) => { const r = document.querySelector(`input[name="${n}"][value="${v}"]`); if (r) r.checked = true; });
-  try { history.replaceState(null, '', d ? `#arch=${id}&panels=${archState.panels}&layout=${archState.orient}&pipe=${Math.round(archState.pipe*1000)}` : '#arch=none'); } catch (e) { /* not available in some file:// contexts */ }
+  [['archDesign', id], ['archPanels', archState.panels], ['archOrient', archState.orient], ['archPipe', archState.pipe], ['archSides', n]].forEach(([k, v]) => { const el = document.querySelector(`input[name="${k}"][value="${v}"]`); if (el) el.checked = true; });
+  try { history.replaceState(null, '', (d ? `#arch=${id}&panels=${archState.panels}&layout=${archState.orient}&pipe=${Math.round(archState.pipe*1000)}` : '#arch=none') + `&sides=${n}`); } catch (e) { /* not available in some file:// contexts */ }
   archKick();
 }
-let currentBuilt = null;
-function archReport() { return currentBuilt ? measureArch(currentBuilt) : null; }
+function archReport() {
+  const r = currentBuilt ? measureArch(currentBuilt) : null, q = currentSide ? measureSides(currentSide, currentBuilt) : null;
+  return r || q ? Object.assign({}, r, { lifeline: q }) : null;
+}
 function initArchUI(kick) {
   archKick = kick;
   const addRadios = (host, name, items, onPick) => items.forEach(([value, label]) => {
@@ -1316,9 +1407,10 @@ function initArchUI(kick) {
   addRadios('archPanelPick', 'archPanels', AC.panelCounts.map(n => [n, `${n} panels`]), v => setArch(lastArch, { panels: +v }));
   addRadios('archOrientPick', 'archOrient', [['across', 'Long side across'], ['fore', 'Long side fore-aft']], v => setArch(lastArch, { orient: v }));
   addRadios('archPipePick', 'archPipe', AC.pipes.map(p => [p, `${Math.round(p*1000)} mm`]), v => setArch(lastArch, { pipe: +v }));
+  addRadios('archSidePick', 'archSides', AC.sidePanels.counts.map(n => [n, n ? `${n} per side` : 'None']), v => setArch(currentArch, { sides: +v }));
   if (innerWidth <= 760) document.getElementById('archPanel').open = false;
-  const q = new URLSearchParams(location.hash.slice(1)), h = q.get('arch');
-  setArch(h === 'none' ? 'none' : archById(h) ? h : AC.designs[0].id, { panels: +q.get('panels'), pipe: +q.get('pipe')/1000, orient: q.get('layout') });
+  const h = new URLSearchParams(location.hash.slice(1)), a = h.get('arch'), sd = h.get('sides');
+  setArch(a === 'none' ? 'none' : archById(a) ? a : AC.designs[0].id, { panels: +h.get('panels'), pipe: +h.get('pipe')/1000, orient: h.get('layout'), sides: sd === null ? undefined : +sd });
 }
 
 /* Renderer, light, water, cameras, views and UI. */
@@ -1331,6 +1423,8 @@ function initArchUI(kick) {
   renderer.toneMappingExposure = .92;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;           // the boat stands still, so shadows are redrawn only when she changes
+  renderer.shadowMap.needsUpdate = true;
 
   const scene = new T.Scene();
   scene.fog = new T.Fog(0xcfe0e8, 70, 520);
@@ -1366,6 +1460,12 @@ function initArchUI(kick) {
   ng.putImageData(img, 0, 0);
   const nt = new T.CanvasTexture(nc); nt.wrapS = nt.wrapT = T.RepeatWrapping; nt.repeat.set(95, 95); nt.anisotropy = 8;
   const water = new T.Mesh(new T.CircleGeometry(800, 64), new T.MeshStandardMaterial({ color: C('#123f4b'), roughness: .2, metalness: .1, normalMap: nt, normalScale: new T.Vector2(.1, .1), transparent: true, opacity: .93 }));
+  const waterT = { a: { value: new T.Vector2() }, b: { value: new T.Vector2() } };
+  water.material.onBeforeCompile = sh => {            // two ripple layers drifting across each other
+    sh.uniforms.uDriftA = waterT.a; sh.uniforms.uDriftB = waterT.b;
+    sh.fragmentShader = 'uniform vec2 uDriftA;uniform vec2 uDriftB;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>',
+      T.ShaderChunk.normal_fragment_maps.replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0', 'vec3 mapN = normalize(texture2D(normalMap, vUv + uDriftA).xyz*2.0 - 1.0 + texture2D(normalMap, vUv*1.73 + uDriftB).xyz*2.0 - 1.0)'));
+  };
   water.rotation.x = -Math.PI/2; water.receiveShadow = true; scene.add(water);
 
   /* Hard-stand ground used when the water is hidden, so the keel can be inspected. */
@@ -1459,6 +1559,7 @@ function initArchUI(kick) {
     if (name === 'rails') G.rails.visible = on;
     if (name === 'arch') setArch(on ? lastArch : 'none');
     if (name === 'drawing') overlay.visible = on;
+    renderer.shadowMap.needsUpdate = true;
     const b = document.querySelector(`[data-layer="${name}"]`); if (b) b.setAttribute('aria-pressed', on);
     needs = 3;
   }
@@ -1468,7 +1569,7 @@ function initArchUI(kick) {
     if (b.dataset.layer === 'drawing' && on && !view.ortho) setView('side');
   }));
 
-  let last = performance.now();
+  let last = performance.now(), lastWave = 0;
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(.05, (now - last)/1000); last = now;
@@ -1477,12 +1578,16 @@ function initArchUI(kick) {
       ['th', 'ph', 'r', 'tx', 'ty', 'tz', 'span'].forEach(q => { const d = goal[q] - view[q]; view[q] += d*k; rest += Math.abs(d); });
       if (rest < .002) anim = false; needs = 2;
     }
-    if (water.visible && !reduced && !view.ortho) { nt.offset.x = now*.000006; nt.offset.y = now*.000004; needs = Math.max(needs, 1); }
+    if (!reduced && now - lastWave > 33) {             // water and flag at about 30 fps; the boat itself never moves
+      lastWave = now; const t = now/1000;
+      waterT.a.value.set(t*.011, t*.007); waterT.b.value.set(-t*.009, t*.013);
+      waveFlags(t); needs = Math.max(needs, 1);
+    }
     if (needs <= 0) return;
     needs--;
     renderer.render(scene, placeCamera());
   }
-  initArchUI(() => { needs = 3; }); resize(); setView('hero', true); requestAnimationFrame(frame);
+  initArchUI(() => { needs = 3; renderer.shadowMap.needsUpdate = true; }); resize(); setView('hero', true); requestAnimationFrame(frame);
 
   // Small API for scripted renders and comparison against photos
   window.alizee = { SPEC, setView, setLayer, view, render() { resize(); renderer.render(scene, placeCamera()); }, hullHalf, sheerY, keelY, halfB,

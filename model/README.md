@@ -16,7 +16,7 @@ The brochure drawing shows the optional 11.20 m reverse stern. Alizée has the s
 
 ## Solar arch designs
 
-In the **Solar arch** panel, choose a design, 2, 3 or 4 panels, the panel orientation, and 25 or 32 mm pipe. Heights, size, clearances, power and weight are measured from the finished geometry.
+In the **Solar arch** panel, choose a design, 2, 3 or 4 panels, the panel orientation, 25 or 32 mm pipe, and 0, 1 or 2 panels per side hung along the lifelines. Heights, size, clearances, power and weight are measured from the finished geometry.
 
 To add a design, copy an entry in `solarArches.designs` in `spec.js`, change its `id`, name and numbers, and rebuild. Clearances under `warnGap` are flagged as tight. A link can open one configuration, for example `#arch=split&panels=4&layout=fore&pipe=32`.
 

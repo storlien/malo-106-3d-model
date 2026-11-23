@@ -184,6 +184,21 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   });
 })();
 
+/* Flags are animated in place; nothing else on the boat moves. */
+const FLAGS = [];
+function waveFlags(t) {
+  FLAGS.forEach(F => {
+    for (let q = F.mesh; q; q = q.parent) if (!q.visible) return;
+    const p = F.mesh.geometry.attributes.position, { base, tip, W, n } = F;
+    let o = 0;
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= 6; j++, o++) {
+      const f = i/n, h = lerp(.5, .985, j/6), amp = .095*Math.min(1, f*2.6)*(.75 + .25*Math.sin(t*.43));
+      const w = Math.sin(f*6.2 - t*3.1 + j*.13) + .35*Math.sin(f*11.5 - t*4.7 + j*.3);
+      p.setXYZ(o, lerp(base[0], tip[0], h) - f*W*(.97 + .02*Math.sin(t*1.1 + f*3)), lerp(base[1], tip[1], h) - f*f*.1 + .018*f*Math.sin(f*4.5 - t*2.3), base[2] + amp*w);
+    }
+    p.needsUpdate = true; F.mesh.geometry.computeVertexNormals();
+  });
+}
 function ensign(parent, base, tip) {
   rod(parent, base, tip, .013, mat.teakDark);
   const rows = [], W = .98, n = 22, uv = [];
@@ -196,7 +211,8 @@ function ensign(parent, base, tip) {
     }
     rows.push(r);
   }
-  const g = gridGeo(rows); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); put(parent, g, mat.flag);
+  const g = gridGeo(rows); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.attributes.position.setUsage(T.DynamicDrawUsage);
+  FLAGS.push({ mesh: put(parent, g, mat.flag, false), base, tip, W, n });
 }
 function antenna(parent, base, top) {
   rod(parent, base, top, .018, mat.steel);

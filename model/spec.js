@@ -141,11 +141,16 @@ const SPEC = {
     backstaySlot: 0.09,     // half-width of the opening around the backstay in the split layout
     warnGap: 0.05,          // clearances below this are flagged as tight
     contactGap: 0.01,       // clearances below this are treated as contact
+    sidePanels: { counts: [0, 1, 2], startX: 0.60, standoff: 0.065, topAboveWire: 0.06 },  // hung outside the lifelines, just forward of the pushpit
     ensign: { base: [0.10, 1.22, 1.02], tip: [-0.62, 2.08, 1.02] },  // moved under the panels
 
     // To add a design, copy one entry and change its numbers. It appears on the page automatically.
     // fwdX is the forward edge of the panels. It must stay aft of the backstay unless layout is 'split'.
     designs: [
+      { id: 'vertical', name: 'Vertical arch', note: 'Fore pipes stand vertical and the rear pipes mount on the transom. Medium height, so you still duck slightly on the aft deck.',
+        hoop: { footX: 0.60, footHalf: 1.06, topX: 0.60, topY: 2.60, half: 0.98, bend: 0.20 },
+        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.60 },
+
       { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },
         aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.48 },
@@ -159,9 +164,6 @@ const SPEC = {
         aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, foreStrut: { footX: 1.30, footHalf: 1.20 },
         layout: 'split', fwdX: { 2: 0.80, 3: 0.98, 4: 0.98 }, fwdXFore: 0.80, centreX: 0.48 },
 
-      { id: 'davit', name: 'With davits', note: 'Medium height with two dinghy davits. The davits and their mounts must be sized for the weight of your dinghy.',
-        hoop: { footX: 0.72, footHalf: 1.06, topX: 0.44, topY: 2.60, half: 0.98, bend: 0.20 },
-        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, davits: { z: 0.72, tipX: -0.95, tipY: 2.20 }, fwdX: 0.60 },
     ],
   },
 

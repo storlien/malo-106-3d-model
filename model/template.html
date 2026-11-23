@@ -17,7 +17,7 @@ button{appearance:none;border:0;background:transparent;color:var(--ink2);font:50
 button:hover{color:var(--ink)}button[aria-pressed="true"]{background:var(--ink);color:#fff}
 button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .arch{position:fixed;right:16px;top:16px;width:318px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 150px);overflow:auto;padding:0;border-radius:16px;background:var(--panel);border:1px solid var(--line);box-shadow:0 8px 26px rgba(12,28,52,.16);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
-.arch summary{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:13px 16px;background:var(--panelSolid);cursor:pointer;font:italic 400 23px/1.1 Georgia,"Times New Roman",serif;list-style:none}
+.arch summary{white-space:nowrap;position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:13px 16px;background:var(--panelSolid);cursor:pointer;font:italic 400 23px/1.1 Georgia,"Times New Roman",serif;list-style:none}
 .arch summary::-webkit-details-marker{display:none}.arch summary:focus-visible{outline:2px solid var(--focus);outline-offset:-2px;border-radius:16px}
 .arch summary span{font:500 13px/1.2 system-ui,sans-serif;color:var(--ink2);text-align:right}
 .arch-body{padding:0 16px 14px}
@@ -54,6 +54,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
       <fieldset class="seg"><legend>Panel orientation</legend><div id="archOrientPick"></div></fieldset>
       <fieldset class="seg"><legend>Pipe diameter</legend><div id="archPipePick"></div></fieldset>
     </div>
+    <fieldset class="seg"><legend>Panels along lifelines</legend><div id="archSidePick"></div></fieldset>
     <p class="note" id="archNote"></p>
     <div class="stats" id="archStats" aria-live="polite"></div>
     <p class="fine">Measured on the 3D model. The stern is estimated from photos, so check with a tape measure before building.</p>
