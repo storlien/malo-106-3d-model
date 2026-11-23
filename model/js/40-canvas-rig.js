@@ -404,18 +404,58 @@ function antenna(parent, base, top) {
 /* ---------- Bow gear ---------- */
 (function bowGear() {
   const x = L - .22, y = sheerY(x) + .01;
-  // stemhead fitting and roller
+  // stemhead fitting: cheek plates that carry the forestay pin
   box(G.deck, [x, y + .012, 0], [.44, .03, .11], mat.steel);
-  [1, -1].forEach(s => { const p = [[L - .44, y + .02, s*.055], [L - .02, y + .03, s*.05], [L + .16, y - .05, s*.05], [L + .08, y - .12, s*.05]]; tube(G.deck, p, .009, mat.steel); });
-  const roller = put(G.deck, new T.CylinderGeometry(.04, .04, .085, 16), mat.dark); roller.rotation.x = Math.PI/2; roller.position.set(L + .09, y - .055, 0);
-  // Bruce anchor stowed under the stem
-  const a = new T.Group(); a.position.set(L + .09, y - .06, 0); a.rotation.z = .62; a.scale.setScalar(.6); G.deck.add(a);
-  const shank = new T.Shape(); shank.moveTo(-.34, .01); shank.lineTo(.02, .03); shank.lineTo(.08, -.16); shank.lineTo(.02, -.20); shank.lineTo(-.03, -.03); shank.lineTo(-.34, -.015); shank.closePath();
-  const sg = put(a, new T.ExtrudeGeometry(shank, { depth: .022, bevelEnabled: false }), mat.steel); sg.position.z = -.011;
-  [1, -1].forEach(s => {
-    const claw = gridGeo([[[.0, -.13, 0], [.0, -.22, s*.03]], [[.10, -.26, s*.05], [.0, -.30, s*.17]], [[.20, -.34, s*.11], [.06, -.33, s*.26]]]);
-    put(a, claw, mat.steel);
-  });
+  const A = SPEC.bowAnchor, CH = A.chainplate, st = RG.stem, metal = M('#8b897c', { roughness: .5, metalness: .6 });
+  const extrude = (pts, z, depth, m, parent = G.hull) => {
+    const sh = new T.Shape(); pts.forEach((p, i) => i ? sh.lineTo(p[0], p[1]) : sh.moveTo(p[0], p[1])); sh.closePath();
+    const g = put(parent, new T.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelSize: .002, bevelThickness: .002, bevelSegments: 1 }), m); g.position.z = z; return g;
+  };
+  [1, -1].forEach(k => extrude([[L - .20, y + .02], [L + .014, sheerY(L) - .012], [L - .004, st[1] - .03], [st[0] + .035, st[1] + .035], [st[0] - .05, st[1] + .03], [L - .20, y + .05]], k*.016 - .003, .006, mat.steel, G.deck));
+  rod(G.deck, [st[0], st[1], -.03], [st[0], st[1], .03], .009, mat.steel, 12);
+
+  // the stem as a line in side view, and its outward normal
+  const stemAt = q => { let lo = 9.1, hi = L; for (let i = 0; i < 34; i++) { const m = (lo + hi)/2; if (keelY(m) < q) lo = m; else hi = m; } return (lo + hi)/2; };
+  const stemFrame = q => { const dx = stemAt(q + .015) - stemAt(q - .015), l = Math.hypot(dx, .03), t = [dx/l, .03/l]; return { p: [stemAt(q), q], t, n: [t[1], -t[0]] }; };
+  const onStem = (q, off) => { const f = stemFrame(q); return [f.p[0] + f.n[0]*off, f.p[1] + f.n[1]*off]; };
+  const strip = (q0, q1, w, front, back, m) => {
+    const rows = []; for (let i = 0; i <= 44; i++) { const q = lerp(q0, q1, i/44), a = onStem(q, back), b = onStem(q, front); rows.push([[a[0], a[1], -w], [b[0], b[1], -w], [b[0], b[1], w], [a[0], a[1], w]]); }
+    return grid(G.hull, rows, m);
+  };
+  // forestay chainplate: one stainless strap from the stemhead down past the anchor
+  const topQ = sheerY(L) - .004;
+  strip(CH.bottomY, topQ, CH.width/2, CH.thick, -.03, mat.steel);
+  const capB = onStem(CH.bottomY, CH.thick), capA = onStem(CH.bottomY, -.03);
+  grid(G.hull, [[[capA[0], capA[1], -CH.width/2], [capA[0], capA[1], CH.width/2]], [[capB[0], capB[1], -CH.width/2], [capB[0], capB[1], CH.width/2]]], mat.steel);
+  for (let q = CH.bottomY + .05; q < topQ - .02; q += .085) {
+    if (Math.abs(q - A.rollerY) < A.slot + .04) continue;
+    const f = stemFrame(q), b = onStem(q, CH.thick), e = onStem(q, CH.thick + .004); rod(G.hull, [b[0], b[1], 0], [e[0], e[1], 0], .0075, mat.dark, 10);
+  }
+  // opening in the stem with the roller between two cast cheeks
+  strip(A.rollerY - A.slot, A.rollerY + A.slot, .026, CH.thick + .001, CH.thick, mat.dark);
+  const P = onStem(A.rollerY, .03), ca = onStem(A.rollerY + A.slot + .03, -.01), cb = onStem(A.rollerY + A.slot + .02, .035), cc = onStem(A.rollerY, .082), cd = onStem(A.rollerY - A.slot - .02, .035), ce = onStem(A.rollerY - A.slot - .03, -.01);
+  [1, -1].forEach(k => extrude([ca, cb, cc, cd, ce], k*.043 - .003, .006, metal));
+  const roll = put(G.hull, new T.CylinderGeometry(.034, .034, .078, 22), mat.dark); roll.rotation.x = Math.PI/2; roll.position.set(P[0], P[1], 0);
+  rod(G.hull, [P[0], P[1], -.056], [P[0], P[1], .056], .009, mat.steel, 12);
+
+  // Delta anchor: straight shank from the roller to the crown, plough head with its toe back towards the hull
+  const sa = A.shankAngle*Math.PI/180, ha = A.headAngle*Math.PI/180, d = [Math.cos(sa), -Math.sin(sa)], perp = [Math.sin(sa), Math.cos(sa)];
+  const Cr = [P[0] + d[0]*A.shank, P[1] + d[1]*A.shank], Toe = [Cr[0] - A.head*Math.cos(ha), Cr[1] - A.head*Math.sin(ha)];
+  const ax = [(Cr[0] - Toe[0])/A.head, (Cr[1] - Toe[1])/A.head], up = [-ax[1], ax[0]], N = up[1] > 0 ? up : [-up[0], -up[1]];
+  const headPt = (f, t, e) => {
+    const c = f*(.83 + .17*Math.pow(Math.abs(t), 1.4))*A.head, b = A.span/2*Math.pow(f, .9), drop = .6*b*Math.abs(t) - e;
+    return [Toe[0] + ax[0]*c - N[0]*drop, Toe[1] + ax[1]*c - N[1]*drop, t*b];
+  };
+  const ts = Array.from({ length: 15 }, (_, i) => -1 + 2*i/14), half = A.thick/2, head = [];
+  for (let i = 0; i <= 28; i++) { const f = .002 + .998*i/28; head.push([...ts.map(t => headPt(f, t, half)), ...ts.slice().reverse().map(t => headPt(f, t, -half))]); }
+  grid(G.hull, head, metal);
+  grid(G.hull, ts.map(t => [headPt(1, t, half), headPt(1, t, -half)]), metal);
+  tube(G.hull, Array.from({ length: 9 }, (_, i) => headPt(.04 + .78*i/8, 0, half + .006)), .012, metal, false, 8);       // ridge of the plough
+  // shank: a slim plate that curves out of the roller and widens where it is welded along the ridge
+  const quad = (p0, c, p1, n = 12) => Array.from({ length: n + 1 }, (_, i) => { const u = i/n, v = 1 - u; return [v*v*p0[0] + 2*v*u*c[0] + u*u*p1[0], v*v*p0[1] + 2*v*u*c[1] + u*u*p1[1]]; });
+  const off = (f, w) => [lerp(P[0], Cr[0], f) + perp[0]*w, lerp(P[1], Cr[1], f) + perp[1]*w];
+  const root = headPt(.42, 0, 0), heel = headPt(.86, 0, 0);
+  extrude([...quad(off(-.2, .024), off(.95, .03), heel), ...quad(root, off(.72, -.026), off(-.2, -.024))], -.011, .022, metal);
   // anchor locker lid outline
   const lx = L - .89, lid = new T.Mesh(new T.ExtrudeGeometry(roundRect(.42, .34, .05), { depth: .012, bevelEnabled: false }), mat.teakRail);
   lid.rotation.x = -Math.PI/2; lid.position.set(lx, deckY(lx, 0) + .001, 0); G.deck.add(lid);

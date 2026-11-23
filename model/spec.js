@@ -70,6 +70,17 @@ const SPEC = {
     anchor: { z: -0.78, spread: 0.23, drop: 0.27, shank: 0.50 },   // claw anchor stowed over the port corner roller
   },
 
+  bowAnchor: {   // Delta anchor stowed through the stem, from the owner's photos [P], replace with measurements
+    rollerY: 0.82,            // height of the bow roller on the stem
+    shank: 0.27,              // roller to crown of the anchor
+    shankAngle: 62,           // shank, degrees below horizontal, pointing forward
+    head: 0.52,               // crown to toe of the plough
+    headAngle: 13,            // plough, degrees below horizontal, toe pointing aft at the hull
+    span: 0.36, thick: 0.012,
+    slot: 0.13,               // half-length of the opening in the stem
+    chainplate: { width: 0.075, thick: 0.007, bottomY: 0.30 },   // forestay chainplate down the stem, past the anchor
+  },
+
   keel: {   // [D] levels are [y, leading edge x, trailing edge x, thickness/chord]
     fin: [[-0.30, 6.614, 2.404, 0.085], [-0.52, 6.414, 2.404, 0.085], [-0.72, 5.894, 2.434, 0.092], [-1.58, 4.824, 2.574, 0.105]],
     deadwood: [[-0.18, 2.664, 1.184, 0.075], [-0.52, 2.664, 1.194, 0.075]],
