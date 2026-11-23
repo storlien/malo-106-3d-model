@@ -127,6 +127,7 @@ const SPEC = {
     chainplateInset: 0.13,    // [P] from the sheer
     boom: { fwd: 6.064, aft: 1.984, y: 2.45, h: 0.155, w: 0.09 }, // [D]
     coverAft: 2.684,           // [P] sail cover end
+    radar: { name: 'Lowrance 3G', diameter: 0.488, height: 0.28, kg: 7.4, aboveSpreader: 0.12, mastGap: 0.035 }, // [B] maker's data; position is the owner's choice
     stem: [10.564, 1.32],      // [D] forestay foot
     backstay: [0.10, 1.16],   // [D]
     furlerR: 0.05,           // [P] furled genoa in its blue UV strip
@@ -137,6 +138,7 @@ const SPEC = {
     panelCounts: [2, 3, 4],
     panelGap: 0.015,        // [E] between neighbouring panels
     pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
+    rearAngles: [0, 60],    // selectable rear pipe angles at the top frame, degrees; 0 = pipe meets the aft panel edge. Add values here to test more.
     pipeWall: 0.002,        // [E] used for the weight estimate
     backstaySlot: 0.09,     // half-width of the opening around the backstay in the split layout
     warnGap: 0.05,          // clearances below this are flagged as tight
@@ -147,9 +149,9 @@ const SPEC = {
     // To add a design, copy one entry and change its numbers. It appears on the page automatically.
     // fwdX is the forward edge of the panels. It must stay aft of the backstay unless layout is 'split'.
     designs: [
-      { id: 'vertical', name: 'Vertical arch', note: 'Fore pipes stand vertical and the rear pipes mount on the transom. Medium height, so you still duck slightly on the aft deck.',
+      { id: 'vertical', name: 'Vertical arch', note: 'Straight, unbent pipes: vertical fore pipes on the side decks and rear pipes on the transom. Medium height, so you still duck slightly on the aft deck.',
         hoop: { footX: 0.60, footHalf: 1.06, topX: 0.60, topY: 2.60, half: 0.98, bend: 0.20 },
-        aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06, straight: true }, fwdX: 0.60 },
+        aftStrut: { footY: 1.00, footHalf: 0.88, standoff: 0.06, straight: true }, fwdX: 0.60 },
 
       { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },

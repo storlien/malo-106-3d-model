@@ -134,6 +134,21 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   [.2, .45, .7].forEach(f => { const r = cover[Math.round(f*nC)]; tube(G.rig, r.map(p => [p[0], p[1], p[2]*1.035]).filter((_, k) => k%2 === 0), .005, mat.dark); });
 })();
 
+/* Lowrance 3G radome on a bracket, on the front of the mast just above the lower spreaders. */
+const RADAR = (() => {
+  const q = RG.radar, r = q.diameter/2, mx = RG.mastX, front = mx + RG.mastSize[0]/2, cx = front + q.mastGap + r, y0 = RG.spreaders[0][0] + q.aboveSpreader;
+  const profile = [[0, 0], [r*.94, 0], [r, .018], [r, q.height*.62], [r*.97, q.height*.76], [r*.86, q.height*.88], [r*.62, q.height*.965], [r*.3, q.height*.995], [0, q.height]].map(([a, b]) => new T.Vector2(a, b));
+  const dome = put(G.rig, new T.LatheGeometry(new T.SplineCurve(profile).getPoints(48), 48), mat.white); dome.position.set(cx, y0, 0);
+  const seam = put(G.rig, new T.CylinderGeometry(r + .002, r + .002, .012, 48, 1, true), mat.dark); seam.position.set(cx, y0 + q.height*.22, 0);
+  box(G.rig, [cx - .03, y0 - .009, 0], [q.diameter*.82, .012, .26], mat.steel);    // platform
+  box(G.rig, [front + .004, y0 - .05, 0], [.008, .24, .12], mat.steel);            // mast plate
+  [1, -1].forEach(s => {
+    rod(G.rig, [front + .006, y0 - .012, s*.05], [cx + .12, y0 - .012, s*.1], .011, mat.steel, 8);
+    rod(G.rig, [front + .006, y0 - .16, s*.05], [cx + .04, y0 - .016, s*.1], .009, mat.steel, 8);
+  });
+  return { bottom: y0, top: y0 + q.height, spreaderGap: q.aboveSpreader - .026, mastGap: q.mastGap, name: q.name, kg: q.kg };
+})();
+
 /* ---------- Guard rails ---------- */
 (function rails() {
   const R = SPEC.rails, P = R.pulpit, Q = R.pushpit, rail = (x, s) => { const z = s*(deckHalf(x) - R.inset); return [x, deckY(x, z), z]; };
