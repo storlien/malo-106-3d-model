@@ -88,6 +88,8 @@ const SPEC = {
   house: {   // cabin trunk and cockpit coamings, one continuous moulding [D/P]
     aft: 0.37, fwd: 7.984,      // [D/P] coamings stop here; the bench runs on aft to the toe rail
     topAft: 0.375, topFwd: 7.514, // [D] the raked front runs from topFwd down to fwd
+    frontCorner: 0.22,        // [P] how far the rounded corners of the flat, raked front reach aft
+    logo: { width: 0.52, midHeight: 0.54 },   // [P] Malö Yachts logo on the front, width in metres
     roof: 1.40,               // [D]
     roofCrown: 0.05,          // [E]
     sideDeck: 0.46,           // [P] side-deck width amidships
@@ -133,7 +135,7 @@ const SPEC = {
   },
 
   hatches: [   // [x, z, length, width] [P]
-    [5.084, -0.44, 0.50, 0.50], [5.084, 0.44, 0.50, 0.50], [7.214, 0, 0.56, 0.56], [9.004, 0, 0.46, 0.46],
+    [5.084, -0.44, 0.50, 0.50], [5.084, 0.44, 0.50, 0.50], [7.10, 0, 0.56, 0.56], [9.004, 0, 0.46, 0.46],
   ],
 
   rig: {

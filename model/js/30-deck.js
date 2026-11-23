@@ -9,14 +9,18 @@ function houseSide(x) {
 }
 function houseHalf(x) {
   if (x <= HO.aft || x >= HO.fwd) return 0;
-  const fR = 1.25; let k = 1;
-  if (x > HO.fwd - fR) { const d = (x - (HO.fwd - fR))/fR; k = Math.pow(1 - Math.pow(d, 2.5), 1/2.5); }
+  const R = HO.frontCorner; let k = 1;
+  if (x > HO.fwd - R) { const d = (x - (HO.fwd - R))/R; k = Math.pow(1 - Math.pow(d, 3.2), 1/3.2); }
   return houseSide(x)*k;
 }
 const toTopX = x => lerp(HO.topAft, HO.topFwd, (x - HO.aft)/(HO.fwd - HO.aft));
 const fromTopX = x => lerp(HO.aft, HO.fwd, (x - HO.topAft)/(HO.topFwd - HO.topAft));
 const roofHalf = x => houseHalf(fromTopX(x))*HO.tumble;
-const roofY = (x, z) => { const w = Math.max(roofHalf(x), .2); return HO.roof + HO.roofCrown*Math.max(0, 1 - (z/w)*(z/w)); };
+const roofSide = x => houseSide(fromTopX(x))*HO.tumble;                   // width without the rounded front corners
+const roofY = (x, z) => { const w = Math.max(roofSide(x), .2); return HO.roof + HO.roofCrown*Math.max(0, 1 - (z/w)*(z/w)); };
+
+/* Stations packed towards the tip of the front, where the outline turns quickly. */
+const frontStations = (end, n = 48) => Array.from({ length: n + 1 }, (_, i) => end - HO.frontCorner*Math.pow(i/n, 3));
 
 /* Half-width of the cockpit well. Its aft edge curves with the transom, right behind the stern toe rail. */
 const cockpitHalf = x => {
@@ -29,13 +33,14 @@ const cockpitHalf = x => {
 
 function stations(a, b, step, extra = []) {
   const xs = [...extra]; for (let x = a; x < b; x += step) xs.push(x); xs.push(b);
-  return xs.filter(x => x >= a && x <= b).sort((p, q) => p - q).filter((x, i, l) => !i || x - l[i - 1] > 1e-4);
+  const o = xs.filter(x => x >= a && x <= b).sort((p, q) => p - q).filter((x, i, l) => !i || x - l[i - 1] > 1e-6);
+  o[o.length - 1] = b; return o;                       // always end exactly at b, so closed outlines have no gap
 }
 const endSamples = (a, b, n = 40) => { const o = []; for (let i = 0; i <= n; i++) { const f = (1 - Math.cos(Math.PI*i/n/2)); o.push(a + (b - a)*f*.2, b - (b - a)*f*.2); } return o; };
 
 /* Deck: two strips from the trunk (or centreline) out to the rail. */
 (function deck() {
-  const ex = [...endSamples(HO.aft + 1e-3, HO.fwd), HO.aft, HO.aft + 1e-3]; for (let i = 0; i <= 24; i++) ex.push(.45*(i/24)*(i/24), CP.aftRail + CP.aftCorner*(i/24)*(i/24));
+  const ex = [...endSamples(HO.aft + 1e-3, HO.fwd), ...frontStations(HO.fwd), HO.aft, HO.aft + 1e-3]; for (let i = 0; i <= 24; i++) ex.push(.45*(i/24)*(i/24), CP.aftRail + CP.aftCorner*(i/24)*(i/24));
   const xs = stations(0, L, .035, ex);
   [1, -1].forEach(s => {
     const rows = xs.map(x => {
@@ -73,7 +78,7 @@ const wallPt = (x, s, h) => {
   return [lerp(x, tx, k), lerp(y0, y1, h), s*(lerp(z0, z1, k) - .012*Math.pow(Math.max(0, h - .9)/.1, 2))];
 };
 (function walls() {
-  const xs = stations(HO.aft + 1e-3, HO.fwd - 1e-3, .03, endSamples(HO.aft + 1e-3, HO.fwd - 1e-3));
+  const xs = stations(HO.aft + 1e-3, HO.fwd, .03, [...endSamples(HO.aft + 1e-3, HO.fwd), ...frontStations(HO.fwd)]);
   [1, -1].forEach(s => {
     const rows = xs.map(x => { const r = []; for (let k = 0; k <= 12; k++) r.push(wallPt(x, s, k/12)); return r; });
     grid(G.deck, rows, mat.gel);
@@ -92,18 +97,29 @@ const wallPt = (x, s, h) => {
 
 /* Roof: teak forward of the windscreen, cream around the cockpit. */
 (function roof() {
-  const ex = [HO.teakFrom, ...endSamples(HO.topAft + 1e-3, CP.fwd - 1e-3, 18), ...endSamples(HO.topAft + 1e-3, HO.topFwd - 1e-3, 30)];
-  const xs = stations(HO.topAft + 1e-3, HO.topFwd - 1e-3, .03, ex);
+  const ex = [HO.teakFrom, ...endSamples(HO.topAft + 1e-3, CP.fwd - 1e-3, 18), ...endSamples(HO.topAft + 1e-3, HO.topFwd, 30), ...frontStations(HO.fwd).map(toTopX)];
+  const xs = stations(HO.topAft + 1e-3, HO.topFwd, .03, ex);
+  const sprung = p => [p[0]/3.4, p[2]/roofSide(p[0])*.9/(SPEC.deck.plank*8)];     // planks follow the sides of the trunk
   const build = (list, m, uv) => [1, -1].forEach(s => {
     const rows = list.map(x => {
-      const o = roofHalf(x) - .012, a = Math.min(cockpitHalf(x), o), r = [];
+      const o = Math.max(roofHalf(x) - .012, 0), a = Math.min(cockpitHalf(x), o), r = [];
       for (let k = 0; k <= 10; k++) { const z = lerp(a, o, k/10); r.push([x, roofY(x, z) + .001, s*z]); }
       return r;
     });
-    grid(G.deck, rows, m, uv ? { uv: teakUV } : undefined);
+    grid(G.deck, rows, m, uv ? { uv: sprung } : undefined);
   });
   build(xs.filter(x => x <= HO.teakFrom + 1e-6), mat.gelDeck, false);
-  build(xs.filter(x => x >= HO.teakFrom - 1e-6), mat.teak, true);
+  const teakXs = xs.filter(x => x >= HO.teakFrom - 1e-6);
+  build(teakXs, mat.teak, true);
+  // margin plank around the edge of the teak
+  const edge = teakXs.map(x => [x, Math.max(roofHalf(x) - .012, 0)]);
+  [1, -1].forEach(s => grid(G.deck, edge.map((p, i) => {
+    const a = edge[Math.max(0, i - 1)], b = edge[Math.min(edge.length - 1, i + 1)];
+    let nx = b[1] - a[1], nz = -(b[0] - a[0]); const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
+    if (i === edge.length - 1) { nx = -1; nz = 0; }
+    const ix = p[0] + nx*.055, iz = Math.max(0, p[1] + nz*.055);
+    return [[p[0], roofY(p[0], p[1]) + .004, s*p[1]], [ix, roofY(ix, iz) + .004, s*iz]];
+  }), mat.teakRail));
 })();
 
 /* Cockpit well: coaming walls, helm bench to the stern toe rail, side seats, footwell and sole. */
@@ -144,6 +160,23 @@ const footAft = CP.aftRail + CP.benchDepth, TG_CAP_END = SPEC.targa.baseX - .06,
   const gx = CP.fwd + .34, gy = roofY(gx, 0);
   box(G.deck, [gx, gy + .03, 0], [.72, .05, ch*2 + .12], mat.gelDeck);
 })();
+
+/* Malö Yachts logo, following the curved, raked front of the trunk. */
+function placeLogo(loaded) {
+  const { width, midHeight } = HO.logo, img = new Image();
+  img.onload = () => {
+    const tex = new T.Texture(img); tex.encoding = T.sRGBEncoding; tex.anisotropy = 8; tex.needsUpdate = true;
+    const front = z => { let a = HO.fwd - HO.frontCorner, b = HO.fwd; for (let i = 0; i < 40; i++) { const m = (a + b)/2; if (houseHalf(m) > z) a = m; else b = m; } return (a + b)/2; };
+    const slope = Math.hypot(HO.fwd - HO.topFwd, HO.roof - deckY(HO.fwd, 0)), dh = width*img.height/img.width/slope/2, rows = [], uv = [];
+    for (let j = 0; j <= 10; j++) { const v = j/10, h = midHeight + dh*(2*v - 1), r = [];
+      for (let i = 0; i <= 28; i++) { const u = i/28, z = width/2*(1 - 2*u), z0 = Math.abs(z)/lerp(1, HO.tumble, h), q = wallPt(front(z0), z < 0 ? -1 : 1, h); r.push([q[0] + .004, q[1] + .002, q[2]]); uv.push(u, v); }
+      rows.push(r); }
+    const geo = gridGeo(rows); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+    const m = put(G.deck, geo, new T.MeshStandardMaterial({ map: tex, color: 0x777777, transparent: true, depthWrite: false, roughness: .45, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), false);
+    m.renderOrder = 2; loaded();
+  };
+  img.src = OVERLAYS.logo;
+}
 
 /* Port lights with stainless frames, set into the trunk wall. */
 (function ports() {

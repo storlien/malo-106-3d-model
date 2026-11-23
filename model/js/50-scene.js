@@ -82,6 +82,7 @@
     bow:    { th: Math.PI/2, ph: Math.PI/2, r: 60, tx: 0, ty: 1, tz: 0, ortho: true, span: 7.2 },
   };
   let needs = 5, anim = false;
+  placeLogo(() => { needs = 3; });
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function setView(name, instant) {
     const v = VIEWS[name]; if (!v) return;

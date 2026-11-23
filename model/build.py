@@ -7,7 +7,7 @@ here = Path(__file__).resolve().parent
 uri = lambda n: 'data:image/png;base64,' + base64.b64encode((here/f'assets/{n}.png').read_bytes()).decode()
 safe = lambda s: s.replace('</script', '<\\/script')
 
-parts = [f"const OVERLAYS={{profile:'{uri('profile')}',plan:'{uri('plan')}'}};", (here/'spec.js').read_text('utf-8')]
+parts = [f"const OVERLAYS={{profile:'{uri('profile')}',plan:'{uri('plan')}',logo:'{uri('malo-logo')}'}};", (here/'spec.js').read_text('utf-8')]
 parts += [p.read_text('utf-8') for p in sorted((here/'js').glob('*.js'))]
 
 html = (here/'template.html').read_text('utf-8')
