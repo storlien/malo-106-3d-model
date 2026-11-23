@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""Bundle model/ into one self-contained file: alizee.html in the repo root."""
+import base64
+from pathlib import Path
+
+here = Path(__file__).resolve().parent
+uri = lambda n: 'data:image/png;base64,' + base64.b64encode((here/f'assets/{n}.png').read_bytes()).decode()
+safe = lambda s: s.replace('</script', '<\\/script')
+
+parts = [f"const OVERLAYS={{profile:'{uri('profile')}',plan:'{uri('plan')}'}};", (here/'spec.js').read_text('utf-8')]
+parts += [p.read_text('utf-8') for p in sorted((here/'js').glob('*.js'))]
+
+html = (here/'template.html').read_text('utf-8')
+html = html.replace('/*THREE*/', safe((here/'vendor/three.min.js').read_text('utf-8')))
+html = html.replace('/*MODEL*/', safe('\n'.join(parts)))
+out = here.parent/'alizee.html'
+out.write_text(html, 'utf-8')
+print(f'{out} ({len(html)/1e6:.2f} MB)')

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SY Alizée</title>
+<style>
+:root{--ink:#14275f;--ink2:#4d5b78;--panel:rgba(247,249,250,.9);--line:rgba(20,39,95,.16);--focus:#1d63d8;color-scheme:light}
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:#c5dcea;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#view{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+.title{position:fixed;left:22px;top:16px;pointer-events:none}
+.title h1{margin:0;font:italic 400 clamp(34px,5vw,54px)/1 Georgia,"Times New Roman",serif}
+.title p{margin:6px 0 0 2px;font-size:14px;font-weight:500;color:var(--ink2)}
+.bar{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;align-items:center;width:max-content;max-width:calc(100vw - 16px)}
+.group{display:flex;gap:2px;padding:4px;border-radius:999px;background:var(--panel);border:1px solid var(--line);box-shadow:0 8px 26px rgba(12,28,52,.16);max-width:100%;overflow-x:auto;scrollbar-width:none}
+button{appearance:none;border:0;background:transparent;color:var(--ink2);font:500 14px/1 inherit;font-family:inherit;padding:9px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
+button:hover{color:var(--ink)}button[aria-pressed="true"]{background:var(--ink);color:#fff}
+button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+@media (max-width:620px){button{padding:9px 10px;font-size:13px}.title{left:16px}}
+</style>
+</head>
+<body>
+<canvas id="view" tabindex="0" aria-label="3D-modell av seilbåten Alizée. Dra for å snu, rull for å zoome."></canvas>
+<div class="title"><h1>Alizée</h1><p>Malö 36</p></div>
+<div class="bar">
+  <div class="group" role="group" aria-label="Lag">
+    <button data-layer="water" aria-pressed="true">Vann</button>
+    <button data-layer="canvas" aria-pressed="true">Kalesje</button>
+    <button data-layer="rig" aria-pressed="true">Rigg</button>
+    <button data-layer="rails" aria-pressed="true">Rekker</button>
+    <button data-layer="drawing" aria-pressed="false">Brosjyretegning</button>
+  </div>
+  <div class="group" role="group" aria-label="Visning">
+    <button data-view="hero">Oversikt</button>
+    <button data-view="deck">Dekk</button>
+    <button data-view="stern">Akter</button>
+    <button data-view="side">Side</button>
+    <button data-view="full">Hele riggen</button>
+    <button data-view="top">Ovenfra</button>
+    <button data-view="aft">Hekk</button>
+    <button data-view="bow">Baug</button>
+  </div>
+</div>
+<script>/*THREE*/</script>
+<script>/*MODEL*/</script>
+</body>
+</html>
