@@ -64,6 +64,12 @@ const SPEC = {
     moulding: { from: 0.40, to: 9.01, below: 0.235, height: 0.032, proud: 0.016 }, // [D] raised strake
   },
 
+  platform: {   // curved teak stern platform with a stainless edge tube [P], from the owner's stern photo
+    y: 0.43, halfWidth: 0.68, aftHalfWidth: 0.84, depth: 0.50, bulge: 0.06, corner: 0.06, thick: 0.03, plank: 0.085, tube: 0.025,
+    stayTopY: 0.78, postHeight: 0.14,
+    anchor: { z: -0.78, spread: 0.23, drop: 0.27, shank: 0.50 },   // claw anchor stowed over the port corner roller
+  },
+
   keel: {   // [D] levels are [y, leading edge x, trailing edge x, thickness/chord]
     fin: [[-0.30, 6.614, 2.404, 0.085], [-0.52, 6.414, 2.404, 0.085], [-0.72, 5.894, 2.434, 0.092], [-1.58, 4.824, 2.574, 0.105]],
     deadwood: [[-0.18, 2.664, 1.184, 0.075], [-0.52, 2.664, 1.194, 0.075]],

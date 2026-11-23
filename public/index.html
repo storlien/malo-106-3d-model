@@ -160,6 +160,12 @@ const SPEC = {
     moulding: { from: 0.40, to: 9.01, below: 0.235, height: 0.032, proud: 0.016 }, // [D] raised strake
   },
 
+  platform: {   // curved teak stern platform with a stainless edge tube [P], from the owner's stern photo
+    y: 0.43, halfWidth: 0.68, aftHalfWidth: 0.84, depth: 0.50, bulge: 0.06, corner: 0.06, thick: 0.03, plank: 0.085, tube: 0.025,
+    stayTopY: 0.78, postHeight: 0.14,
+    anchor: { z: -0.78, spread: 0.23, drop: 0.27, shank: 0.50 },   // claw anchor stowed over the port corner roller
+  },
+
   keel: {   // [D] levels are [y, leading edge x, trailing edge x, thickness/chord]
     fin: [[-0.30, 6.614, 2.404, 0.085], [-0.52, 6.414, 2.404, 0.085], [-0.72, 5.894, 2.434, 0.092], [-1.58, 4.824, 2.574, 0.105]],
     deadwood: [[-0.18, 2.664, 1.184, 0.075], [-0.52, 2.664, 1.194, 0.075]],
@@ -1046,30 +1052,77 @@ function antenna(parent, base, top) {
 
 /* ---------- Stern gear (photo of the haul-out) ---------- */
 (function sternGear() {
-  const yP = .635, xB = .0;
-  // fold-down teak platform on stainless brackets
-  const py = yP, pw = .74;
-  const plat = new T.Mesh(new T.BoxGeometry(.40, .025, pw*2), mat.teak.clone()); plat.position.set(xB - .22, py, 0); plat.castShadow = true; G.hull.add(plat);
+  const P = SPEC.platform, A = P.anchor, w0 = P.halfWidth, w1 = P.aftHalfWidth, plat = new T.Group(); G.hull.add(plat);
+  const inner = z => transomX(P.y, z) - .002;
+  const outer = z => {                                  // convex aft edge with rounded corners
+    const q = Math.abs(z) - (w1 - P.corner), c = q > 0 ? P.corner - Math.sqrt(Math.max(0, P.corner*P.corner - q*q)) : 0;
+    return -P.depth - P.bulge*(1 - (z/w1)*(z/w1)) + c;
+  };
+  // teak deck flares outward from the transom; planks follow the curve of the aft edge
+  const nz = 64, nd = 12, top = [], under = [], uv = [];
+  for (let i = 0; i <= nz; i++) {
+    const a = Math.sin((-1 + 2*i/nz)*Math.PI/2), x0 = inner(a*w0), x1 = outer(a*w1), r = [], b = [];
+    for (let j = 0; j <= nd; j++) { const f = j/nd, x = lerp(x0, x1, f), z = a*lerp(w0, w1, f); r.push([x, P.y, z]); b.push([x, P.y - P.thick, z]); uv.push(a*w1/3.4, f*P.depth/(P.plank*8)); }
+    top.push(r); under.push(b);
+  }
+  const tg = gridGeo(top); tg.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); const platTeak = mat.teak.clone(); platTeak.color.setScalar(.62); put(plat, tg, platTeak);   // more weathered than the deck
+  grid(plat, under, mat.teakRail);
+  grid(plat, top.map((r, i) => [r[nd], under[i][nd]]), mat.teakRail);
+  tube(plat, top.map(r => [r[0][0] - .006, P.y + .006, r[0][2]]).filter((_, i) => i%2 === 0), .007, mat.white);    // light trim against the transom
+  box(plat, [outer(-.1) + .09, P.y + .009, -.1], [.05, .018, .34], mat.teakRail);                                 // raised strip
+
+  // stainless edge tube from flange to flange, around the flared sides and aft edge
+  const edgeZ = w0 + .035, edgeY = P.y + .025, path = [[transomX(edgeY, -edgeZ), edgeY, -edgeZ]];
+  for (let i = 1; i <= 3; i++) { const f = i/4; path.push([lerp(transomX(edgeY, -edgeZ), outer(-w1 + .01), f), lerp(edgeY, P.y + .004, f), lerp(-edgeZ, -w1 - .012, f)]); }
+  for (let i = 0; i <= 48; i++) { const a = -1 + 2*i/48, z = (w1 + .012)*Math.sin(a*Math.PI/2); path.push([outer(z*w1/(w1 + .012)) - .012, P.y + .004, z]); }
+  for (let i = 3; i >= 1; i--) { const f = i/4; path.push([lerp(transomX(edgeY, edgeZ), outer(w1 - .01), f), lerp(edgeY, P.y + .004, f), lerp(edgeZ, w1 + .012, f)]); }
+  path.push([transomX(edgeY, edgeZ), edgeY, edgeZ]);
+  tube(plat, path, P.tube/2, mat.steel, false, 10);
+  const flange = (x, y, z, r = .032) => { const m = put(plat, new T.CylinderGeometry(r, r, .012, 22), mat.steel); m.rotation.z = Math.PI/2; m.position.set(x - .004, y, z); };
   [1, -1].forEach(s => {
-    rod(G.hull, [.03, py + .014, s*pw], [xB - .43, py + .014, s*pw], .012, mat.steel);
-    rod(G.hull, [.03, py - .10, s*.62], [xB - .28, py - .012, s*.65], .012, mat.steel);
+    flange(transomX(edgeY, s*edgeZ), edgeY, s*edgeZ);
+    // corner post with a white fitting, and a diagonal stay up to the transom
+    const cx = outer(s*(w1 - .05)) + .05, cz = s*(w1 - .025), py = P.y + P.postHeight, sz = s*(w0 + .12);
+    rod(plat, [cx, P.y, cz], [cx, py, cz], P.tube/2, mat.steel, 10);
+    box(plat, [cx + .012, py + .008, cz], [.12, .026, .08], mat.dark);
+    const fit = put(plat, new T.CylinderGeometry(.033, .033, .07, 18), mat.white); fit.rotation.x = Math.PI/2; fit.position.set(cx, py + .052, cz);
+    rod(plat, [cx + .05, py + .012, cz], [transomX(P.stayTopY, sz), P.stayTopY, sz], .011, mat.steel, 10);
+    flange(transomX(P.stayTopY, sz), P.stayTopY, sz, .026);
   });
-  rod(G.hull, [xB - .43, py + .014, -pw], [xB - .43, py + .014, pw], .012, mat.steel);
-  // boarding ladder
-  [1, -1].forEach(s => {
-    const z = s*.21;
-    tube(G.hull, [[.05, py + .03, z], [.03, .95, z], [.015, 1.25, z], [.05, 1.42, z], [.20, 1.52, z]], .0125, mat.steel);
-  });
-  [.78, .96, 1.14].forEach(y => { const x = .025 - (y - .78)*.02; box(G.hull, [x - .05, y, 0], [.11, .014, .42], mat.steel); });
-  // transom drain, fuel-vent and shore-power details from the photo
+
+  // claw anchor: shank over a white roller at the port corner, head hanging aft of it
+  const metal = M('#6d6a57', { roughness: .68, metalness: .35 });
+  const rx = outer(A.z) - .005, ry = P.y + .075, anchorZ = A.z, splay = Math.atan2(w1 - w0, P.depth);
+  const roller = put(plat, new T.CylinderGeometry(.036, .036, .11, 20), mat.white); roller.rotation.x = Math.PI/2; roller.position.set(rx, ry - .04, anchorZ);
+  [1, -1].forEach(k => rod(plat, [rx + .07, P.y + .006, anchorZ + k*.062], [rx, ry - .04, anchorZ + k*.062], .006, mat.steel, 8));
+  const eL = A.shank, eH = .15, sh = new T.Shape();          // shank and centre claw, drawn from the roller
+  sh.moveTo(eL, eH + .042); sh.lineTo(.06, .055); sh.lineTo(-.035, .02); sh.lineTo(-.1, -.1); sh.lineTo(-.085, -A.drop + .015);
+  sh.lineTo(.008, -A.drop + .012); sh.lineTo(.03, -.07); sh.lineTo(.08, -.022); sh.lineTo(eL, eH - .042); sh.closePath();
+  const shank = new T.Group(); shank.position.set(rx, ry, anchorZ); shank.rotation.y = -splay; plat.add(shank);
+  const plate = put(shank, new T.ExtrudeGeometry(sh, { depth: .024, bevelEnabled: true, bevelSize: .003, bevelThickness: .003, bevelSegments: 1 }), metal); plate.position.z = -.012;
+  const clawSpan = 1.25, claw = [];
+  for (let i = 0; i <= 38; i++) {
+    const t = -1 + 2*i/38, a = t*clawSpan, cz = anchorZ + A.spread*Math.sin(a)/Math.sin(clawSpan), cy = ry - A.drop + (A.drop - .025)*(1 - Math.cos(a))/(1 - Math.cos(clawSpan));
+    const wid = .125*Math.pow(1 - t*t, .5) + .006, nz2 = -Math.sin(a), ny = Math.cos(a), cx0 = rx - .05 + .05*t*t, ring = [];
+    for (let k = 0; k <= 12; k++) { const f = k/12*Math.PI*2, th = .015*Math.sin(f); ring.push([cx0 + wid*Math.cos(f), cy + ny*th, cz + nz2*th]); }
+    claw.push(ring);
+  }
+  grid(plat, claw, metal);
+  const ex = rx + eL*Math.cos(splay), ey = ry + eH, ez = anchorZ + eL*Math.sin(splay);
+  const bar = put(plat, new T.CylinderGeometry(.012, .012, .05, 10), mat.steel); bar.rotation.x = Math.PI/2; bar.position.set(ex - .012, ey, ez);
+  const tz0 = ez + .1, tx0 = transomX(.86, tz0);
+  tube(plat, [[ex, ey, ez], [ex + .025, ey + .05, ez + .02], [lerp(ex, tx0, .65), .8, lerp(ez, tz0, .65)], [tx0 - .012, .86, tz0]], .006, mat.wire, false, 6);
+  box(plat, [tx0 - .012, .865, tz0], [.035, .055, .05], mat.white);
+
+  // transom fittings from the photo
   const ring = (y, z, r) => { const x = transomX(y, z) - .004, m = put(G.hull, new T.TorusGeometry(r, r*.26, 8, 22), mat.steel); m.position.set(x, y, z); m.rotation.y = Math.PI/2; const d = put(G.hull, new T.CircleGeometry(r, 18), mat.dark, false); d.position.set(x + .001, y, z); d.rotation.y = -Math.PI/2; };
-  ring(.56, .50, .034); ring(.92, -.58, .024);
-  // outboard bracket with folded motor mount on port side
-  const oz = -.92, ox = transomX(.84, oz);
-  box(G.hull, [ox - .03, .84, oz], [.05, .16, .18], mat.steel);
-  rod(G.hull, [ox - .03, .92, oz + .05], [ox - .34, .94, oz + .05], .014, mat.steel);
-  rod(G.hull, [ox - .03, .92, oz - .05], [ox - .34, .94, oz - .05], .014, mat.steel);
-  const cowl = put(G.hull, new T.SphereGeometry(.12, 18, 12), mat.dark); cowl.position.set(ox - .37, .98, oz); cowl.scale.set(1.25, .8, .85);
+  ring(.985, -.86, .024); ring(.985, -.72, .024);
+  const disc = put(G.hull, new T.CylinderGeometry(.062, .066, .018, 28), mat.white); disc.rotation.z = Math.PI/2; disc.position.set(transomX(.89, .06) - .008, .89, .06);
+  const discIn = put(G.hull, new T.TorusGeometry(.034, .004, 6, 24), M('#b9bcb8')); discIn.rotation.y = Math.PI/2; discIn.position.set(transomX(.89, .06) - .019, .89, .06);
+  // exhaust outlet on the starboard quarter
+  const ex2 = .24, ey2 = .36, ez2 = hullHalf(ex2, ey2) + .004;
+  const out = put(G.hull, new T.TorusGeometry(.04, .011, 8, 24), mat.steel); out.position.set(ex2, ey2, ez2);
+  const hole = put(G.hull, new T.CircleGeometry(.04, 20), mat.dark, false); hole.position.set(ex2, ey2, ez2 - .001);
   // ensign and antenna as they are today; the solar arch carries its own versions
   const fx = .12, fz = .74;
   ensign(G.asBuilt, [fx, deckY(fx, fz) + .02, fz], [-.34, 2.46, fz]);
