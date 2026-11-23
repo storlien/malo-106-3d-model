@@ -157,35 +157,71 @@ const RADAR = (() => {
   const joint = []; for (let i = 0; i <= 64; i++) { const a = i/64*Math.PI*2, y = .066 - .017*Math.cos(a), r = (y < .058 ? lerp(.240, .2445, (y - .047)/.011)*k : radiusAt(y)) + .0015; joint.push([cx0 + r*Math.cos(a), y, r*Math.sin(a)]); }
   tube(g, joint, .0022, mat.dark, true, 6);
 
-  // LOWRANCE in blue on port and starboard
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 180;
-  const t = c.getContext('2d'); t.fillStyle = '#1558b0'; t.font = 'italic 900 138px Arial Black, Arial, sans-serif'; t.textAlign = 'center'; t.textBaseline = 'middle'; t.fillText('LOWRANCE', 512, 94, 990);
-  const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 12;
-  const logoMat = new T.MeshStandardMaterial({ map: tex, transparent: true, roughness: .4, depthWrite: false, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+  // LOWRANCE in heavy upright blue lettering, wrapped around each side of the radome
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 300;
+  const t = c.getContext('2d'), logoFont = '900 220px "Arial Black", "Helvetica Neue", Arial, "Liberation Sans", sans-serif';
+  t.font = logoFont; t.textBaseline = 'alphabetic'; t.fillStyle = t.strokeStyle = '#22409a'; t.lineJoin = 'round';
+  const mt = t.measureText('LOWRANCE'), capH = mt.actualBoundingBoxAscent + mt.actualBoundingBoxDescent, kx = 1890/mt.width, ky = 236/capH;
+  t.save(); t.translate(50, 268); t.scale(kx, ky); t.lineWidth = 5; t.fillText('LOWRANCE', 0, 0); t.strokeText('LOWRANCE', 0, 0); t.restore();
+  t.font = '700 40px Arial, "Liberation Sans", sans-serif'; t.fillText('®', 1952, 72);
+  const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 16;
+  const logoMat = new T.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, depthWrite: false, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
   [1, -1].forEach(s => {
-    const span = .68, yA = .135, yB = .185, rows = [], uv = [];
-    for (let j = 0; j <= 2; j++) { const y = lerp(yA, yB, j/2), r = radiusAt(y) + .0012, row = []; for (let i = 0; i <= 24; i++) { const a = (i/24 - .5)*span; row.push([cx0 + r*Math.sin(a), y, s*r*Math.cos(a)]); uv.push(s > 0 ? i/24 : 1 - i/24, j/2); } rows.push(row); }
+    const span = 2.15, yA = .119, yB = .194, rows = [], uv = [];
+    for (let j = 0; j <= 3; j++) { const y = lerp(yA, yB, j/3), r = radiusAt(y) + .0012, row = []; for (let i = 0; i <= 64; i++) { const a = (i/64 - .5)*span; row.push([cx0 + r*Math.sin(a), y, s*r*Math.cos(a)]); uv.push(s > 0 ? i/64 : 1 - i/64, j/3); } rows.push(row); }
     const d = gridGeo(rows); d.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); const q2 = put(g, d, logoMat, false); q2.renderOrder = 3;
   });
 
-  // SC20 plate: narrow at the mast, round at the forward end
+  // SC20: white cast bracket, shaped from the fixing drawing and the maker's photo
+  const cast = M('#f3f3ef', { roughness: .34, envMapIntensity: .8 }), seq = (a, b, n) => Array.from({ length: n + 1 }, (_, i) => lerp(a, b, i/n));
   const W = m.width/2, R = W, tip = m.length - R, h = m.pinSpacing/2, plate = new T.Shape();
   plate.moveTo(0, h + .012); plate.bezierCurveTo(.07, h + .018, .13, W - .03, tip, W); plate.absarc(tip, 0, R, Math.PI/2, -Math.PI/2, true); plate.bezierCurveTo(.13, -W + .03, .07, -h - .018, 0, -h - .012); plate.closePath();
-  const pg = new T.Mesh(new T.ExtrudeGeometry(plate, { depth: .006, bevelEnabled: false, curveSegments: 18 }), mat.white); pg.rotation.x = -Math.PI/2; pg.position.y = -.006; pg.castShadow = true; g.add(pg);
-  m.holeX.forEach(x => [1, -1].forEach(s => { const b = put(g, new T.CylinderGeometry(.0095, .0095, .012, 10), mat.steel); b.position.set(x, -.012, s*m.holeWidth/2); }));
+  const pg = new T.Mesh(new T.ExtrudeGeometry(plate, { depth: .007, bevelEnabled: false, curveSegments: 20 }), cast); pg.rotation.x = -Math.PI/2; pg.position.y = -.007; pg.castShadow = true; g.add(pg);
+  m.holeX.forEach(x => [1, -1].forEach(s => { const b = put(g, new T.CylinderGeometry(.017, .02, .026, 16), cast); b.position.set(x, -.019, s*(m.holeWidth/2 - .006)); }));
 
-  const yPad = (m.height - m.armDrop)/2;
+  // the two deep side webs follow the plate and open into a hexagon at the mast end
+  const xEnd = m.length - .012, webTop = -.005, low = x => lerp(-m.armDrop - .012, -.009, x/xEnd);
+  const zw = x => x < .26 ? h + (W - .02 - h)*smooth(x/.26) : (W - .02)*Math.sqrt(Math.max(.0004, 1 - Math.pow((x - .26)/(xEnd - .26 + .001), 2)));
+  const hA = .014, hB = .064, holeUp = x => x < .044 ? -.024 : lerp(-.024, -.052, (x - .044)/(hB - .044)), holeLo = x => lerp(-.09, -.052, (x - hA)/(hB - hA));
   [1, -1].forEach(s => {
-    const z = s*h, lo = [0, -m.armDrop, z];
-    rod(g, lo, [m.length - .03, -.008, s*.05], .012, mat.white, 10, .005);                 // lower arm running out under the plate
-    tube(g, [[.012, -m.armDrop + .006, z], [.045, -.085, s*.05], [.052, -.04, s*.05], [.085, -.008, s*.055]], .005, mat.white, false, 6);
-    rod(g, [.03, -m.armDrop + .012, z], [.17, -.008, s*(W - .022)], .008, mat.white, 8, .004);   // side web
-    [0, -m.armDrop].forEach(y => {                                                         // mast fittings
-      const pad = new T.Shape(); pad.moveTo(0, yPad); pad.lineTo(.018, .012); pad.lineTo(.018, -.012); pad.lineTo(0, -yPad); pad.lineTo(-.018, -.012); pad.lineTo(-.018, .012); pad.closePath();
-      const f = put(g, new T.ExtrudeGeometry(pad, { depth: .016, bevelEnabled: false }), mat.dark); f.position.set(-.018, y, z - .008);
-      const pin = put(g, new T.CylinderGeometry(.0065, .0065, .026, 10), mat.steel); pin.rotation.x = Math.PI/2; pin.position.set(0, y, z);
-      const zM = s*Math.min(h, RG.mastSize[1]/2 - .004), xM = (mx - pinX) + (RG.mastSize[0]/2)*Math.sqrt(Math.max(0, 1 - Math.pow(zM/(RG.mastSize[1]/2), 2)));
-      rod(g, [-.012, y, z], [xM, y, zM], .009, mat.steel, 8);                              // link back to the mast wall
+    const P = (x, y, o) => [x, y, s*(zw(x) + o)];
+    const band = (x0, x1, yA, yB, n = 10) => {
+      const xs = seq(x0, x1, n);
+      [.004, -.008].forEach(o => grid(g, xs.map(x => [P(x, yA(x), o), P(x, yB(x), o)]), cast));
+      [yA, yB].forEach(f => grid(g, xs.map(x => [P(x, f(x), .004), P(x, f(x), -.008)]), cast));
+    };
+    band(0, hA, () => webTop, low, 3); band(hA, hB, () => webTop, holeUp); band(hA, hB, holeLo, low); band(hB, xEnd, () => webTop, low, 44);
+    grid(g, [[P(hA, holeUp(hA), .004), P(hA, holeLo(hA), .004)], [P(hA, holeUp(hA), -.008), P(hA, holeLo(hA), -.008)]], cast);
+  });
+
+  // SCANSTRUT on the upper arm
+  const sc = document.createElement('canvas'); sc.width = 512; sc.height = 72;
+  const st = sc.getContext('2d'); st.fillStyle = '#343a40'; st.font = 'italic 900 58px Arial, "Liberation Sans", sans-serif'; st.textAlign = 'center'; st.textBaseline = 'middle'; st.fillText('SCANSTRUT', 256, 38, 500);
+  const stx = new T.CanvasTexture(sc); stx.encoding = T.sRGBEncoding; stx.anisotropy = 8;
+  const scMat = new T.MeshStandardMaterial({ map: stx, transparent: true, roughness: .4, depthWrite: false, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+  [1, -1].forEach(s => {
+    const rows = [], uv = [];
+    seq(.03, .135, 10).forEach((x, i) => { rows.push([[x, -.021, s*(zw(x) + .0048)], [x, -.008, s*(zw(x) + .0048)]]); uv.push(s > 0 ? i/10 : 1 - i/10, 0, s > 0 ? i/10 : 1 - i/10, 1); });
+    const d = gridGeo(rows); d.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); put(g, d, scMat, false).renderOrder = 3;
+  });
+
+  // hinged diamond pads lying flat on the mast wall, tangent from each hinge pin
+  const yPad = (m.height - m.armDrop)/2, a0 = RG.mastSize[0]/2, b0 = RG.mastSize[1]/2, d0 = pinX - mx;
+  const th = Math.atan2(h/b0, d0/a0) + Math.acos(1/Math.hypot(d0/a0, h/b0)), tx = -d0 + a0*Math.cos(th), tz = b0*Math.sin(th), reach = Math.hypot(tx, tz - h), padW = .048;
+  const dia = new T.Shape(); dia.moveTo(-padW + .006, .010); dia.lineTo(-.006, yPad - .007); dia.quadraticCurveTo(0, yPad, .006, yPad - .007); dia.lineTo(padW - .004, .007); dia.quadraticCurveTo(padW, 0, padW - .004, -.007); dia.lineTo(.006, -yPad + .007); dia.quadraticCurveTo(0, -yPad, -.006, -yPad + .007); dia.lineTo(-padW + .006, -.010); dia.closePath();
+  const padGeo = new T.ExtrudeGeometry(dia, { depth: .005, bevelEnabled: true, bevelSize: .0015, bevelThickness: .0015, bevelSegments: 1, curveSegments: 6 });
+  [1, -1].forEach(s => {
+    const u = new V3(tx/reach, 0, s*(tz - h)/reach), v = new V3(0, 1, 0), wN = new V3().crossVectors(u, v), n = new V3(-u.z, 0, u.x); if (n.z*s < 0) n.negate();
+    [0, -m.armDrop].forEach(y => {
+      const pin = new V3(0, y, s*h), mid = pin.clone().addScaledVector(u, reach - padW*.4);
+      const pad = put(g, padGeo, cast); pad.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(u, v, wN)); pad.position.copy(mid).addScaledVector(n, wN.dot(n) > 0 ? .0015 : .0065);
+      [[0, yPad - .014], [0, -yPad + .014], [padW - .012, 0]].forEach(([a, b]) => { const q = mid.clone().addScaledVector(u, a).addScaledVector(v, b); rod(g, q.addScaledVector(n, .006).toArray(), q.clone().addScaledVector(n, .004).toArray(), .0042, mat.steel, 10); });
+      const L = Math.max(.012, reach - padW*1.3), leaf = new T.Shape();                    // flat hinge leaf from the pin to the pad
+      leaf.moveTo(0, -.017); leaf.lineTo(L, -.026); leaf.lineTo(L, .026); leaf.lineTo(0, .017); leaf.closePath();
+      const lf = put(g, new T.ExtrudeGeometry(leaf, { depth: .009, bevelEnabled: false }), cast); lf.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(u, v, wN)); lf.position.copy(pin).addScaledVector(wN, -.0045);
+      [-.019, .019].forEach(k => { const lobe = put(g, new T.CylinderGeometry(.0125, .0125, .017, 16), cast); lobe.position.set(0, y + k, s*h); });
+      const barrel = put(g, new T.CylinderGeometry(.0105, .0105, .023, 14), cast); barrel.position.set(0, y, s*h);
+      const hpin = put(g, new T.CylinderGeometry(.004, .004, .062, 8), mat.steel); hpin.position.set(0, y, s*h);
     });
   });
   const bottom = y0, mountBottom = y0 - m.armDrop - yPad;
