@@ -157,7 +157,7 @@ const SPEC = {
       { id: 'split', name: 'Split at backstay', note: 'Panels pass the backstay on each side and reach forward over the cockpit tent, which keeps the overhang short.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.345, half: 0.98, bend: 0.18 },
         aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, foreStrut: { footX: 1.30, footHalf: 1.20 },
-        layout: 'split', fwdX: { 2: 0.80, 3: 0.98, 4: 0.98 } },
+        layout: 'split', fwdX: { 2: 0.80, 3: 0.98, 4: 0.98 }, fwdXFore: 0.80, centreX: 0.48 },
 
       { id: 'davit', name: 'With davits', note: 'Medium height with two dinghy davits. The davits and their mounts must be sized for the weight of your dinghy.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.44, topY: 2.60, half: 0.98, bend: 0.20 },
