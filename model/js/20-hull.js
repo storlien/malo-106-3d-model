@@ -173,7 +173,26 @@ mat.foil = mat.anti.clone();           // keel, skeg and rudder: their roots ins
   mat.foil.customProgramCacheKey = () => 'foil';
 })();
 foil(SPEC.keel.fin, mat.foil);
-foil(SPEC.keel.deadwood, mat.foil);
+(function deadwood() {     // horizontal slices from inside the hull down to the flat bottom, each a thick rounded outline in plan
+  const D = SPEC.keel.deadwoodShape, top = sheerY(1.5) - .2, ny = 24, nu = 40, rows = [];
+  const aftAt = y => y <= D.bottom ? D.aftBottom : D.aftBottom - (D.aftBottom - D.aftTop)*Math.pow(clamp((y - D.bottom)/(D.topY - D.bottom), 0, 1.6), .7);
+  for (let j = 0; j <= ny; j++) {
+    const f = j/ny, y = lerp(D.bottom, top, Math.pow(f, 1.3)), lift = Math.max(0, 1 - f*ny/2.5), hw = D.halfWidth*Math.sqrt(1 - lift*lift*.85);   // bottom edge rounded
+    const xa = aftAt(y), xf = D.fwd, row = [];
+    for (let i = 0; i <= nu; i++) {
+      const a = i/nu*Math.PI*2, c = Math.cos(a), sn = Math.sin(a);
+      // aft half: a semicircle of radius hw; forward: a long taper to the fin
+      let x, z;
+      if (c <= 0) { x = xa + hw + c*hw; z = sn*hw; }
+      else { x = xa + hw + c*(xf - xa - hw); z = sn*hw*Math.pow(1 - c, .35); }
+      row.push([x, y, z]);
+    }
+    rows.push(row);
+  }
+  grid(G.hull, rows, mat.foil);
+  const cap = rows[0].map(p => [p[0], D.bottom, p[2]]), mid = rows[0].map(p => [p[0], D.bottom, 0]);
+  grid(G.hull, [cap, mid], mat.foil);
+})();
 foil(SPEC.keel.skeg, mat.foil);
 foil(SPEC.keel.rudder, mat.foil);
 
