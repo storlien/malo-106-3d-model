@@ -221,6 +221,10 @@ function front(c, w, h, normal, kind = 'door') {
     ibox([x, y, S.z], [.13, .03, S.half*2], intMat.trim);
   }
   [1, -1].forEach(s => rod(IG, [S.botX + .02, s0, S.z + s*(S.half + .02)], [S.topX - .02, CP.threshold, S.z + s*(S.half + .02)], .022, intMat.trim));
+  // engine compartment front: a mahogany wall right behind the ladder, from the sole up to the cockpit, lifted out with it
+  const wx = INT.steps.topX - .03, wl = INT.aftCabin.wall, wr = INT.head.inner;
+  ibox([wx, (s0 + CP.threshold)/2, (wl + wr)/2], [.02, CP.threshold - s0, wr - wl], intMat.wood);
+  for (let k = 0; k < 2; k++) front([wx + .012, s0 + .25 + k*.5, (wl + wr)/2], .46, .4, [1, 0]);
   G.ladder = new T.Group(); IG.children.slice(before).forEach(c => G.ladder.add(c)); IG.add(G.ladder);
 })();
 
@@ -245,10 +249,37 @@ function front(c, w, h, normal, kind = 'door') {
   const basin = iput(new T.CircleGeometry(.14, 24), new T.MeshStandardMaterial({ color: C('#e8e6e0'), roughness: .2 })); basin.rotation.x = -Math.PI/2; basin.scale.set(1.5, 1, 1); basin.position.set((H.basin[0] + H.basin[1])/2, fy + .805, zi + .16);
 
   // aft cabin: the berth aft, a standing area forward of it, an inboard wall beside the ladder and an angled door
-  hullBlock(A.aft, A.fwd, fy, A.berth, -A.inner, -1, intMat.wood); hullBlock(A.aft, A.fwd, A.berth, A.berth + .11, -A.inner, -1, intMat.cushion, 'top');
+  aftBerth();
   wall([A.aft, A.wall], [A.door[0][0], A.wall]);
   door(A.door);
 })();
+
+/* ---------- Aft cabin double berth ----------
+   From the brochure plan: a wide berth under the cockpit to port, from the stern forward to the standing area,
+   inboard edge at the cabin wall. It sits low, so there is sitting headroom under the cockpit seat. */
+function aftBerth() {
+  const B = INT.aftBerth, z0 = -B.inner, top = B.top, base = top - B.mattress, xs = span(B.aft, B.fwd, 30);
+  const out = (x, y) => Math.max(B.inner + .1, hin(x, y) - .01);
+  // mahogany platform with a front facing the standing area, and a lee board along the inboard side
+  hullBlock(B.aft, B.fwd, INT.sole, base, B.inner, -1, intMat.wood);
+  ibox([B.fwd + .012, (INT.sole + base + .04)/2, -(B.inner + out(B.fwd, base))/2], [.024, base + .04 - INT.sole, out(B.fwd, base) - B.inner], intMat.trim);
+  for (let i = 0; i < 2; i++) front([B.fwd + .026, INT.sole + .14 + i*.2, -(B.inner + .25)], .32, .15, [1, 0], 'drawer');
+  ibox([(B.aft + B.fwd)/2, base + .03, z0 - .012], [B.fwd - B.aft, .06, .024], intMat.trim);
+  // mattress: rounded edges, following the hull on its outboard side, with a seam along the middle
+  const rows = xs.map(x => { const o = out(x, top); return span(B.inner + .02, o - .02, 10).map(a => [x, top, -a]); });
+  igrid(rows, intMat.cushion);
+  igrid(xs.map(x => [[x, base, -(B.inner)], [x, top - .025, -(B.inner)], [x, top, -(B.inner + .02)]]), intMat.cushion);
+  igrid(xs.map(x => { const o = out(x, top); return [[x, top, -(o - .02)], [x, top - .025, -o], [x, base, -out(x, base)]]; }), intMat.cushion);
+  [B.aft, B.fwd].forEach((x, k) => { const o = out(x, top); igrid(span(B.inner, o, 10).map(a => [[x + (k ? .004 : -.004), base, -a], [x + (k ? .004 : -.004), top - .01, -a]]), intMat.cushion); });
+  ibox([(B.aft + B.fwd)/2, top + .002, -(B.inner + out(1.4, top))/2], [B.fwd - B.aft - .08, .004, .012], new T.MeshStandardMaterial({ color: C('#8796a0'), roughness: .9 }));
+  // two pillows at the forward end, where the headroom is
+  [.27, .62].forEach(d => { const p = iput(new T.SphereGeometry(1, 20, 12), new T.MeshStandardMaterial({ color: C('#f2f0ea'), roughness: .9 }));
+    p.scale.set(.2, .06, .26); p.position.set(B.fwd - .26, top + .05, -(B.inner + d)); });
+  // folded blanket at the foot
+  ibox([B.aft + .45, top + .025, -(B.inner + out(B.aft + .45, top))/2], [.35, .05, out(B.aft + .45, top) - B.inner - .1], new T.MeshStandardMaterial({ color: C('#23457f'), roughness: .95 }));
+  // reading lamp on the hull side
+  const lx = B.fwd - .45, ly = top + .4, lz = -(hin(lx, ly) - .03); const l = iput(new T.CylinderGeometry(.03, .045, .07, 16), intMat.brass); l.position.set(lx, ly, lz);
+}
 
 /* ---------- Warm cabin lights, on only when the interior is open ---------- */
 const intLights = [[5.2, 1.18, 0], [3.5, 1.18, -.4], [3.5, 1.18, .6], [7.6, 1.0, 0], [1.4, .7, -.7], [2.4, 1.1, .8], [6.6, 1.15, 0]].map(([x, y, z]) => {

@@ -46,12 +46,8 @@
   // shaft from the coupling down to the stern tube
   const ex = 1.15, [sx, sy] = shaftLine.at(ex);
   rod(IG, [cx, cy, 0], [sx, sy, 0], .015, m.steel, 12);
-  // a red battery cable and the blue water hose seen in the photo
-  tube(IG, [P(.74, .36, -.26), P(.74, .46, 0), P(.70, .44, .26), P(.5, .3, .29)], .006, m.red, false, 6);
-  tube(IG, [P(.73, -.1, .2), P(.76, .0, .27), P(.74, .35, .27), P(.6, .48, .24)], .012, m.hose, false, 8);
 
   // compartment: foil-lined sides on the head and aft-cabin walls, mahogany panel above the front
   const x0 = P(-.05, 0, 0)[0], x1 = INT.steps.topX - .02, top = CP.sole - .05, bot = P(.3, -.2, 0)[1];
   [[INT.head.inner - .006, 1], [INT.aftCabin.wall + .006, -1]].forEach(([z]) => igrid(span(x0, x1, 4).map(x => [[x, bot, z], [x, top, z]]), m.foil));
-  ibox([x1 + .01, (P(.7, .42, 0)[1] + top)/2 + .02, 0], [.02, top - P(.7, .42, 0)[1] - .04, .62], intMat.wood);
 })();
