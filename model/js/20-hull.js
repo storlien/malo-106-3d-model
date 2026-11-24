@@ -40,10 +40,12 @@ function hullMaterial() {
   const m = new T.MeshStandardMaterial({ color: 0xffffff, roughness: .3, envMapIntensity: .55, side: T.DoubleSide });
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, { uCream: { value: C(P.topsides) }, uNavy: { value: C(P.navy) }, uAnti: { value: C(P.antifoul) } });
-    sh.vertexShader = 'attribute float aDown;varying float vDown;varying float vH;\n' +
-      sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvDown=aDown;vH=position.y;');
-    sh.fragmentShader = 'uniform vec3 uCream,uNavy,uAnti;varying float vDown;varying float vH;\n' +
+    sh.vertexShader = 'attribute float aDown;varying float vDown;varying float vH;varying float vX;\n' +
+      sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvDown=aDown;vH=position.y;vX=position.x;');
+    const BT = SPEC.keel.bowThruster;
+    sh.fragmentShader = 'uniform vec3 uCream,uNavy,uAnti;varying float vDown;varying float vH;varying float vX;\n' +
       sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      if (length(vec2(vX - ${BT.x.toFixed(4)}, vH - (${BT.y.toFixed(4)}))) < ${(BT.d/2).toFixed(4)}) discard;   // bow thruster tunnel
       float e=.0022; vec3 c=uCream;
       c=mix(c,uNavy,smoothstep(${P.sheerBand[0]}-e,${P.sheerBand[0]}+e,vDown)*(1.-smoothstep(${P.sheerBand[1]}-e,${P.sheerBand[1]}+e,vDown)));
       c=mix(c,uNavy,1.-smoothstep(${P.boot[1]}-e,${P.boot[1]}+e,vH));
@@ -111,6 +113,22 @@ function hullMaterial() {
     const geo = gridGeo(rows); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
     put(G.hull, geo, new T.MeshStandardMaterial({ map: tx, transparent: true, roughness: .4, side: T.DoubleSide, depthWrite: false }), false);
   });
+})();
+
+/* Bow thruster: a tunnel straight through the forefoot, its ends cut by the hull, with the propeller in the middle. [P] */
+(function bowThruster() {
+  const B = SPEC.keel.bowThruster, r = B.d/2, n = 40, rows = [];
+  for (let i = 0; i <= n; i++) {
+    const a = i/n*Math.PI*2, x = B.x + r*Math.cos(a), y = B.y + r*Math.sin(a), h = hullHalf(x, y) + .004;
+    rows.push([[x, y, -h], [x, y, 0], [x, y, h]]);
+  }
+  put(G.hull, gridGeo(rows), mat.anti, false);
+  const motor = put(G.hull, new T.CylinderGeometry(r*.32, r*.32, .05, 18), mat.dark); motor.rotation.x = Math.PI/2; motor.position.set(B.x, B.y, 0);
+  for (let k = 0; k < 4; k++) {                          // four-bladed thruster propeller
+    const b = put(G.hull, new T.BoxGeometry(r*.62, .006, .035), mat.dark); const a = k*Math.PI/2 + .3;
+    b.position.set(B.x + Math.cos(a)*r*.5, B.y + Math.sin(a)*r*.5, .03); b.rotation.set(.5, 0, a);
+  }
+  const strut = put(G.hull, new T.BoxGeometry(.03, r*.9, .03), mat.dark); strut.position.set(B.x, B.y + r*.55, 0);
 })();
 
 /* Foils: stacked NACA sections between tabulated levels. */

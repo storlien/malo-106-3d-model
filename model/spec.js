@@ -89,6 +89,7 @@ const SPEC = {
     rudder: [[0.05, 0.409, 0.164, 0.14], [-0.82, 0.409, 0.024, 0.12], [-0.84, 0.524, 0.024, 0.11], [-1.34, 0.504, -0.036, 0.10]],
     prop: { x: 0.914, y: -0.42, r: 0.19, blades: 3, pitch: 0.30 },  // [D/P] polished brass, owner's photo; pitch [E]
     shaftFrom: [1.224, -0.405],
+    bowThruster: { x: 8.55, y: -0.15, d: 0.185 },   // [P] owner's photo: tunnel below the bow 'm', a third of the way down the antifouling; 185 mm tunnel [E]
   },
 
   deck: {
