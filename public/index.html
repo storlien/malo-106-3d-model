@@ -2675,7 +2675,7 @@ const SeaMotion = (() => {
 (function seaTrial() {
   const A = window.alizee, scene = A.scene, NW = SEA.waves.frequencies*SEA.waves.directions;
   const state = { Hs: 2, Tp: 8, heading: 'beam', mode: 'drift', rate: 1, running: true };
-  let on = false, S = null, sim = null, stats = null, lastUi = 0, saved = null;
+  let on = false, S = null, S0 = null, sim = null, stats = null, lastUi = 0, saved = null;
 
   /* ---------- Sea surface: displaced in the vertex shader from the same wave trains the boat feels ---------- */
   const R = 320, n = 260, geo = new T.PlaneGeometry(2, 2, n, n); geo.rotateX(-Math.PI/2);
@@ -2834,6 +2834,7 @@ const SeaMotion = (() => {
       ${row('Weight in the trial', `${f0(S.m)} kg`)}${row('Of which half-full diesel and water tanks', `${f0(SEA.liquids.reduce((a, q) => a + q.kg, 0))} kg`)}${row('Of which solar arch and panels', arch ? `${f0(arch)} kg` : 'None')}
       ${row('Centre of gravity above waterline, with tank slosh', `${f2(S.yG - S.d0)} m`)}${row('Metacentric height, GM', `${f2(S.GM)} m`)}
       ${row('Largest righting arm', `${f2(S.gzMax[1])} m at ${f0(S.gzMax[0])}°`)}${row('Angle of vanishing stability', `${f0(S.avs)}°`)}
+      ${arch ? row('Arch costs, against no arch', `GM ${f1((S.GM - S0.GM)*100)} cm, vanishing ${f1(S.avs - S0.avs)}°, roll period +${f2(S.Troll - S0.Troll)} s`) : ''}
       ${row('Stability ratio, positive to negative area', isFinite(S.ratio) ? f1(S.ratio) : '—')}
       ${row('Roll period', `${f1(S.Troll)} s`)}${row('Pitch period', `${f1(S.Tpitch)} s`)}${row('Heave period', `${f1(S.Theave)} s`)}
       ${row('Capsize screening (published 1.76)', f2(S.capsize))}${row(`Comfort ratio (published ${f1(P.comfort[0])}–${f1(P.comfort[1])})`, f1(S.comfort))}
@@ -2865,7 +2866,7 @@ const SeaMotion = (() => {
   /* ---------- Turning the trial on and off ---------- */
   function enter() {
     document.dispatchEvent(new CustomEvent('alizee:mode', { detail: 'sea' }));
-    S = SeaHydro.analyse(archMasses()); on = true;
+    S = SeaHydro.analyse(archMasses()); S0 = SeaHydro.analyse([]); on = true;   // S0: the same boat without arch or lifeline panels
     const pressed = n => document.querySelector(`[data-layer="${n}"]`).getAttribute('aria-pressed') === 'true';
     saved = { water: A.water.visible, ground: A.ground.visible, pos: boat.position.clone(), quat: boat.quaternion.clone(), sail: pressed('sail'), genoa: pressed('genoa') };
     A.water.visible = false; A.ground.visible = false; sea.visible = true;
