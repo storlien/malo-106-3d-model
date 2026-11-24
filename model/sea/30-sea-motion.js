@@ -37,10 +37,18 @@ const SeaMotion = (() => {
   }
 
   function create(S, sea) {
-    const trains = waveTrains(sea.Hs, sea.Tp, sea.heading, sea.knots), ex = excitation(S, trains), rg = SEA.rho*g, D = SEA.damping, A = SEA.addedMass;
+    const mode = sea.mode, trains = waveTrains(sea.Hs, sea.Tp, sea.heading, mode.knots), ex = excitation(S, trains), rg = SEA.rho*g, D = SEA.damping, A = SEA.addedMass;
     const m3 = S.m*(1 + A.heave), m4 = S.I44*(1 + A.roll), m5 = S.I55*(1 + A.pitch);
     const c3 = rg*S.Aw, c5 = rg*S.IL, b3 = 2*D.heave*Math.sqrt(c3*m3), b5 = 2*D.pitch*Math.sqrt(c5*m5);
-    const b4 = 2*(D.roll + D.rollPerKnot*sea.knots)*Math.sqrt(S.m*g*S.GM*m4), rollScale = S.GM/S.BM;   // wave slope acts through GM, not BM
+    const b4 = 2*(D.roll + D.rollPerKnot*mode.knots + mode.sailDamping)*Math.sqrt(S.m*g*S.GM*m4), rollScale = S.GM/S.BM;   // wave slope acts through GM, not BM
+    // wind: a steady heeling moment that holds her at the mode's heel, falling with cos² of the heel, with slow gusts
+    const bRad = sea.heading*Math.PI/180, side = Math.sin(bRad) < -1e-6 ? -1 : 1, heel = mode.heel*sea.heelFactor;
+    const M0 = heel ? S.m*g*SeaHydro.gzAt(S, heel)/Math.cos(heel*Math.PI/180)**2 : 0;
+    const wind = (ph, t) => { if (!M0 || Math.abs(ph) > Math.PI/2) return 0; const gust = 1 + SEA.gusts*(.6*Math.sin(.21*t) + .4*Math.sin(.53*t + 1.3)); return side*M0*gust*Math.cos(ph)**2*Math.min(1, t/8); };
+    // breaking crests: watched a quarter wavelength up-wave, so a crest that breaks there reaches her as it is flagged
+    const B = SEA.breaking, rnd = rng(SEA.waves.seed + 7), lam = g*sea.Tp*sea.Tp/(2*Math.PI), probe = [-Math.cos(bRad)*lam/4, -Math.sin(bRad)*lam/4];
+    const beamShare = Math.max(Math.sin(bRad)**2, .04), events = [];
+    const wv = { prev: 0, up: 0, crest: 0, trough: 0, lastTrough: 0, pulseEnd: -1, pulseM: 0, limit: lerp(B.steepness[0], B.steepness[1], rnd()) };
     const st = { t: 0, z: 0, zd: 0, th: 0, thd: 0, ph: 0, phd: 0, zdd: 0, thdd: 0, phdd: 0 };
     function forces(t) {
       let F3 = 0, M5 = 0, M4 = 0;
@@ -55,7 +63,8 @@ const SeaMotion = (() => {
     function deriv(y, t) {
       const [F3, M5, M4] = forces(t), [z, zd, th, thd, ph, phd] = y;
       const zdd = (F3 - c3*z - b3*zd)/m3, thdd = (M5 - c5*th - b5*thd)/m5;
-      const phdd = (M4 - S.m*g*SeaHydro.gzAt(S, ph*180/Math.PI) - b4*phd - D.rollQuadratic*phd*Math.abs(phd))/m4;
+      const hit = t < wv.pulseEnd ? wv.pulseM : 0;
+      const phdd = (M4 + wind(ph, t) + hit - S.m*g*SeaHydro.gzAt(S, ph*180/Math.PI) - b4*phd - D.rollQuadratic*phd*Math.abs(phd))/m4;
       return [zd, zdd, thd, thdd, phd, phdd];
     }
     function step(dt) {
@@ -66,25 +75,43 @@ const SeaMotion = (() => {
       [st.z, st.zd, st.th, st.thd, st.ph, st.phd] = n; st.t = t + dt;
       st.zdd = k4[1]; st.thdd = k4[3]; st.phdd = k4[5];
       if (st.ph > Math.PI) st.ph -= 2*Math.PI; if (st.ph < -Math.PI) st.ph += 2*Math.PI;
+      watchCrests();
+    }
+    function watchCrests() {
+      const t = st.t, e = elevation(probe[0], probe[1], t)*Math.min(1, t/(2*sea.Tp));
+      if (wv.prev < 0 && e >= 0) { wv.up = t; wv.crest = e; wv.lastTrough = wv.trough; }
+      if (e > wv.crest) wv.crest = e; if (e < wv.trough) wv.trough = e;
+      if (wv.prev > 0 && e <= 0 && wv.up) {                  // a crest has passed the watch point
+        const H = wv.crest - wv.lastTrough, T = 2*(t - wv.up), steep = H/(g*T*T/(2*Math.PI));
+        if (steep > wv.limit && H > B.minHeight*L) {
+          const E = B.refEnergy*Math.pow(H/(.55*L), B.power)*beamShare, kick = Math.sqrt(2*E/m4);
+          wv.pulseM = side*m4*kick/B.pulse; wv.pulseEnd = t + B.pulse;
+          events.push({ t, H, steep, energy: E, heel0: st.ph*180/Math.PI, maxHeel: Math.abs(st.ph*180/Math.PI) });
+        }
+        wv.trough = 0; wv.limit = lerp(B.steepness[0], B.steepness[1], rnd());
+      }
+      wv.prev = e;
+      events.forEach(v => { if (t - v.t < 8) v.maxHeel = Math.max(v.maxHeel, Math.abs(st.ph*180/Math.PI)); });
     }
     const elevation = (x, z, t) => { let e = 0; for (const q of trains) e += q[2]*Math.cos(q[0]*x + q[1]*z - q[3]*t + q[4]); return e; };
-    return { st, step, trains, elevation };
+    return { st, step, trains, elevation, events, side, probe, knots: mode.knots, get breaking() { return st.t < wv.pulseEnd + 2.5 ? 1 - Math.max(0, st.t - wv.pulseEnd)/2.5 : 0; } };
   }
 
   /* Running statistics over the trial. */
   function stats(S) {
     const helm = { x: 1.0, y: 1.25, z: .55 }, mast = { x: SPEC.rig.mastX, y: SPEC.rig.mastTop };
-    const acc = { n: 0, roll2: 0, pitch2: 0, heave2: 0, av2: 0, avAbs: 0, zc: 0, lastSign: 0, rollMax: 0, pitchMax: 0, latMax: 0, mastLatMax: 0, knock: 0, inKnock: false, capsized: false, capsizes: 0, t: 0 };
+    const acc = { n: 0, roll2: 0, pitch2: 0, heave2: 0, av2: 0, avAbs: 0, zc: 0, lastSign: 0, rollMax: 0, pitchMax: 0, latMax: 0, mastLatMax: 0, knock: 0, inKnock: false, k60: 0, in60: false, capsized: false, capsizes: 0, t: 0 };
     function add(st, dt) {
       const ph = st.ph, deg = ph*180/Math.PI;
       const av = st.zdd + (helm.x - S.LCF)*st.thdd - helm.z*st.phdd;            // vertical acceleration at the helm
       const lat = (helm.y - S.yG)*st.phdd + g*Math.sin(ph);                         // sideways push felt at the helm
       const mlat = (mast.y - S.yG)*st.phdd;
-      acc.n++; acc.t += dt; acc.roll2 += deg*deg; acc.pitch2 += (st.th*180/Math.PI)**2; acc.heave2 += st.z*st.z; acc.av2 += av*av; acc.avAbs += Math.abs(av);
+      acc.n++; acc.t += dt; acc.roll2 += deg*deg; acc.roll1 = (acc.roll1 || 0) + deg; acc.pitch2 += (st.th*180/Math.PI)**2; acc.heave2 += st.z*st.z; acc.av2 += av*av; acc.avAbs += Math.abs(av);
       const sg = Math.sign(av); if (sg && sg !== acc.lastSign) { acc.zc++; acc.lastSign = sg; }
       acc.rollMax = Math.max(acc.rollMax, Math.abs(deg)); acc.pitchMax = Math.max(acc.pitchMax, Math.abs(st.th*180/Math.PI));
       acc.latMax = Math.max(acc.latMax, Math.abs(lat)); acc.mastLatMax = Math.max(acc.mastLatMax, Math.abs(mlat));
-      if (Math.abs(deg) > 60 && !acc.inKnock) { acc.knock++; acc.inKnock = true; } else if (Math.abs(deg) < 40) acc.inKnock = false;
+      if (Math.abs(deg) > 90 && !acc.inKnock) { acc.knock++; acc.inKnock = true; } else if (Math.abs(deg) < 60) acc.inKnock = false;   // mast in the water
+      if (Math.abs(deg) > 60 && !acc.in60) { acc.k60++; acc.in60 = true; } else if (Math.abs(deg) < 40) acc.in60 = false;
       const over = Math.abs(deg) > S.avs; if (over && !acc.capsized) acc.capsizes++; acc.capsized = over;
     }
     function report() {
@@ -92,8 +119,9 @@ const SeaMotion = (() => {
       // motion sickness incidence after two hours, O'Hanlon & McCauley (1974)
       const za = 2.128*Math.log10(Math.max(aMean, 1e-3)/g) - 9.277*Math.log10(Math.max(f, .05)) - 5.809*Math.log10(Math.max(f, .05))**2 - 1.851;
       const msi = 100*.5*(1 + erf(za/Math.SQRT2));
-      return { t: acc.t, rollSig: 2*rms(acc.roll2), rollMax: acc.rollMax, pitchSig: 2*rms(acc.pitch2), pitchMax: acc.pitchMax, heaveSig: 4*rms(acc.heave2),
-        accRms: rms(acc.av2)/g, latMax: acc.latMax/g, mastLatMax: acc.mastLatMax/g, msi, knock: acc.knock, capsizes: acc.capsizes, capsized: acc.capsized };
+      const mean = (acc.roll1 || 0)/n;
+      return { t: acc.t, heelMean: mean, rollSig: 2*Math.sqrt(Math.max(0, acc.roll2/n - mean*mean)), rollMax: acc.rollMax, pitchSig: 2*rms(acc.pitch2), pitchMax: acc.pitchMax, heaveSig: 4*rms(acc.heave2),
+        accRms: rms(acc.av2)/g, latMax: acc.latMax/g, mastLatMax: acc.mastLatMax/g, msi, knock: acc.knock, k60: acc.k60, capsizes: acc.capsizes, capsized: acc.capsized };
     }
     return { add, report };
   }

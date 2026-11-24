@@ -3,27 +3,29 @@
    lifeline panels included), builds her stability, and runs her through the chosen sea while the 3D view follows. */
 (function seaTrial() {
   const A = window.alizee, scene = A.scene, NW = SEA.waves.frequencies*SEA.waves.directions;
-  const state = { Hs: 2, Tp: 8, heading: 'beam', knots: 0, rate: 1, running: true };
+  const state = { Hs: 2, Tp: 8, heading: 'beam', mode: 'drift', rate: 1, running: true };
   let on = false, S = null, sim = null, stats = null, lastUi = 0, saved = null;
 
   /* ---------- Sea surface: displaced in the vertex shader from the same wave trains the boat feels ---------- */
   const R = 320, n = 260, geo = new T.PlaneGeometry(2, 2, n, n); geo.rotateX(-Math.PI/2);
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) { const f = v => Math.sign(v)*R*Math.pow(Math.abs(v), 2.1); pos.setX(i, f(pos.getX(i))); pos.setZ(i, f(pos.getZ(i))); }
+  const uvs = geo.attributes.uv; for (let i = 0; i < pos.count; i++) uvs.setXY(i, pos.getX(i)/(2*R) + .5, -pos.getZ(i)/(2*R) + .5);
   geo.computeBoundingSphere(); geo.boundingSphere.radius = R*1.5;
-  const uW = { value: Array.from({ length: NW }, () => new T.Vector4()) }, uOff = { value: L/2 };
-  const ripples = A.water.material.normalMap.clone(); ripples.needsUpdate = true; ripples.repeat.set(70, 70);   // the calm water's ripples ride on the swell
+  const uW = { value: Array.from({ length: NW }, () => new T.Vector4()) }, uOff = { value: L/2 }, uBreak = { value: 0 }, uBreakPos = { value: new T.Vector2() };
+  const ripples = A.water.material.normalMap.clone(); ripples.needsUpdate = true; ripples.repeat.set(70, 70); ripples.wrapS = ripples.wrapT = T.RepeatWrapping;   // the calm water's ripples ride on the swell
   const seaMat = new T.MeshStandardMaterial({ color: C('#0b3344'), roughness: .2, metalness: .08, envMapIntensity: 1.0, normalMap: ripples, normalScale: new T.Vector2(.35, .35) });
   seaMat.onBeforeCompile = sh => {
-    sh.uniforms.uW = uW; sh.uniforms.uOff = uOff;
-    const fn = `uniform vec4 uW[${NW}]; uniform float uOff; varying float vFoam;
+    sh.uniforms.uW = uW; sh.uniforms.uOff = uOff; sh.uniforms.uBreak = uBreak; sh.uniforms.uBreakPos = uBreakPos;
+    const fn = `uniform vec4 uW[${NW}]; uniform float uOff; varying float vFoam; varying vec2 vP;
       vec3 seaAt(vec2 p) { float e = 0.0, gx = 0.0, gz = 0.0;
         for (int i = 0; i < ${NW}; i++) { vec4 w = uW[i]; float ph = w.x*p.x + w.y*p.y - w.w; float s = -w.z*sin(ph); e += w.z*cos(ph); gx += s*w.x; gz += s*w.y; }
         return vec3(e, gx, gz); }\n`;
     sh.vertexShader = fn + sh.vertexShader
-      .replace('#include <beginnormal_vertex>', `vec3 sw = seaAt(vec2(position.x + uOff, position.z)); vec3 objectNormal = normalize(vec3(-sw.y, 1.0, -sw.z)); vFoam = smoothstep(.28, .55, length(sw.yz));`)
+      .replace('#include <beginnormal_vertex>', `vec3 sw = seaAt(vec2(position.x + uOff, position.z)); vec3 objectNormal = normalize(vec3(-sw.y, 1.0, -sw.z)); vFoam = smoothstep(.26, .5, length(sw.yz)); vP = vec2(position.x + uOff, position.z);`)
       .replace('#include <begin_vertex>', 'vec3 transformed = vec3(position); transformed.y += sw.x;');
-    sh.fragmentShader = 'varying float vFoam;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.82, .88, .9), vFoam*.85);');
+    sh.fragmentShader = 'varying float vFoam; varying vec2 vP; uniform float uBreak; uniform vec2 uBreakPos;\n' + sh.fragmentShader.replace('#include <color_fragment>',
+      '#include <color_fragment>\n float br = uBreak*smoothstep(11.0, 2.0, length(vP - uBreakPos))*(.75 + .25*sin(vP.x*1.7)*sin(vP.y*2.3));\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.86, .9, .92), clamp(vFoam*.85 + br, 0.0, .95));');
   };
   const sea = new T.Mesh(geo, seaMat); sea.visible = false; sea.receiveShadow = true; sea.frustumCulled = false; scene.add(sea);
 
@@ -41,7 +43,10 @@
 
   function restart() {
     const hd = SEA.headings.find(h => h[0] === state.heading)[2];
-    sim = SeaMotion.create(S, { Hs: state.Hs, Tp: state.Tp, heading: hd, knots: state.knots });
+    const mode = SEA.modes.find(m => m.id === state.mode);
+    sim = SeaMotion.create(S, { Hs: state.Hs, Tp: state.Tp, heading: hd, mode, heelFactor: SEA.heelByHeading[state.heading] });
+    if (on) { A.setLayer('sail', mode.sails); A.setLayer('genoa', mode.sails); }
+    const b = hd*Math.PI/180; uBreakPos.value.set(S.LCF - Math.cos(b)*4, -Math.sin(b)*4);
     stats = SeaMotion.stats(S); lastUi = 0;
     // let the sea build up gently over the first wave periods
     sim.ramp = 0; render(true);
@@ -58,7 +63,8 @@
   function pushWaves() {
     const t = sim.st.t, ramp = Math.min(1, t/ (2*state.Tp));
     sim.trains.forEach((q, i) => uW.value[i].set(q[0], q[1], q[2]*ramp, q[3]*t - q[4]));
-    sim.ramp = ramp;
+    sim.ramp = ramp; uBreak.value = sim.breaking;
+    ripples.offset.x = (sim.knots*.5144*t/(2*R/70))%1;         // the water streams past at her speed
   }
 
   A.hooks.push(dt => {
@@ -83,25 +89,25 @@
   document.head.append(css);
   const panel = document.createElement('details'); panel.className = 'arch'; panel.id = 'seaPanel'; panel.open = true; panel.hidden = true;
   panel.innerHTML = `<summary>Sea trial <span id="seaCurrent"></span></summary><div class="arch-body">
-    <fieldset class="seg"><legend>Significant wave height</legend><div id="seaHs"></div></fieldset>
-    <fieldset class="seg"><legend>Peak wave period</legend><div id="seaTp"></div></fieldset>
+    <fieldset class="seg"><legend>Significant wave height, metres</legend><div id="seaHs"></div></fieldset>
+    <fieldset class="seg"><legend>Peak wave period, seconds</legend><div id="seaTp"></div></fieldset>
     <fieldset class="seg"><legend>Waves from</legend><div id="seaHead"></div></fieldset>
-    <fieldset class="seg"><legend>Boat speed</legend><div id="seaKn"></div></fieldset>
+    <fieldset class="seg"><legend>How she is sailed</legend><div id="seaMode"></div></fieldset>
     <fieldset class="seg"><legend>Simulation speed</legend><div id="seaRate"></div></fieldset>
     <div class="sea-run"><button id="seaPause">Pause</button><button id="seaRestart">Start again</button></div>
     <p class="note" id="seaNote"></p><div class="stats" id="seaStats" aria-live="off"></div>
     <p class="fine">An estimate from the model's hull lines, the published displacement and ballast, and standard seakeeping approximations.
-    The boat drifts or motors on a fixed heading with bare poles. Breaking waves, wind and sails are not modelled. It is not a stability certificate.</p></div>`;
+    She holds a fixed heading and speed; the wind is a steady heeling moment with gusts, and breaking crests are an empirical blow scaled to tank tests. It is not a stability certificate.</p></div>`;
   document.body.append(panel);
   const radios = (host, name, items, pick) => items.forEach(([v, label]) => {
     const l = document.createElement('label'), i = document.createElement('input'); i.type = 'radio'; i.name = name; i.value = v;
     i.addEventListener('change', () => pick(v)); l.append(i, document.createTextNode(label)); panel.querySelector('#' + host).append(l);
   });
   const set = (k, v) => { state[k] = v; restart(); };
-  radios('seaHs', 'seaHs', SEA.heights.map(h => [h, `${h} m`]), v => set('Hs', +v));
-  radios('seaTp', 'seaTp', SEA.periods.map(p => [p, `${p} s`]), v => set('Tp', +v));
+  radios('seaHs', 'seaHs', SEA.heights.map(h => [h, String(h).replace('.', '·')]), v => set('Hs', +v));
+  radios('seaTp', 'seaTp', SEA.periods.map(p => [p, String(p)]), v => set('Tp', +v));
   radios('seaHead', 'seaHead', SEA.headings.map(h => [h[0], h[1]]), v => set('heading', v));
-  radios('seaKn', 'seaKn', SEA.speeds.map(k => [k, k ? `${k} kn` : 'Drifting']), v => set('knots', +v));
+  radios('seaMode', 'seaMode', SEA.modes.map(m => [m.id, m.name]), v => set('mode', v));
   radios('seaRate', 'seaRate', [[1, 'Real time'], [4, '4 × faster']], v => { state.rate = +v; });
   panel.querySelector('#seaPause').addEventListener('click', e => { state.running = !state.running; e.target.textContent = state.running ? 'Pause' : 'Run'; });
   panel.querySelector('#seaRestart').addEventListener('click', restart);
@@ -146,9 +152,11 @@
     const arch = S.W.list.filter(q => /Solar|Lifeline/.test(q.name)).reduce((a, q) => a + q.kg, 0);
     const hd = SEA.headings.find(h => h[0] === state.heading);
     panel.querySelector('#seaCurrent').textContent = `Hs ${state.Hs} m, ${state.Tp} s, ${hd[1].toLowerCase()}`;
-    const lmax = 1.86*state.Hs;
-    panel.querySelector('#seaNote').textContent = `${seaName(state.Hs)} sea. The largest wave in three hours is likely to be about ${f1(lmax)} m.` +
-      (lmax > .55*L ? ` In the 1979 Fastnet research, breaking waves over 55 % of the boat's length (${f1(.55*L)} m) capsized most yachts. Breaking waves are not part of this simulation.` : '');
+    const md = SEA.modes.find(m => m.id === state.mode);
+    const lmax = 1.86*state.Hs, steepness = state.Hs/(SEA.g*state.Tp*state.Tp/(2*Math.PI));
+    panel.querySelector('#seaNote').textContent = `${seaName(state.Hs)} sea${steepness > 1/16 ? ', steep enough for crests to break' : ''}. The largest wave in three hours is likely to be about ${f1(lmax)} m. ` +
+      (md.heel ? `${md.name} at ${md.knots} knots, heeled about ${f0(md.heel*SEA.heelByHeading[state.heading])}° away from the waves by the wind. ` : 'Bare poles, lying to the sea. ') +
+      `Breaking crests hit her harder the more they come from the beam; one of 55 % of her length (${f1(.55*L)} m) beam-on capsized most yachts in the 1979 Fastnet tank tests.`;
     const row = (k, v, c) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`;
     panel.querySelector('#seaStats').innerHTML = `
       <h2>Stability of the boat as configured</h2>${gzChart(deg)}<dl>
@@ -161,28 +169,33 @@
       ${row('Immersion (published 188)', `${f0(S.immersion)} kg/cm`)}</dl><div id="seaLive">${live(r, deg)}</div>`;
     hookChart();
     const pick = (name, v) => { const el = panel.querySelector(`input[name="${name}"][value="${v}"]`); if (el) el.checked = true; };
-    pick('seaHs', state.Hs); pick('seaTp', state.Tp); pick('seaHead', state.heading); pick('seaKn', state.knots); pick('seaRate', state.rate);
+    pick('seaHs', state.Hs); pick('seaTp', state.Tp); pick('seaHead', state.heading); pick('seaMode', state.mode); pick('seaRate', state.rate);
     SEA.periods.forEach(p => { const el = panel.querySelector(`input[name="seaTp"][value="${p}"]`); if (el) el.disabled = steep(state.Hs, p); });
     SEA.heights.forEach(h => { const el = panel.querySelector(`input[name="seaHs"][value="${h}"]`); if (el) el.disabled = steep(h, state.Tp); });
   }
   function live(r, deg) {
     const row = (k, v, c) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`;
-    const warm = sim.st.t < 2*state.Tp;
-    return `<h2>In this sea${warm ? ', the sea is building' : `, after ${f0(r.t/60)} min ${f0(r.t%60)} s`}</h2><dl>
-      ${row('Heel now', `${f0(deg)}°`, r.capsized ? 'bad' : '')}
-      ${row('Roll, significant', `± ${f0(r.rollSig)}°`)}${row('Roll, largest', `${f0(r.rollMax)}°`, r.rollMax > S.avs ? 'bad' : r.rollMax > 60 ? 'warn' : '')}
+    const warm = sim.st.t < 2*state.Tp, ev = sim.events, md = SEA.modes.find(m => m.id === state.mode);
+    const clock = t => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2, '0')}`;
+    const log = ev.slice(-5).reverse().map(v => `<div><dt>${clock(v.t)} breaking crest ${f1(v.H)} m</dt><dd${v.maxHeel > S.avs ? ' class="bad"' : v.maxHeel > 90 ? ' class="warn"' : ''}>to ${f0(v.maxHeel)}°</dd></div>`).join('');
+    return `<h2>In this sea${warm ? ', the sea is building' : `, after ${clock(r.t)}`}</h2><dl>
+      ${row('Heel now', `${f0(deg)}°`, r.capsized ? 'bad' : '')}${md.heel ? row('Average heel from the wind', `${f0(Math.abs(r.heelMean))}°`) : ''}
+      ${row('Roll either side of that, significant', `± ${f0(r.rollSig)}°`)}${row('Largest heel', `${f0(r.rollMax)}°`, r.rollMax > S.avs ? 'bad' : r.rollMax > 60 ? 'warn' : '')}
       ${row('Pitch, significant', `± ${f1(r.pitchSig)}°`)}${row('Pitch, largest', `${f1(r.pitchMax)}°`)}
       ${row('Heave, significant height', `${f2(r.heaveSig)} m`)}
       ${row('Vertical acceleration at the helm, RMS', `${f2(r.accRms)} g`)}${row('Largest sideways push at the helm', `${f2(r.latMax)} g`)}
       ${row('Largest sideways acceleration at the masthead', `${f2(r.mastLatMax)} g`)}
-      ${row('Knockdowns past 60°', f0(r.knock), r.knock ? 'warn' : '')}${row('Capsizes', f0(r.capsizes), r.capsizes ? 'bad' : '')}
-      ${row('Seasick after 2 hours (MSI)', `${f0(r.msi)} %`)}</dl>`;
+      ${row('Breaking crests that hit her', f0(ev.length), ev.length ? 'warn' : '')}
+      ${row('Heeled past 60°', f0(r.k60), r.k60 ? 'warn' : '')}${row('Knockdowns, mast in the water (past 90°)', f0(r.knock), r.knock ? 'warn' : '')}
+      ${row('Capsizes, past the vanishing angle', f0(r.capsizes), r.capsizes ? 'bad' : '')}
+      ${row('Seasick after 2 hours (MSI)', `${f0(r.msi)} %`)}</dl>${log ? `<h2>Breaking crests, latest first</h2><dl>${log}</dl>` : ''}`;
   }
 
   /* ---------- Turning the trial on and off ---------- */
   function enter() {
     S = SeaHydro.analyse(archMasses()); on = true;
-    saved = { water: A.water.visible, ground: A.ground.visible, pos: boat.position.clone(), quat: boat.quaternion.clone(), view: Object.assign({}, A.view) };
+    const pressed = n => document.querySelector(`[data-layer="${n}"]`).getAttribute('aria-pressed') === 'true';
+    saved = { water: A.water.visible, ground: A.ground.visible, pos: boat.position.clone(), quat: boat.quaternion.clone(), sail: pressed('sail'), genoa: pressed('genoa') };
     A.water.visible = false; A.ground.visible = false; sea.visible = true;
     document.getElementById('archPanel').hidden = true; panel.hidden = false;
     A.renderer.shadowMap.autoUpdate = true;
@@ -190,7 +203,7 @@
   }
   function leave() {
     on = false; sea.visible = false; A.water.visible = saved.water; A.ground.visible = saved.ground;
-    boat.position.copy(saved.pos); boat.quaternion.copy(saved.quat);
+    boat.position.copy(saved.pos); boat.quaternion.copy(saved.quat); A.setLayer('sail', saved.sail); A.setLayer('genoa', saved.genoa);
     document.getElementById('archPanel').hidden = false; panel.hidden = true;
     A.renderer.shadowMap.autoUpdate = false; A.renderer.shadowMap.needsUpdate = true; A.wake();
   }
