@@ -192,7 +192,30 @@ const SPEC = {
     // The bimini top is 1.25 m above the helm bench [M], which is 0.10 m below the toe rail [M].
     archHeights: [{ id: 'bimini', name: 'Same as bimini', headroom: 1.15 }, { id: 'middle', name: 'Middle', headroom: 1.27 }, { id: 'highest', name: 'Highest', headroom: 1.47 }],
     foreLimitX: 0.25,       // where the vertical arch's fore pipes stand, just forward of the pushpit's aft rail
-    pipeWall: 0.002,        // [E] used for the weight estimate
+    pipeWall: 0.002,        // [E] wall thickness, for weight and strength
+    // Structural check of the straight-piped arches (46-arch-strength.js). Loads are the extremes the arch must survive,
+    // from the sea trial and common practice; the frame is welded 316 stainless, feet and transom plates fixed.
+    strength: {
+      E: 193e9, yield: 205e6, gamma: 1.25,   // 316L welded tube: the weld zone is annealed, so its yield is used; utilisation = stress / (yield / gamma)
+      fatigueRange: 40,                      // MPa stress range for welded tube joints over millions of rolls (about FAT 40)
+      sleeveLength: 0.3,                     // m of inner sleeve at each foot
+      panelFrame: 0.6,                       // panel end frames (aluminium, bolted) as a fraction of the pipe's bending stiffness
+      warnUtil: 0.8, swayLimit: 15, minFreq: 4, element: 0.2, extraKg: 4,   // extraKg: cables, antenna, ensign
+      cases: {
+        knock: { side: 2.0, down: 0.5 },     // sea trial: knocked down past 90° by a breaking crest (1 g from gravity, ~1 g from the snap roll)
+        slam: { down: 3.0, side: 0.5 },      // falling off a wave
+        pitch: { fore: 1.5, down: 1.0 },     // burying the bow / hobby-horsing
+        wind: { speed: 40, cn: 1.2, drag: 0.35 },   // storm gust at anchor, panels at the worst angle; lift up plus sideways drag
+        person: { push: 1000, hang: 1500 },  // N: crew thrown against a corner; crew hanging from the aft tube (or a MOB hoist)
+        fatigue: { side: 0.5 },              // ± g at the arch top in everyday rolling: ±13° at 4.2 s in 3 m seas (sea trial)
+      },
+      // supporting pipes; presets combine them
+      braces: { knee: { down: 0.35, inboard: 0.32 }, side: { low: 0.55, along: 0.5 }, stays: { forward: 0.75, outboard: 0.10 }, aftBar: { up: 0.8 } },   // aftBar: 1.8 m clear over the stern platform
+      braceNames: [['knee', 'Knee braces'], ['planX', 'X under panels'], ['aftBar', 'Rear truss'], ['side', 'Side diagonals'], ['stays', 'Forward stays'], ['sleeves', 'Foot sleeves']],
+      // presets from the analysis with 32 mm pipe (all vertical and angled layouts tried):
+      // coastal passes every case except someone hanging from the aft tube; offshore passes all, hanging at the limit; bluewater passes all with margin
+      presets: [['off', 'None', []], ['coastal', 'Coastal', ['knee', 'sleeves']], ['offshore', 'Offshore', ['knee', 'stays', 'sleeves']], ['bluewater', 'Bluewater', ['knee', 'aftBar', 'stays', 'sleeves']]],
+    },
     backstaySlot: 0.09,     // half-width of the opening around the backstay in the split layout
     warnGap: 0.05,          // clearances below this are flagged as tight
     contactGap: 0.01,       // clearances below this are treated as contact

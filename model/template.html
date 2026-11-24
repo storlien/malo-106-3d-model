@@ -31,7 +31,8 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}.seg label:has(input:checked){background:var(--ink);color:#fff}
 .seg label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:1px}
 #archOptions[hidden],.seg[hidden]{display:none}
-.seg label:has(input:disabled){opacity:.4;cursor:not-allowed}.seg label:has(input:disabled) input{cursor:not-allowed}
+.seg label:has(input:disabled){opacity:.4;cursor:not-allowed}
+.seg>div.chips{flex-wrap:wrap;margin-top:4px;background:none;padding:0;gap:4px}.chips label{flex:0 1 auto;padding:6px 10px;background:rgba(20,39,95,.08)}.seg label:has(input:disabled) input{cursor:not-allowed}
 .note{margin:10px 2px 4px;font-size:13px;line-height:1.45;color:var(--ink2)}
 .stats h2{margin:13px 2px 3px;font-size:12px;font-weight:600;color:var(--ink2)}
 .stats dl{margin:0}.stats dl div{display:flex;justify-content:space-between;gap:10px;padding:4px 2px;border-top:1px solid var(--line);font-size:13.5px}
@@ -63,6 +64,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
       <fieldset class="seg" id="archEdgeWrap"><legend>Pipe at the panel edge</legend><div id="archEdgePick"></div></fieldset>
       <fieldset class="seg" id="archHeightWrap"><legend>Headroom above toe rail</legend><div id="archHeightPick"></div></fieldset>
       <fieldset class="seg"><legend>Pipe diameter</legend><div id="archPipePick"></div></fieldset>
+      <fieldset class="seg" id="archBraceWrap"><legend>Supporting pipes</legend><div id="archBracePresetPick"></div><div id="archBracePick" class="chips"></div></fieldset>
     </div>
     <fieldset class="seg"><legend>Panels along lifelines</legend><div id="archSidePick"></div></fieldset>
     <p class="note" id="archNote"></p>
