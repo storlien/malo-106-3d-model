@@ -191,7 +191,7 @@ const SPEC = {
     rudder: [[0.05, 0.409, 0.164, 0.14], [-0.82, 0.409, 0.024, 0.12], [-0.84, 0.524, 0.024, 0.11], [-1.34, 0.504, -0.036, 0.10]],
     prop: { x: 0.914, y: -0.42, r: 0.19, blades: 3, pitch: 0.30 },  // [D/P] polished brass, owner's photo; pitch [E]
     shaftFrom: [1.224, -0.405],
-    bowThruster: { x: 8.55, y: -0.15, d: 0.185 },   // [P] owner's photo: tunnel below the bow 'm', a third of the way down the antifouling; 185 mm tunnel [E]
+    bowThruster: { x: 7.90, y: -0.12, d: 0.185 },   // [P] owner's yard photos: about 1 m aft of the bow 'm', 40 % of the way from the boot-top to the keel line; 185 mm tunnel [E]
   },
 
   deck: {
@@ -2186,6 +2186,7 @@ function initArchUI(kick) {
   function setView(name, instant) {
     const v = VIEWS[name]; if (!v) return;
     Object.assign(goal, v); goal.span = v.span || view.span;
+    ['fov', 'near', 'rMin', 'phMax'].forEach(k => { view[k] = v[k]; });   // a standard view drops any add-on lens settings
     if (goal.ortho !== view.ortho || instant || reduced) Object.assign(view, goal);
     else { const tau = Math.PI*2; view.th = goal.th + (((view.th - goal.th)%tau + tau*1.5)%tau - tau/2); anim = true; }
     document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === name));
@@ -2198,7 +2199,7 @@ function initArchUI(kick) {
     c.up.set(0, 1, 0); if (view.ph < .01) c.up.set(0, 0, -1);
     c.lookAt(view.tx, view.ty, view.tz);
     if (view.ortho) { const s = Math.max(view.span/2, view.span/2/a); const sw = s*a >= view.span/2 ? s : view.span/2/a; c.left = -sw*a; c.right = sw*a; c.top = sw; c.bottom = -sw; c.updateProjectionMatrix(); }
-    else { c.aspect = a; c.fov = a < 1 ? 46 : 32; c.updateProjectionMatrix(); }
+    else { c.aspect = a; c.fov = view.fov || (a < 1 ? 46 : 32); c.near = view.near || .4; c.updateProjectionMatrix(); }   // add-ons may widen the lens
     return c;
   }
   function resize() {
@@ -2229,11 +2230,11 @@ function initArchUI(kick) {
     } else if (p.b === 2 || e.shiftKey) pan(dx, dy);
     else {
       if (view.ortho) { view.ortho = false; view.r = Math.min(view.r, 26); view.span = 13; deselect(); }
-      view.th -= dx*.0055; view.ph = clamp(view.ph - dy*.0045, .04, 1.72);
+      view.th -= dx*.0055; view.ph = clamp(view.ph - dy*.0045, .04, view.phMax || 1.72);
     }
     needs = 2;
   });
-  function zoom(f) { if (view.ortho) view.span = clamp(view.span*f, 1, 40); else view.r = clamp(view.r*f, 2.5, 60); needs = 2; }
+  function zoom(f) { if (view.ortho) view.span = clamp(view.span*f, 1, 40); else view.r = clamp(view.r*f, view.rMin || 2.5, 60); needs = 2; }
   canvas.addEventListener('wheel', e => { e.preventDefault(); anim = false; zoom(Math.exp(e.deltaY*.001)); }, { passive: false });
 
   /* Controls */
@@ -2813,6 +2814,7 @@ const SeaMotion = (() => {
 
   /* ---------- Turning the trial on and off ---------- */
   function enter() {
+    document.dispatchEvent(new CustomEvent('alizee:mode', { detail: 'sea' }));
     S = SeaHydro.analyse(archMasses()); on = true;
     const pressed = n => document.querySelector(`[data-layer="${n}"]`).getAttribute('aria-pressed') === 'true';
     saved = { water: A.water.visible, ground: A.ground.visible, pos: boat.position.clone(), quat: boat.quaternion.clone(), sail: pressed('sail'), genoa: pressed('genoa') };
@@ -2827,11 +2829,367 @@ const SeaMotion = (() => {
     document.getElementById('archPanel').hidden = false; panel.hidden = true;
     A.renderer.shadowMap.autoUpdate = false; A.renderer.shadowMap.needsUpdate = true; A.wake();
   }
+  document.addEventListener('alizee:mode', e => { if (e.detail !== 'sea' && on) { btn.setAttribute('aria-pressed', 'false'); leave(); } });
   const btn = document.createElement('button'); btn.textContent = 'Sea trial'; btn.setAttribute('aria-pressed', 'false');
   btn.addEventListener('click', () => { const v = !on; btn.setAttribute('aria-pressed', v); v ? enter() : leave(); });
   const bar = document.querySelector('.bar'), grp = document.createElement('div'); grp.className = 'group'; grp.setAttribute('role', 'group'); grp.setAttribute('aria-label', 'Sea trial'); grp.append(btn); bar.append(grp);
 
   A.sea = { enter, leave, set(o) { Object.assign(state, o); if (on) restart(); }, analyse: () => SeaHydro.analyse(archMasses()), get S() { return S; }, get sim() { return sim; }, report: () => stats && stats.report() };
+})();
+
+/* ===== Interior, part 1: layout =====
+   The interior is a separate viewer. Its code lives only in model/interior/ and reads the hull and deck through the
+   model's globals; nothing in model/js depends on it.
+   Positions come from the brochure's accommodation plan, scaled to the model (the mast lands at 6.17 m on both),
+   and from the owner's photos. Boat frame: x forward from the transom, y up from the drawing's waterline, z to starboard.
+   [B] brochure plan, [P] owner's photos, [E] estimate. */
+const INT = {
+  sole: -0.38,            // [E] saloon sole, which gives about 1.8 m headroom under the coachroof ("full standing height" [B])
+  foreSole: -0.12,        // [E] forward cabin sole, a step up
+  aftSole: -0.22,         // [E] head and aft-cabin floor
+  lining: 0.022,          // hull lining thickness
+
+  saloon: { aft: 4.15, fwd: 6.30 },                       // [B]
+  dinette: { aft: 4.15, fwd: 6.25, inner: 0.80, legInner: 0.12, seat: 0.43, cushion: 0.10, back: 0.46 },   // port U [B][P], heights above the sole
+  table: { aft: 4.69, fwd: 5.63, port: -0.66, stbd: 0.06, height: 0.76, leaf: 0.30 },   // [B][P] with a drop leaf to starboard
+  settee: { aft: 4.30, fwd: 6.25, inner: 0.68 },          // starboard [B][P], curved at its forward end
+  pole: { x: 4.20, z: 0.60, r: 0.032 },                   // [P] mahogany grab pole at the aft end of the saloon
+  lockers: { bottom: 0.57, top: 1.00, depth: 0.30 },      // [P] lockers and bookshelves above the settee backs, up under the side deck (heights in the boat frame)
+
+  forwardBulkhead: 6.30, doorHalf: 0.30, wardrobe: { aft: 6.30, fwd: 6.85 },   // [B] hanging lockers each side of the door
+  vBerth: { aft: 6.88, fwd: 8.86, height: 0.52, floorFwd: 7.45, floorHalf: 0.30 },   // [B][P] above the forward-cabin sole
+
+  galley: { aft: 2.94, fwd: 4.02, inner: -0.80, legAft: 3.55, legInner: -0.10, height: 0.90 },   // port, L-shaped: outboard counter, and a forward leg reaching in to the steps [B][P]
+  stove: { x: 3.22, z: -0.80 },                           // [B][P] gimballed cooker with oven in the outboard counter, facing the centreline
+  sink: { x: 3.78, z: -0.42, half: [0.16, 0.22] },        // [B][P] in the forward leg
+  nav: { aft: 2.94, fwd: 4.02, inner: 0.88, seatFwd: 3.36, table: 0.78 },   // starboard, the navigator faces forward [B]
+  steps: { topX: 3.56, botX: 4.12, z: 0.18, half: 0.25, treads: 4 },   // [E] from the model's companionway down to the sole, a little to starboard as on the plan [B]
+  head: { aft: 1.80, fwd: 2.94, inner: 0.28, toilet: [2.08, 0.62], basin: [2.36, 2.86] },   // starboard aft [B][P]
+  aftCabin: { aft: 0.42, fwd: 2.33, inner: -0.24, berth: 0.40 },   // port aft, under the cockpit seat [B][P]
+  engine: { aft: 0.42, fwd: 2.27, half: 0.24 },           // [B] under the cockpit sole
+
+  colours: { mahogany: '#8a3f1e', trim: '#6e2f14', cushion: '#aebdc6', headliner: '#f1ede4', laminate: '#d9e0e4', sole: '#7a4524', holly: '#e0c79a' },   // [P]
+};
+
+/* ===== Interior, part 2: geometry =====
+   Built once, hidden until the interior viewer opens it. Joinery follows the hull's own lines (hullHalf),
+   the ceiling follows the deck, coachroof and cockpit above. */
+G.interior = new T.Group(); G.interior.visible = false; boat.add(G.interior);
+G.ceiling = new T.Group(); G.interior.add(G.ceiling);
+const IG = G.interior, IC = INT.colours;
+
+/* ---------- Materials ---------- */
+const intMat = (() => {
+  const canvas = (w, h, paint) => { const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.encoding = T.sRGBEncoding; t.anisotropy = 8; return t; };
+  const grain = (base, dark, light, seed) => canvas(512, 512, (g, w, h) => {      // ribbon-striped mahogany veneer
+    const r = rng(seed); g.fillStyle = base; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) { const x = r()*w, wd = 1 + r()*7; g.fillStyle = `rgba(${r() < .55 ? dark : light},${.05 + r()*.12})`; g.fillRect(x, 0, wd, h); }
+    for (let i = 0; i < 40; i++) { g.strokeStyle = `rgba(${dark},.08)`; g.lineWidth = 1; g.beginPath(); const x = r()*w; g.moveTo(x, 0); for (let y = 0; y <= h; y += 32) g.lineTo(x + Math.sin(y*.02 + i)*4, y); g.stroke(); }
+  });
+  const wood = grain(IC.mahogany, '60,18,6', '196,110,60', 41), trim = grain(IC.trim, '45,14,4', '170,90,50', 43);
+  const cushionTex = canvas(256, 256, (g, w, h) => {                               // woven light blue-grey with button tufts
+    const r = rng(7); g.fillStyle = IC.cushion; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(${r() < .5 ? '255,255,255' : '60,80,95'},.10)`; g.fillRect(r()*w, r()*h, 2, 1); }
+    [[64, 64], [192, 192]].forEach(([x, y]) => { g.fillStyle = 'rgba(70,90,105,.55)'; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); });
+  });
+  const soleTex = canvas(512, 64, (g, w, h) => {                                   // teak sole with holly strips, running fore and aft
+    g.fillStyle = IC.sole; g.fillRect(0, 0, w, h); const r = rng(5);
+    for (let i = 0; i < 120; i++) { g.fillStyle = `rgba(${r() < .6 ? '50,20,8' : '200,130,80'},.10)`; g.fillRect(r()*w, r()*h, 20 + r()*120, 1 + r()*2); }
+    g.fillStyle = IC.holly; g.fillRect(0, h - 5, w, 5);
+  });
+  const S = (o) => new T.MeshStandardMaterial(Object.assign({ side: T.DoubleSide }, o));
+  return {
+    wood: S({ map: wood, roughness: .38, envMapIntensity: .5 }), trim: S({ map: trim, roughness: .35, envMapIntensity: .5 }),
+    cushion: S({ map: cushionTex, roughness: .95, envMapIntensity: .2 }), sole: S({ map: soleTex, roughness: .45, envMapIntensity: .4 }),
+    headliner: S({ color: C(IC.headliner), roughness: .85 }), laminate: S({ color: C(IC.laminate), roughness: .6 }),
+    white: S({ color: C('#f4f2ec'), roughness: .25 }), dark: S({ color: C('#1c1a18'), roughness: .5 }), steel: S({ color: C('#c9ced2'), roughness: .22, metalness: .9 }),
+    brass: S({ color: C('#c9a24e'), roughness: .3, metalness: .9 }), glass: new T.MeshBasicMaterial({ color: C('#dfeaf1'), side: T.DoubleSide }), opening: S({ color: C('#3a1a0c'), roughness: .8 }),
+    hatch: new T.MeshBasicMaterial({ color: C('#eef6fa'), side: T.DoubleSide }), panel: S({ color: C('#101114'), roughness: .4 }),
+  };
+})();
+const soleUV = p => [p[0]/1.6, p[2]/.055];
+const iput = (geo, m) => put(IG, geo, m, false);
+const ibox = (c, s, m) => { const b = iput(new T.BoxGeometry(s[0], s[1], s[2]), m); b.position.set(...c); return b; };
+const igrid = (rows, m, uv) => { const geo = gridGeo(rows, uv ? { uv } : undefined); return iput(geo, m); };
+
+/* Inside face of the hull lining at station x and height y. */
+const hin = (x, y) => Math.max(0, hullHalf(x, Math.min(y, sheerY(x) - .005)) - INT.lining);
+const span = (a, b, n) => Array.from({ length: n + 1 }, (_, i) => lerp(a, b, i/n));
+
+/* A block from a straight inner face (|z| = zi) out to the hull, on one side. */
+function hullBlock(x0, x1, y0, y1, zi, side, m, faces = 'all') {
+  const xs = span(x0, x1, 12), ys = span(y0, y1, 6), out = z => Math.max(zi, z), s = side;
+  igrid(xs.map(x => [[x, y1, s*zi], [x, y1, s*out(hin(x, y1))]]), m);                       // top
+  if (faces !== 'top') {
+    igrid(xs.map(x => [[x, y0, s*zi], [x, y1, s*zi]]), m);                                  // inner face
+    [x0, x1].forEach(x => igrid(ys.map(y => [[x, y, s*zi], [x, y, s*out(hin(x, y))]]), m));  // ends
+  }
+}
+/* Door and drawer fronts: a slightly proud panel with a darker inset and a round finger hole. */
+function front(c, w, h, normal, kind = 'door') {
+  const [nx, nz] = normal, along = nx ? [0, 0, 1] : [1, 0, 0], d = .012;
+  const size = nx ? [d, h, w] : [w, h, d];
+  ibox([c[0] + nx*d/2, c[1], c[2] + nz*d/2], size, intMat.trim);
+  if (kind === 'door') ibox([c[0] + nx*d*1.2, c[1], c[2] + nz*d*1.2], nx ? [d, h*.72, w*.66] : [w*.66, h*.72, d], intMat.wood);
+  const hole = iput(new T.CircleGeometry(.014, 14), intMat.dark); hole.position.set(c[0] + nx*d*1.5 + along[0]*w*.32, c[1] + (kind === 'door' ? h*.36 : 0), c[2] + nz*d*1.5 + along[2]*w*.32*(nx ? 1 : 0));
+  hole.lookAt(hole.position.x + nx, hole.position.y, hole.position.z + nz);
+}
+
+/* ---------- Shell: sole, lining, ceiling, trunk sides, windows and hatches ---------- */
+(function shell() {
+  const sole = INT.sole;
+  // saloon, galley and navigation sole, with the aft-cabin entry
+  const xs = span(2.33, INT.wardrobe.fwd, 40);
+  igrid(xs.map(x => { const h = hin(x, sole + .01); return [[x, sole, -h], [x, sole, 0], [x, sole, Math.min(h, x < INT.head.fwd ? INT.head.inner : h)]]; }), intMat.sole, soleUV);
+  // forward cabin floor, a step up, and the head and aft-cabin floors
+  const v = INT.vBerth, hf = INT.head, fh = v.floorHalf;
+  igrid(span(v.aft - .03, v.floorFwd, 4).map(x => [[x, INT.foreSole, -fh], [x, INT.foreSole, fh]]), intMat.sole, soleUV);
+  ibox([v.aft - .04, (sole + INT.foreSole)/2, 0], [.04, INT.foreSole - sole, fh*2], intMat.trim);
+  igrid(span(hf.aft, hf.fwd, 8).map(x => [[x, INT.aftSole, hf.inner], [x, INT.aftSole, hin(x, INT.aftSole)]]), intMat.laminate);
+
+  // hull lining from the sole up to the deck, both sides
+  const lx = span(.45, 8.86, 90);
+  [1, -1].forEach(s => igrid(lx.map(x => span(Math.max(keelY(x) + .12, sole - .05), sheerY(x) - .03, 8).map(y => [x, y, s*hin(x, y)])), intMat.wood));
+
+  // ceiling: coachroof, side decks, and the cockpit seats and sole over the aft cabins
+  const ceilY = (x, a) => {
+    if (x >= CP.fwd && x < HO.fwd - .02 && a < houseHalf(x) - .03) return HO.roof - .04;
+    if (x < CP.fwd) { if (a < CP.footHalf && x > footAft) return CP.sole - .04; if (a < cockpitHalf(x)) return CP.seat - .04; if (a < houseHalf(x) - .03) return HO.roof - .05; }
+    return deckLevel(x, a) - .045;
+  };
+  const cx = span(.45, 8.86, 180);
+  const across = (x, w) => {                                   // sample densely, and twice at each edge so the steps stand vertical
+    const edges = [CP.footHalf, cockpitHalf(x), houseHalf(x) - .03].filter(e => e > .01 && e < w).flatMap(e => [e - .0015, e + .0015]);
+    return [...span(0, w, 30), ...edges].sort((a, b) => a - b);
+  };
+  [1, -1].forEach(s => { const g = gridGeo(cx.map(x => { const w = hin(x, sheerY(x) - .04); return across(x, w).slice(0, 36).concat(Array(Math.max(0, 36 - across(x, w).length)).fill(w)).map(a => [x, ceilY(x, a), s*a]); })); put(G.ceiling, g, intMat.headliner, false); });
+  // floor of the starboard cockpit locker
+  igrid(span(.45, INT.head.aft, 8).map(x => [[x, INT.aftSole, INT.engine.half], [x, INT.aftSole, hin(x, INT.aftSole)]]), intMat.wood);
+  // mahogany battens along the coachroof
+  [-.72, -.36, .36, .72].forEach(z => { const b = put(G.ceiling, new T.BoxGeometry(HO.fwd - CP.fwd - .5, .02, .035), intMat.trim, false); b.position.set((CP.fwd + HO.fwd)/2 - .15, HO.roof - .05, z); });
+
+  // inside of the trunk sides, with the port lights
+  const tx = span(CP.fwd + .02, HO.fwd - .06, 60);
+  [1, -1].forEach(s => {
+    igrid(tx.map(x => { const h = houseHalf(x); return [[x, deckLevel(x, h) - .05, s*(h - .03)], [x, HO.roof - .045, s*(h*HO.tumble - .03)]]; }), intMat.wood);
+    HO.windows.forEach(wx => { const h = houseHalf(wx), p = put(G.ceiling, new T.PlaneGeometry(HO.windowSize[0], HO.windowSize[1]), intMat.glass, false);
+      p.position.set(wx, HO.windowY, s*(lerp(h, h*HO.tumble, .5) - .036)); p.rotation.y = Math.PI/2; });
+  });
+  // opening hatches overhead, with mahogany frames
+  SPEC.hatches.forEach(([x, z, l, w]) => {
+    if (x > INT.vBerth.fwd) return;
+    const y = (x > CP.fwd && x < HO.fwd ? HO.roof : deckLevel(x, Math.abs(z))) - .046, p = put(G.ceiling, new T.PlaneGeometry(l - .06, w - .06), intMat.hatch, false);
+    p.rotation.x = Math.PI/2; p.position.set(x, y, z);
+    [[0, w/2 - .02, l, .04], [0, -w/2 + .02, l, .04], [l/2 - .02, 0, .04, w], [-l/2 + .02, 0, .04, w]].forEach(([dx, dz, a, b]) => { const f = put(G.ceiling, new T.BoxGeometry(a, .025, b), intMat.trim, false); f.position.set(x + dx, y - .01, z + dz); });
+  });
+})();
+
+/* ---------- Saloon ---------- */
+(function saloon() {
+  const s0 = INT.sole, D = INT.dinette, seatTop = s0 + D.seat, base = seatTop - D.cushion;
+  // port U-dinette: the long seat along the hull and two legs reaching to the table
+  hullBlock(D.aft, D.fwd, s0, base, D.inner, -1, intMat.wood);
+  hullBlock(D.aft, D.fwd, base, seatTop, D.inner, -1, intMat.cushion, 'top');
+  [[D.aft, D.aft + .52], [D.fwd - .52, D.fwd]].forEach(([a, b]) => {
+    ibox([(a + b)/2, (s0 + base)/2, -(D.inner + D.legInner)/2], [b - a, base - s0, D.inner - D.legInner], intMat.wood);
+    ibox([(a + b)/2, base + D.cushion/2, -(D.inner + D.legInner)/2], [b - a - .02, D.cushion, D.inner - D.legInner - .02], intMat.cushion);
+  });
+  // backs: along the hull, and across the two ends of the U
+  const back = (x0, x1, side, inset) => igrid(span(x0, x1, 12).map(x => [[x, seatTop + .02, side*(hin(x, seatTop) - inset)], [x, seatTop + D.back, side*(hin(x, seatTop + D.back) - .05)]]), intMat.cushion);
+  back(D.aft + .1, D.fwd - .1, -1, .14);
+  [D.aft + .06, D.fwd - .06].forEach(x => ibox([x, seatTop + D.back/2, -(hin(x, seatTop) + D.legInner)/2], [.10, D.back, hin(x, seatTop) - D.legInner], intMat.cushion));
+  // table with its drop leaf hanging down to starboard, on a single pedestal
+  const T0 = INT.table, ty = s0 + T0.height;
+  ibox([(T0.aft + T0.fwd)/2, ty, (T0.port + T0.stbd)/2], [T0.fwd - T0.aft, .032, T0.stbd - T0.port], intMat.trim);
+  ibox([(T0.aft + T0.fwd)/2, ty - T0.leaf/2, T0.stbd + .018], [T0.fwd - T0.aft, T0.leaf, .022], intMat.trim);
+  rod(IG, [(T0.aft + T0.fwd)/2, s0, (T0.port + T0.stbd)/2], [(T0.aft + T0.fwd)/2, ty, (T0.port + T0.stbd)/2], .035, intMat.steel);
+  const foot = iput(new T.CylinderGeometry(.16, .18, .02, 24), intMat.steel); foot.position.set((T0.aft + T0.fwd)/2, s0 + .01, (T0.port + T0.stbd)/2);
+
+  // starboard settee with its back along the hull
+  const St = INT.settee;
+  hullBlock(St.aft, St.fwd, s0, base, St.inner, 1, intMat.wood);
+  hullBlock(St.aft, St.fwd, base, seatTop, St.inner, 1, intMat.cushion, 'top');
+  back(St.aft + .08, St.fwd - .1, 1, .14);
+  ibox([St.fwd - .05, seatTop + D.back/2, (hin(St.fwd, seatTop) + St.inner)/2], [.10, D.back, hin(St.fwd, seatTop) - St.inner], intMat.cushion);
+  ibox([St.aft + .02, (s0 + seatTop + .25)/2, (hin(St.aft, seatTop) + St.inner)/2], [.04, seatTop + .25 - s0, hin(St.aft, seatTop) - St.inner], intMat.trim);   // curved mahogany end, squared off here
+  // grab pole
+  rod(IG, [INT.pole.x, s0, INT.pole.z], [INT.pole.x, HO.roof - .04, INT.pole.z], INT.pole.r, intMat.trim, 14);
+
+  // lockers and bookshelves above both settees, with a fiddle along the shelves
+  const Lk = INT.lockers;
+  [[D.aft + .05, D.fwd - .05, -1], [St.aft + .05, St.fwd - .05, 1]].forEach(([a, b, s]) => {
+    const zi = Math.min(...span(a, b, 8).map(x => hin(x, Lk.bottom))) - Lk.depth;
+    hullBlock(a, b, Lk.bottom, Lk.top, zi, s, intMat.wood);
+    let x = a + .05; const pattern = ['shelf', 'door', 'door', 'shelf', 'door', 'door', 'door'];
+    for (const p of pattern) {
+      const w = p === 'shelf' ? .55 : .27; if (x + w > b - .03) break;
+      const c = [x + w/2, (Lk.bottom + Lk.top)/2, s*(zi - .002)];
+      if (p === 'shelf') { ibox([c[0], c[1] + .01, s*(zi + .02)], [w, Lk.top - Lk.bottom - .1, .045], intMat.opening); ibox([c[0], Lk.bottom + .1, s*(zi - .008)], [w, .03, .016], intMat.trim); }
+      else front(c, w - .02, Lk.top - Lk.bottom - .08, [0, -s]);
+      x += w + .02;
+    }
+  });
+  // bulkhead fittings: clocks to starboard, a painting to port, brass reading lamps
+  const fb = INT.forwardBulkhead - .025;
+  [[.92, .5], [.72, .5]].forEach(([y, z]) => { const c = iput(new T.CylinderGeometry(.065, .065, .03, 24), intMat.brass); c.rotation.z = Math.PI/2; c.position.set(fb, y, z); const f = iput(new T.CircleGeometry(.055, 24), intMat.white); f.position.set(fb - .017, y, z); f.rotation.y = -Math.PI/2; });
+  ibox([fb, .85, -.55], [.02, .26, .36], intMat.brass); ibox([fb - .012, .85, -.55], [.004, .22, .32], new T.MeshStandardMaterial({ color: C('#8a9aa0'), roughness: .8 }));
+})();
+
+/* ---------- Bulkheads, hanging lockers and the forward cabin ---------- */
+(function forward() {
+  const s0 = INT.sole, W = INT.wardrobe, dh = INT.doorHalf, top = HO.roof - .045;
+  // forward bulkhead, with the door opening in the middle
+  [1, -1].forEach(s => igrid(span(s0, top, 10).map(y => [[INT.forwardBulkhead, y, s*dh], [INT.forwardBulkhead, y, s*Math.max(dh, hin(INT.forwardBulkhead, y))]]), intMat.wood));
+  ibox([INT.forwardBulkhead, (1.36 + top)/2, 0], [.03, top - 1.36, dh*2], intMat.wood);
+  [1, -1].forEach(s => {
+    hullBlock(W.aft, W.fwd, s0, top, dh, s, intMat.wood);
+    front([(W.aft + W.fwd)/2, (s0 + 1.2)/2 + .05, s*(dh - .002)], W.fwd - W.aft - .08, 1.3, [0, -s]);
+  });
+  // V-berth: two wings beside the little floor, then the full width forward, with a chest of drawers facing aft
+  const V = INT.vBerth, by = INT.foreSole + V.height;
+  [1, -1].forEach(s => { hullBlock(V.aft, V.floorFwd, INT.foreSole, by, V.floorHalf, s, intMat.wood); hullBlock(V.aft, V.fwd, by, by + .12, s > 0 ? .005 : .005, s, intMat.cushion, 'top'); });
+  hullBlock(V.floorFwd, V.fwd, INT.foreSole, by, 0, 1, intMat.wood); hullBlock(V.floorFwd, V.fwd, INT.foreSole, by, 0, -1, intMat.wood);
+  for (let i = 0; i < 4; i++) front([V.floorFwd - .002, INT.foreSole + .07 + i*.115, 0], .36, .1, [-1, 0], 'drawer');
+  // forward bulkhead of the cabin, and lockers above the berth
+  igrid(span(INT.foreSole, sheerY(V.fwd) - .05, 8).map(y => [[V.fwd, y, -hin(V.fwd, y)], [V.fwd, y, hin(V.fwd, y)]]), intMat.wood);
+  [1, -1].forEach(s => { const zi = Math.min(...span(7.0, 8.3, 6).map(x => hin(x, .8))) - .28; hullBlock(7.0, 8.3, .78, 1.02, Math.max(.2, zi), s, intMat.wood); });
+})();
+
+/* ---------- Galley, navigation station and companionway steps ---------- */
+(function midships() {
+  const s0 = INT.sole, Gy = INT.galley, top = s0 + Gy.height;
+  // outboard counter the length of the galley, and the forward leg reaching in towards the steps
+  hullBlock(Gy.aft, Gy.fwd, s0, top, -Gy.inner, -1, intMat.wood);
+  ibox([(Gy.legAft + Gy.fwd)/2, (s0 + top)/2, (Gy.inner + Gy.legInner)/2], [Gy.fwd - Gy.legAft, top - s0, Gy.legInner - Gy.inner], intMat.wood);
+  ibox([(Gy.legAft + Gy.fwd)/2, top + .015, (Gy.inner + Gy.legInner)/2], [Gy.fwd - Gy.legAft + .02, .03, Gy.legInner - Gy.inner + .02], intMat.trim);
+  // cooker and oven facing the centreline, recessed into the outboard counter, with a drawer below
+  const st = INT.stove, fz = Gy.inner + .006;
+  ibox([st.x, s0 + .62, fz], [.46, .44, .012], intMat.dark);
+  ibox([st.x, s0 + .55, fz + .008], [.32, .2, .004], new T.MeshStandardMaterial({ color: C('#2a2624'), roughness: .2, metalness: .3 }));
+  ibox([st.x, s0 + .8, fz + .01], [.4, .05, .006], intMat.steel);
+  front([st.x, s0 + .2, Gy.inner - .002], .42, .22, [0, 1], 'drawer');
+  // sink and tap in the forward leg, drawers and a locker facing aft and to starboard
+  const sk = INT.sink, sy = top + .033;
+  const sinkTop = iput(new T.PlaneGeometry(sk.half[0]*2, sk.half[1]*2), intMat.steel); sinkTop.rotation.x = -Math.PI/2; sinkTop.position.set(sk.x, sy, sk.z);
+  rod(IG, [sk.x + sk.half[0] + .04, sy, sk.z - .12], [sk.x + sk.half[0] + .04, sy + .22, sk.z - .12], .012, intMat.steel); rod(IG, [sk.x + sk.half[0] + .04, sy + .22, sk.z - .12], [sk.x + .02, sy + .2, sk.z - .12], .01, intMat.steel);
+  for (let i = 0; i < 4; i++) front([Gy.legAft - .002, s0 + .12 + i*.18, -.24], .22, .15, [-1, 0], 'drawer');
+  front([Gy.legAft - .002, s0 + .45, -.6], .3, .7, [-1, 0]);
+  front([3.8, s0 + .45, Gy.legInner - .002], .36, .7, [0, 1]);
+  // bulkhead to the aft cabin above the counter, and lockers along the hull
+  igrid(span(top, 1.3, 6).map(y => [[Gy.aft, y, Gy.inner], [Gy.aft, y, -Math.max(-Gy.inner, hin(Gy.aft, y))]]), intMat.wood);
+  { const zi = Math.min(...span(Gy.aft, Gy.fwd, 6).map(x => hin(x, .72))) - .3; hullBlock(Gy.aft + .02, Gy.fwd - .02, .68, 1.0, Math.max(zi, .5), -1, intMat.wood); }
+
+  // navigation station: seat facing forward, chart table, and the Malö electrical panel on the hull side
+  const N = INT.nav;
+  hullBlock(N.aft, N.seatFwd, s0, s0 + .33, N.inner, 1, intMat.wood); hullBlock(N.aft, N.seatFwd, s0 + .33, s0 + .43, N.inner, 1, intMat.cushion, 'top');
+  hullBlock(N.seatFwd + .05, N.fwd, s0, s0 + N.table, N.inner, 1, intMat.wood);
+  const px = (N.seatFwd + N.fwd)/2 + .1, py = s0 + N.table + .42, pz = hin(px, py) - .02;
+  ibox([px, py, pz], [.34, .3, .012], intMat.trim); ibox([px, py - .01, pz - .008], [.28, .2, .006], intMat.panel);
+  for (let i = 0; i < 3; i++) { const g = iput(new T.CircleGeometry(.022, 18), intMat.white); g.position.set(px + .03 + i*.05, py - .03, pz - .012); g.rotation.y = Math.PI; }
+
+  // companionway steps from the cockpit down to the sole
+  const S = INT.steps, n = S.treads;
+  for (let i = 0; i < n; i++) {
+    const f = (i + 1)/(n + 1), x = lerp(S.botX, S.topX, (i + .5)/n), y = lerp(s0, CP.seat, f);
+    ibox([x, y, S.z], [.13, .03, S.half*2], intMat.trim);
+  }
+  [1, -1].forEach(s => rod(IG, [S.botX + .02, s0, S.z + s*(S.half + .02)], [S.topX - .04, CP.seat, S.z + s*(S.half + .02)], .022, intMat.trim));
+})();
+
+/* ---------- Head, aft cabin and engine box ---------- */
+(function aft() {
+  const H = INT.head, fy = INT.aftSole, top = 1.32;
+  // walls: inboard with a door, and athwartships fore and aft; light laminate inside, mahogany outside
+  igrid([[ [H.aft, fy, H.inner], [H.aft, top, H.inner] ], [ [H.aft + .45, fy, H.inner], [H.aft + .45, top, H.inner] ]], intMat.wood);
+  ibox([(H.aft + .45 + H.fwd)/2, (1.15 + top)/2, H.inner], [H.fwd - H.aft - .45, top - 1.15, .03], intMat.wood);
+  front([(H.aft + .45 + H.fwd)/2, (INT.sole + 1.15)/2, H.inner - .003], H.fwd - H.aft - .5, 1.15 - INT.sole - .05, [0, -1]);
+  [H.aft, H.fwd].forEach(x => igrid(span(fy, top, 6).map(y => [[x, y, H.inner], [x, y, Math.max(H.inner, hin(x, y))]]), intMat.laminate));
+  // toilet and the moulded basin counter
+  const [tx, tz] = H.toilet; const bowl = iput(new T.CylinderGeometry(.17, .13, .36, 20), intMat.white); bowl.position.set(tx, fy + .18, tz); bowl.scale.set(1.2, 1, 1);
+  const lid = iput(new T.CylinderGeometry(.18, .18, .03, 20), intMat.white); lid.position.set(tx, fy + .38, tz); lid.scale.set(1.2, 1, 1);
+  const zi = Math.min(...span(H.basin[0], H.basin[1], 4).map(x => hin(x, .4))) - .4;
+  hullBlock(H.basin[0], H.basin[1], fy, fy + .78, zi, 1, intMat.wood); hullBlock(H.basin[0], H.basin[1], fy + .78, fy + .8, zi - .01, 1, intMat.white, 'top');
+  const basin = iput(new T.CircleGeometry(.16, 24), new T.MeshStandardMaterial({ color: C('#e8e6e0'), roughness: .2 })); basin.rotation.x = -Math.PI/2; basin.scale.set(1.3, 1, 1); basin.position.set((H.basin[0] + H.basin[1])/2, fy + .805, zi + .2);
+
+  // aft cabin: a wide berth under the cockpit seat, with its bulkhead and door
+  const A = INT.aftCabin;
+  hullBlock(A.aft, A.fwd - .05, fy, A.berth, -A.inner, -1, intMat.wood); hullBlock(A.aft, A.fwd - .05, A.berth, A.berth + .11, -A.inner, -1, intMat.cushion, 'top');
+  igrid(span(fy, 1.3, 8).map(y => [[A.fwd, y, -.95], [A.fwd, y, -Math.max(.95, hin(A.fwd, y))]]), intMat.wood);
+  ibox([A.fwd, (.95 + 1.3)/2, (A.inner - .95)/2 - .01], [.03, .35, .95 + A.inner], intMat.wood);
+  ibox([A.fwd, (INT.sole + .95)/2, -(.95 + .30)/2 - .3], [.03, .95 - INT.sole, .02], intMat.trim);
+  // engine box under the cockpit sole, behind the steps
+  const E = INT.engine, ey = (INT.aftSole + CP.sole - .05)/2; ibox([(E.aft + E.fwd)/2, ey, 0], [E.fwd - E.aft, CP.sole - .05 - INT.aftSole, E.half*2], intMat.wood);
+  front([E.fwd + .002, ey, 0], .4, .5, [1, 0]);
+})();
+
+/* ---------- Warm cabin lights, on only when the interior is open ---------- */
+const intLights = [[5.2, 1.18, 0], [3.5, 1.18, -.4], [3.5, 1.18, .6], [7.6, 1.0, 0], [1.4, .7, -.7], [2.4, 1.1, .8], [6.6, 1.15, 0]].map(([x, y, z]) => {
+  const l = new T.PointLight(0xffd9a8, .55, 3.2, 2); l.position.set(x, y, z); IG.add(l); return l;
+});
+
+/* ===== Interior, part 3: the viewer =====
+   An "Interior" button opens it in place of the solar arch panel. The cutaway lifts the deck off; the other
+   places put the camera at standing eye height inside, where dragging looks around. */
+(function interiorViewer() {
+  const A = window.alizee, off = { x: -L/2, y: -SPEC.hull.floatSink };
+  const eye = (x, y, z, th, ph) => ({ tx: x + off.x, ty: y + off.y, tz: z, th, ph, r: .35, fov: 72, near: .03, rMin: .05, phMax: 2.9, ortho: false, inside: true });
+  const s0 = INT.sole, h = 1.55;
+  const PLACES = [
+    ['cutaway', 'Cutaway from above', { tx: .3, ty: .2, tz: 0, th: .95, ph: .72, r: 10.5, ortho: false, fov: 40, near: .1, rMin: 1, phMax: 1.72 }],
+    ['plan', 'Plan from above', { tx: .15, ty: 0, tz: 0, th: 0, ph: .0006, r: 60, ortho: true, span: 4.2 }],
+    ['saloon', 'Saloon, looking forward', eye(4.35, s0 + h, .25, -Math.PI/2, 1.42)],
+    ['saloonAft', 'Saloon, looking aft', eye(6.05, s0 + h, .1, Math.PI/2, 1.42)],
+    ['galley', 'Galley', eye(3.95, s0 + h, .2, .8, 1.2)],
+    ['nav', 'Navigation', eye(3.95, s0 + h, -.25, 2.35, 1.2)],
+    ['forward', 'Forward cabin', eye(6.55, s0 + h, 0, -Math.PI/2, 1.3)],
+    ['aftCabin', 'Aft cabin and galley', { tx: 2.6 + off.x, ty: -.1 + off.y, tz: -.5, th: -.6, ph: .5, r: 5.5, ortho: false, fov: 40, near: .1, rMin: 1, phMax: 1.72, cut: true }],
+    ['head', 'Head and navigation', { tx: 2.6 + off.x, ty: -.1 + off.y, tz: .5, th: -2.5, ph: .5, r: 5.5, ortho: false, fov: 40, near: .1, rMin: 1, phMax: 1.72, cut: true }],
+  ];
+  let on = false, saved = null, place = 'cutaway';
+
+  const panel = document.createElement('details'); panel.className = 'arch'; panel.id = 'intPanel'; panel.open = true; panel.hidden = true;
+  panel.innerHTML = `<summary>Interior <span id="intCurrent"></span></summary><div class="arch-body">
+    <fieldset class="pick" id="intPick"><legend>Where to look</legend></fieldset>
+    <p class="note">Inside, drag to look around and scroll to step closer. In the plan, <b>Brochure drawing</b> lays the builder's plan over it. The layout follows the brochure's accommodation plan, scaled to the model, and the owner's photos.</p>
+    <p class="fine">The companionway steps come down from the model's companionway at the forward end of the cockpit. The brochure plan draws them under the cockpit, about 0.7 m further aft.</p></div>`;
+  document.body.append(panel);
+  PLACES.forEach(([id, label]) => {
+    const l = document.createElement('label'), i = document.createElement('input'); i.type = 'radio'; i.name = 'intPlace'; i.value = id;
+    i.addEventListener('change', () => go(id)); l.append(i, document.createTextNode(label)); panel.querySelector('#intPick').append(l);
+  });
+
+  const exterior = () => Object.values(G).filter(g => g && g.parent === boat && g !== G.hull && g !== G.interior);   // everything the model hangs above the hull
+  function go(id) {
+    place = id; const p = PLACES.find(q => q[0] === id), v = p[2], cut = id === 'cutaway' || id === 'plan' || !!v.cut;
+    exterior().forEach((g, i) => { g.visible = cut ? false : saved.vis[i]; });
+    G.ceiling.visible = !cut;
+    Object.assign(A.view, v); delete A.view.inside; delete A.view.cut;
+    panel.querySelector('#intCurrent').textContent = p[1];
+    const el = panel.querySelector(`input[value="${id}"]`); if (el) el.checked = true;
+    A.renderer.shadowMap.needsUpdate = true; A.wake();
+  }
+  function enter() {
+    document.dispatchEvent(new CustomEvent('alizee:mode', { detail: 'interior' }));
+    on = true; saved = { water: A.water.visible, ground: A.ground.visible, vis: exterior().map(g => g.visible), view: Object.assign({}, A.view) };
+    A.water.visible = false; A.ground.visible = false; G.interior.visible = true;
+    document.getElementById('archPanel').hidden = true; panel.hidden = false;
+    go(place);
+  }
+  function leave() {
+    if (!on) return; on = false; btn.setAttribute('aria-pressed', 'false');
+    A.water.visible = saved.water; A.ground.visible = saved.ground; G.interior.visible = false;
+    exterior().forEach((g, i) => { g.visible = saved.vis[i]; });
+    panel.hidden = true; document.getElementById('archPanel').hidden = false;
+    A.setView('hero', true); A.renderer.shadowMap.needsUpdate = true; A.wake();
+  }
+  document.addEventListener('alizee:mode', e => { if (e.detail !== 'interior') leave(); });
+  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => { if (on) leave(); }));
+
+  const btn = document.createElement('button'); btn.textContent = 'Interior'; btn.setAttribute('aria-pressed', 'false');
+  btn.addEventListener('click', () => { if (on) leave(); else { btn.setAttribute('aria-pressed', 'true'); enter(); } });
+  const bar = document.querySelector('.bar'), grp = [...bar.querySelectorAll('.group')].find(g => g.getAttribute('aria-label') === 'Sea trial');
+  if (grp) grp.append(btn); else { const g = document.createElement('div'); g.className = 'group'; g.append(btn); bar.append(g); }
+  A.interior = { enter, leave, go, places: PLACES.map(p => p[0]) };
 })();
 </script>
 </body>

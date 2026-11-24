@@ -37,4 +37,8 @@ The site is the static page `public/index.html`, which is committed. Vercel only
   - `sea/20-sea-hydro.js`: weight, hydrostatics and the righting-arm curve from the hull lines
   - `sea/30-sea-motion.js`: irregular waves and the heave, pitch and roll solver
   - `sea/40-sea-view.js`: the wave surface, the boat's motion and the panel
+- `interior/`: the **Interior** viewer, kept apart in the same way. Nothing in `js/` or `sea/` depends on it.
+  - `interior/10-int-data.js`: layout positions and colours, from the brochure plan and the owner's photos
+  - `interior/20-int-build.js`: the joinery, cushions, sole, ceiling and fittings
+  - `interior/30-int-view.js`: the places to look from and the panel
 - `make_overlays.py`: extracts the drawing overlays from the brochure

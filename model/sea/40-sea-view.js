@@ -193,6 +193,7 @@
 
   /* ---------- Turning the trial on and off ---------- */
   function enter() {
+    document.dispatchEvent(new CustomEvent('alizee:mode', { detail: 'sea' }));
     S = SeaHydro.analyse(archMasses()); on = true;
     const pressed = n => document.querySelector(`[data-layer="${n}"]`).getAttribute('aria-pressed') === 'true';
     saved = { water: A.water.visible, ground: A.ground.visible, pos: boat.position.clone(), quat: boat.quaternion.clone(), sail: pressed('sail'), genoa: pressed('genoa') };
@@ -207,6 +208,7 @@
     document.getElementById('archPanel').hidden = false; panel.hidden = true;
     A.renderer.shadowMap.autoUpdate = false; A.renderer.shadowMap.needsUpdate = true; A.wake();
   }
+  document.addEventListener('alizee:mode', e => { if (e.detail !== 'sea' && on) { btn.setAttribute('aria-pressed', 'false'); leave(); } });
   const btn = document.createElement('button'); btn.textContent = 'Sea trial'; btn.setAttribute('aria-pressed', 'false');
   btn.addEventListener('click', () => { const v = !on; btn.setAttribute('aria-pressed', v); v ? enter() : leave(); });
   const bar = document.querySelector('.bar'), grp = document.createElement('div'); grp.className = 'group'; grp.setAttribute('role', 'group'); grp.setAttribute('aria-label', 'Sea trial'); grp.append(btn); bar.append(grp);

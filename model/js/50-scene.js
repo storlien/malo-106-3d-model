@@ -87,6 +87,7 @@
   function setView(name, instant) {
     const v = VIEWS[name]; if (!v) return;
     Object.assign(goal, v); goal.span = v.span || view.span;
+    ['fov', 'near', 'rMin', 'phMax'].forEach(k => { view[k] = v[k]; });   // a standard view drops any add-on lens settings
     if (goal.ortho !== view.ortho || instant || reduced) Object.assign(view, goal);
     else { const tau = Math.PI*2; view.th = goal.th + (((view.th - goal.th)%tau + tau*1.5)%tau - tau/2); anim = true; }
     document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === name));
@@ -99,7 +100,7 @@
     c.up.set(0, 1, 0); if (view.ph < .01) c.up.set(0, 0, -1);
     c.lookAt(view.tx, view.ty, view.tz);
     if (view.ortho) { const s = Math.max(view.span/2, view.span/2/a); const sw = s*a >= view.span/2 ? s : view.span/2/a; c.left = -sw*a; c.right = sw*a; c.top = sw; c.bottom = -sw; c.updateProjectionMatrix(); }
-    else { c.aspect = a; c.fov = a < 1 ? 46 : 32; c.updateProjectionMatrix(); }
+    else { c.aspect = a; c.fov = view.fov || (a < 1 ? 46 : 32); c.near = view.near || .4; c.updateProjectionMatrix(); }   // add-ons may widen the lens
     return c;
   }
   function resize() {
@@ -130,11 +131,11 @@
     } else if (p.b === 2 || e.shiftKey) pan(dx, dy);
     else {
       if (view.ortho) { view.ortho = false; view.r = Math.min(view.r, 26); view.span = 13; deselect(); }
-      view.th -= dx*.0055; view.ph = clamp(view.ph - dy*.0045, .04, 1.72);
+      view.th -= dx*.0055; view.ph = clamp(view.ph - dy*.0045, .04, view.phMax || 1.72);
     }
     needs = 2;
   });
-  function zoom(f) { if (view.ortho) view.span = clamp(view.span*f, 1, 40); else view.r = clamp(view.r*f, 2.5, 60); needs = 2; }
+  function zoom(f) { if (view.ortho) view.span = clamp(view.span*f, 1, 40); else view.r = clamp(view.r*f, view.rMin || 2.5, 60); needs = 2; }
   canvas.addEventListener('wheel', e => { e.preventDefault(); anim = false; zoom(Math.exp(e.deltaY*.001)); }, { passive: false });
 
   /* Controls */
