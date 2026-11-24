@@ -41,6 +41,7 @@ The site is the static page `public/index.html`, which is committed. Vercel only
   - `interior/10-int-data.js`: layout positions and colours, from the brochure plan and the owner's photos
   - `interior/20-int-build.js`: the joinery, cushions, sole, ceiling and fittings
   - `interior/25-int-engine.js`: the Yanmar 3JH5E with KM35A gearbox, from Yanmar's installation drawing
+  - `interior/26-int-tanks.js`: the 220 l diesel and water tanks, shaped to the hull
   - `interior/28-int-fit.js`: trims every interior surface to the inside of the hull
   - `interior/30-int-view.js`: the places to look from and the panel
 - `make_overlays.py`: extracts the drawing overlays from the brochure

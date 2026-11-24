@@ -30,6 +30,12 @@ const INT = {
   head: { aft: 1.80, fwd: 2.95, inner: 0.28, floorAft: 2.30, door: [[2.77, 0.28], [2.95, 0.90]], toilet: [2.04, 0.60], basin: [2.37, 2.90] },   // starboard aft [B][P]
   aftCabin: { aft: 0.42, fwd: 2.37, inner: -0.27, berth: 0.40, floorFwd: 2.74, wall: -0.31, door: [[2.74, -0.31], [2.95, -0.78]] },   // port aft: berth, then a standing area [B][P]
 
-  aftBerth: { aft: 0.45, fwd: 2.30, inner: 0.31, top: 0.08, mattress: 0.12 },   // [B] double berth: plan outline; top height [E], about 0.46 m above the sole and 0.75 m under the cockpit seat
+  aftBerth: { aft: 0.45, fwd: 2.30, inner: 0.31, top: 0.24, mattress: 0.12 },   // [B] double berth on top of the 220 l diesel tank: 0.62 m above the sole, 0.59 m sitting room under the cockpit seat
+  // Tanks from Malö's wiring and tank drawing [B], both 220 l stainless steel [M owner]. Each tank runs from just aft of the
+  // ladder towards the stern, from 0.40 m off the centreline out to the hull; its top height is solved for 220 l.
+  tanks: [
+    { name: 'Diesel', side: -1, fwd: 2.26, aft: 0.80, inner: 0.40, litres: 220, label: 'FUEL' },     // under the aft-cabin berth
+    { name: 'Water', side: 1, fwd: 1.76, aft: 0.40, inner: 0.40, litres: 220, label: 'WATER' },     // under the cockpit locker, aft of the head
+  ],
   colours: { mahogany: '#8a3f1e', trim: '#6e2f14', cushion: '#aebdc6', headliner: '#f1ede4', laminate: '#d9e0e4', sole: '#7a4524', holly: '#e0c79a' },   // [P]
 };
