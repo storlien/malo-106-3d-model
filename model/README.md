@@ -31,6 +31,7 @@ The site is the static page `public/index.html`, which is committed. Vercel only
 - `js/30-deck.js`: deck, cabin trunk, cockpit, windscreen, hatches, arch
 - `js/40-canvas-rig.js`: canvas, rig, rails, stern and bow gear
 - `js/45-solar-arch.js`: builds the solar arch designs and measures them
+- `js/48-radar-beam.js`: the radar beam from the Lowrance installation guide, shadows from the rig, and mast heights to compare
 - `js/46-arch-strength.js`: supporting pipes, and a 3D frame analysis of the arch (stresses, sway, frequencies, foot loads); load cases in `solarArches.strength`
 - `js/50-scene.js`: light, water, cameras, controls
 - `sea/`: the **Sea trial** viewer, kept apart from the model. It reads the boat as configured (solar arch included) and nothing in `js/` depends on it.

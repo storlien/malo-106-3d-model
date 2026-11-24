@@ -243,7 +243,7 @@ const RADAR = (() => {
     });
   });
   const bottom = y0, mountBottom = y0 - m.armDrop - yPad;
-  return { bottom, top: y0 + q.height, spreaderGap: mountBottom - (RG.spreaders[0][0] + RG.spreaderBlade.rootThick/2 + .011), mastGap: cx - q.diameter/2 - nose, name: q.name, mount: m.name, kg: q.kg, diameter: q.diameter, height: q.height };
+  return { group: g, domeX: cx, y0, bottom, top: y0 + q.height, spreaderGap: mountBottom - (RG.spreaders[0][0] + RG.spreaderBlade.rootThick/2 + .011), mastGap: cx - q.diameter/2 - nose, name: q.name, mount: m.name, kg: q.kg, diameter: q.diameter, height: q.height };
 })();
 
 /* ---------- Guard rails ---------- */

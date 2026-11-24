@@ -149,6 +149,7 @@
     if (name === 'rails') G.rails.visible = on;
     if (name === 'arch') setArch(on ? lastArch : 'none');
     if (name === 'drawing') overlay.visible = on;
+    if (name === 'radar') radarBeamLayer(on);
     renderer.shadowMap.needsUpdate = true;
     const b = document.querySelector(`[data-layer="${name}"]`); if (b) b.setAttribute('aria-pressed', on);
     needs = 3;

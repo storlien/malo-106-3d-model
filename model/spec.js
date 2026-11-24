@@ -172,6 +172,19 @@ const SPEC = {
     radar: { name: 'Lowrance 3G', diameter: 0.489, height: 0.28, kg: 7.4, aboveSpreader: 0.23, mastGap: 0.015,  // [B] maker's drawing; position is the owner's choice
       // Scanstrut SC20 mast mount [B]: pin = mast fixing pin, holes are measured forward from the pins
       mount: { name: 'Scanstrut SC20', length: 0.395, width: 0.263, pinSpacing: 0.105, armDrop: 0.112, height: 0.232, holeX: [0.159, 0.3005], holeWidth: 0.233 } },
+    // Lowrance Broadband 3G beam [B installation guide 2011-12-19]: full vertical beam ±25°, half power within ±12.5°, horizontal 5.2°, shortest range 200 ft.
+    // plate: height of the mount plate (the radome's bottom); null = the owner's position, just above the lower spreaders.
+    radarBeam: {
+      full: 25, main: 12.5, minRange: 61, drawRadius: 40, upRadius: 12, shadowReach: 3.5, azSteps: 180, elSteps: 26, reportLoss: 0.05,
+      fullColour: '#f2a541', mainColour: '#e0482b', shadowColour: '#2a1a2e',
+      positions: [
+        { id: 'belowLower', name: 'Below the lower spreaders', plate: 6.67 },
+        { id: 'aboveLower', name: 'Just above the lower spreaders (now)', plate: null, current: true },
+        { id: 'middle', name: 'Halfway between the spreaders', plate: 9.30 },
+        { id: 'belowUpper', name: 'Below the upper spreaders', plate: 11.27 },
+        { id: 'aboveUpper', name: 'Just above the upper spreaders', plate: 11.88 },
+      ],
+    },
     mainsail: { headBelowTop: 0.20, clewInset: 0.14, headWidth: 0.16, roach: 0.22, camber: 0.05, battens: [0.23, 0.44, 0.64, 0.83], logoV: 0.69 }, // [P] owner's photo
     // 140 % roller genoa [M owner]: LP (clew square to the luff) = 1.40 x J (forestay foot to the mast). Trim and shape are [P]
     genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6 },
