@@ -189,7 +189,11 @@ mat.zinc = M('#b9bec2', { roughness: .45, metalness: .85 });
 (function propeller() {
   const p = SPEC.keel.prop, f = shaftLine.at(1.224), R = p.r, pitch = p.pitch, hubR = .042;
   rod(G.hull, [f[0], f[1], 0], [p.x + .06, p.y, 0], .016, mat.steel);
-  const prop = new T.Group(); prop.position.set(p.x, p.y, 0); G.hull.add(prop);
+  const prop = new T.Group(); prop.position.set(p.x, p.y, 0); prop.rotation.z = shaftLine.angle; G.hull.add(prop);   // in line with the shaft
+  // faired boss round the shaft at the aft end of the deadwood, ending just ahead of the hub, with the cutless bearing
+  const SB = SPEC.keel.shaftBoss, x0 = .064 + SB.gap, prof = [[0, x0], [SB.endR*.55, x0], [SB.endR*.75, x0 + .004], [SB.endR, x0 + .02], [SB.r*.97, x0 + .09], [SB.r, x0 + .17], [SB.r*.92, x0 + SB.length*.6], [SB.r*.6, x0 + SB.length*.85], [SB.r*.15, x0 + SB.length], [0, x0 + SB.length]];   // tapers forward into the deadwood
+  const boss = put(prop, new T.LatheGeometry(prof.map(([r, u]) => new T.Vector2(r, u)), 32), mat.anti); boss.rotation.z = -Math.PI/2;
+  const bearing = put(prop, new T.RingGeometry(.018, SB.endR*.55, 24), mat.dark); bearing.rotation.y = -Math.PI/2; bearing.position.x = x0 - .001;
   // boss and anode along the shaft axis (x), the anode aft
   const lathe = (pts, m) => { const g = new T.LatheGeometry(pts.map(([r, x]) => new T.Vector2(r, x)), 28); const o = put(prop, g, m); o.rotation.z = Math.PI/2; return o; };
   lathe([[.0, -.064], [.034, -.064], [.04, -.05], [hubR, -.02], [hubR, .03], [.036, .05], [.022, .062], [0, .062]].map(([r, x]) => [r, -x]), mat.brass);

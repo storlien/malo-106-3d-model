@@ -84,7 +84,8 @@ const SPEC = {
 
   keel: {   // [D] levels are [y, leading edge x, trailing edge x, thickness/chord]
     fin: [[-0.30, 6.614, 2.404, 0.085], [-0.52, 6.414, 2.404, 0.085], [-0.72, 5.894, 2.434, 0.092], [-1.58, 4.824, 2.574, 0.105]],
-    deadwood: [[-0.18, 2.664, 1.184, 0.075], [-0.52, 2.664, 1.194, 0.075]],
+    deadwood: [[-0.18, 2.664, 1.06, 0.075], [-0.52, 2.664, 1.07, 0.075]],   // [D/P] runs aft to the shaft boss, which ends just ahead of the propeller (owner's photo)
+    shaftBoss: { gap: 0.025, length: 0.42, r: 0.075, endR: 0.052 },   // [P] faired boss round the shaft at the aft end of the deadwood
     skeg: [[0.05, 0.844, 0.424, 0.22], [-0.25, 0.624, 0.424, 0.34], [-0.83, 0.554, 0.424, 0.34]],
     rudder: [[0.05, 0.409, 0.164, 0.14], [-0.82, 0.409, 0.024, 0.12], [-0.84, 0.524, 0.024, 0.11], [-1.34, 0.504, -0.036, 0.10]],
     prop: { x: 0.914, y: -0.42, r: 0.19, blades: 3, pitch: 0.30 },  // [D/P] polished brass, owner's photo; pitch [E]
