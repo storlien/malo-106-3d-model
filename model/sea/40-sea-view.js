@@ -160,8 +160,8 @@
     const row = (k, v, c) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`;
     panel.querySelector('#seaStats').innerHTML = `
       <h2>Stability of the boat as configured</h2>${gzChart(deg)}<dl>
-      ${row('Weight in the trial', `${f0(S.m)} kg`)}${row('Of which solar arch and panels', arch ? `${f0(arch)} kg` : 'None')}
-      ${row('Centre of gravity above waterline', `${f2(S.yG - S.d0)} m`)}${row('Metacentric height, GM', `${f2(S.GM)} m`)}
+      ${row('Weight in the trial', `${f0(S.m)} kg`)}${row('Of which half-full diesel and water tanks', `${f0(SEA.liquids.reduce((a, q) => a + q.kg, 0))} kg`)}${row('Of which solar arch and panels', arch ? `${f0(arch)} kg` : 'None')}
+      ${row('Centre of gravity above waterline, with tank slosh', `${f2(S.yG - S.d0)} m`)}${row('Metacentric height, GM', `${f2(S.GM)} m`)}
       ${row('Largest righting arm', `${f2(S.gzMax[1])} m at ${f0(S.gzMax[0])}°`)}${row('Angle of vanishing stability', `${f0(S.avs)}°`)}
       ${row('Stability ratio, positive to negative area', isFinite(S.ratio) ? f1(S.ratio) : '—')}
       ${row('Roll period', `${f1(S.Troll)} s`)}${row('Pitch period', `${f1(S.Tpitch)} s`)}${row('Heave period', `${f1(S.Theave)} s`)}

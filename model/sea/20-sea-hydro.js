@@ -80,7 +80,8 @@ const SeaHydro = (() => {
     list.push({ name: 'Lead keel', kg: P.ballast, y: fin.y, x: fin.x, len: 0 });
     const inside = list.reduce((a, q) => a + q.kg, 0);
     list.push({ name: 'Hull, deck and interior', kg: P.displacement - inside, y: SEA.rest.y, x: 0, len: 0, rest: true });
-    list.push({ name: 'Crew, stores, half tanks', kg: SEA.load.kg, y: SEA.load.y, x: SEA.load.x, len: 0 });
+    list.push({ name: 'Crew and stores', kg: SEA.load.kg, y: SEA.load.y, x: SEA.load.x, len: 0 });
+    SEA.liquids.forEach(q => list.push({ name: q.name, kg: q.kg, y: q.y, x: q.x, len: 0 }));
     if (arch) arch.forEach(a => list.push(a));
     const m = list.reduce((a, q) => a + q.kg, 0);
     // the hull share sits where it puts the boat's centre of gravity over its centre of buoyancy
@@ -92,7 +93,9 @@ const SeaHydro = (() => {
     const W = weights(arch), Vt = W.m/SEA.rho;
     const d0 = draftFor(0, Vt), B0 = displaced(0, d0);
     W.restItem.x = (B0.X*W.m - W.list.filter(q => !q.rest).reduce((a, q) => a + q.kg*q.x, 0))/W.restItem.kg;   // level trim
-    const xG = W.list.reduce((a, q) => a + q.kg*q.x, 0)/W.m, yG = W.list.reduce((a, q) => a + q.kg*q.y, 0)/W.m;
+    // slack liquid shifts to the low side: its free-surface moment raises the effective centre of gravity
+    const fse = SEA.liquids.reduce((a, q) => a + q.density*q.length*q.breadth**3/12, 0)/W.m;
+    const xG = W.list.reduce((a, q) => a + q.kg*q.x, 0)/W.m, yG = W.list.reduce((a, q) => a + q.kg*q.y, 0)/W.m + fse;
 
     // waterplane and strips at the upright waterline
     const strips = xs.map(x => ({ x, b: hullHalf(x, d0), T: Math.max(0, d0 - Math.min(keelY(x), sheerY(x))) })).filter(q => q.b > .01);
@@ -124,7 +127,7 @@ const SeaHydro = (() => {
     const lb = W.m*2.20462, bft = W.beam/.3048, loaFt = L/.3048, lwlFt = lwl/.3048;
     return {
       W, m: W.m, V: Vt, d0, sink: d0 - SPEC.hull.floatSink, xG, yG, KB: B0.Y, BM, GM, Aw, IT, IL, LCF, lwl, bwl, strips, stripDx: dx,
-      I44, I55, gz, gzMax: gz[iMax], avs, ratio: negArea ? posArea/negArea : Infinity, Troll, Theave, Tpitch,
+      fse, I44, I55, gz, gzMax: gz[iMax], avs, ratio: negArea ? posArea/negArea : Infinity, Troll, Theave, Tpitch,
       capsize: bft/Math.cbrt(lb/64), comfort: lb/(.65*(.7*lwlFt + .3*loaFt)*Math.pow(bft, 1.333)),
       immersion: SEA.rho*Aw/100, finKg: W.fin.V*11340,
     };

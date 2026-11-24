@@ -26,6 +26,12 @@ const SEA = {
   ],
   rest: { y: 0.30, rollGyration: 0.33, pitchGyration: 0.24 },  // hull, deck, interior: height, and gyration radii as fractions of beam and length [E]
   load: { kg: 300, y: 0.40, x: 3.8 },                         // two crew and their stores [E]
+  // Tanks half full, added on top of the displacement: 220 l stainless tanks from Malö's drawing [B][M owner].
+  // Centre of the liquid at half volume, and the free-surface moment l·b³/12 of its surface, from the interior's tank shapes [E].
+  liquids: [
+    { name: 'Diesel, 110 l (half tank)', kg: 110*0.84, y: -0.13, x: 1.53, density: 840, length: 1.46, breadth: 0.50 },
+    { name: 'Water, 110 l (half tank)', kg: 110, y: -0.02, x: 1.08, density: 1000, length: 1.36, breadth: 0.50 },
+  ],
   sidePanelY: 1.55,                                            // lifeline panels' centre height [E]
 
   // Hydrodynamic coefficients for a heavy long-fin cruiser [E]
