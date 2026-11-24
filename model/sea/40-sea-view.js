@@ -7,13 +7,15 @@
   let on = false, S = null, S0 = null, sim = null, stats = null, lastUi = 0, saved = null;
 
   /* ---------- Sea surface: displaced in the vertex shader from the same wave trains the boat feels ---------- */
-  const R = 320, n = 260, geo = new T.PlaneGeometry(2, 2, n, n); geo.rotateX(-Math.PI/2);
+  const uW = { value: Array.from({ length: NW }, () => new T.Vector4()) }, uOff = { value: L/2 }, uBreak = { value: 0 }, uBreakPos = { value: new T.Vector2() };
+  const R = 320; let sea = null, ripples = null;
+  function makeSea() {                                  // built when the trial opens, released when it closes
+  const n = 260, geo = new T.PlaneGeometry(2, 2, n, n); geo.rotateX(-Math.PI/2);
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) { const f = v => Math.sign(v)*R*Math.pow(Math.abs(v), 2.1); pos.setX(i, f(pos.getX(i))); pos.setZ(i, f(pos.getZ(i))); }
   const uvs = geo.attributes.uv; for (let i = 0; i < pos.count; i++) uvs.setXY(i, pos.getX(i)/(2*R) + .5, -pos.getZ(i)/(2*R) + .5);
   geo.computeBoundingSphere(); geo.boundingSphere.radius = R*1.5;
-  const uW = { value: Array.from({ length: NW }, () => new T.Vector4()) }, uOff = { value: L/2 }, uBreak = { value: 0 }, uBreakPos = { value: new T.Vector2() };
-  const ripples = A.water.material.normalMap.clone(); ripples.needsUpdate = true; ripples.repeat.set(70, 70); ripples.wrapS = ripples.wrapT = T.RepeatWrapping;   // the calm water's ripples ride on the swell
+  ripples = A.water.material.normalMap.clone(); ripples.needsUpdate = true; ripples.repeat.set(70, 70); ripples.wrapS = ripples.wrapT = T.RepeatWrapping;   // the calm water's ripples ride on the swell
   const seaMat = new T.MeshStandardMaterial({ color: C('#0b3344'), roughness: .2, metalness: .08, envMapIntensity: 1.0, normalMap: ripples, normalScale: new T.Vector2(.35, .35) });
   seaMat.onBeforeCompile = sh => {
     sh.uniforms.uW = uW; sh.uniforms.uOff = uOff; sh.uniforms.uBreak = uBreak; sh.uniforms.uBreakPos = uBreakPos;
@@ -27,7 +29,8 @@
     sh.fragmentShader = 'varying float vFoam; varying vec2 vP; uniform float uBreak; uniform vec2 uBreakPos;\n' + sh.fragmentShader.replace('#include <color_fragment>',
       '#include <color_fragment>\n float br = uBreak*smoothstep(11.0, 2.0, length(vP - uBreakPos))*(.75 + .25*sin(vP.x*1.7)*sin(vP.y*2.3));\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.86, .9, .92), clamp(vFoam*.85 + br, 0.0, .95));');
   };
-  const sea = new T.Mesh(geo, seaMat); sea.visible = false; sea.receiveShadow = true; sea.frustumCulled = false; scene.add(sea);
+    sea = new T.Mesh(geo, seaMat); sea.visible = false; sea.receiveShadow = true; sea.frustumCulled = false; scene.add(sea);
+  }
 
   /* ---------- Weigh the boat as configured ---------- */
   function archMasses() {
@@ -198,13 +201,13 @@
     S = SeaHydro.analyse(archMasses()); S0 = SeaHydro.analyse([]); on = true;   // S0: the same boat without arch or lifeline panels
     const pressed = n => document.querySelector(`[data-layer="${n}"]`).getAttribute('aria-pressed') === 'true';
     saved = { water: A.water.visible, ground: A.ground.visible, pos: boat.position.clone(), quat: boat.quaternion.clone(), sail: pressed('sail'), genoa: pressed('genoa') };
-    A.water.visible = false; A.ground.visible = false; sea.visible = true;
+    makeSea(); A.water.visible = false; A.ground.visible = false; sea.visible = true;
     document.getElementById('archPanel').hidden = true; panel.hidden = false;
     A.renderer.shadowMap.autoUpdate = true;
     restart(); Object.assign(A.view, { th: .95, ph: 1.3, r: 24, tx: 0, ty: 2.2, tz: 0, ortho: false }); A.wake();
   }
   function leave() {
-    on = false; sea.visible = false; A.water.visible = saved.water; A.ground.visible = saved.ground;
+    on = false; scene.remove(sea); disposeTree(sea); sea = ripples = null; sim = stats = S = S0 = null; A.water.visible = saved.water; A.ground.visible = saved.ground;
     boat.position.copy(saved.pos); boat.quaternion.copy(saved.quat); A.setLayer('sail', saved.sail); A.setLayer('genoa', saved.genoa);
     document.getElementById('archPanel').hidden = false; panel.hidden = true;
     A.renderer.shadowMap.autoUpdate = false; A.renderer.shadowMap.needsUpdate = true; A.wake();

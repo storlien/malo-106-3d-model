@@ -135,3 +135,13 @@ const mat = {
   flag:    M('#ffffff', { map: flagTexture(), roughness: .85 }),
   logo:    M('#7a5a24', { roughness: .4, transparent: true }),
 };
+
+/* Free the GPU memory of everything under a group (add-on viewers release their geometry when they close). */
+function disposeTree(root) {
+  if (!root) return;
+  root.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    ms.forEach(m => { Object.values(m).forEach(v => { if (v && v.isTexture) v.dispose(); }); m.dispose(); });
+  });
+}

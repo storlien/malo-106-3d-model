@@ -1,7 +1,7 @@
 /* Renderer, light, water, cameras, views and UI. */
 (function main() {
   const canvas = document.getElementById('view');
-  const renderer = new T.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  const renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });   // ask for the discrete GPU on laptops that have two
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.outputEncoding = T.sRGBEncoding;
   renderer.toneMapping = T.ACESFilmicToneMapping;

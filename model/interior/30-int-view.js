@@ -42,6 +42,7 @@
   }
   function enter() {
     document.dispatchEvent(new CustomEvent('alizee:mode', { detail: 'interior' }));
+    if (!G.interior) buildInteriorGeometry();               // built on demand, released again on leaving
     on = true; saved = { water: A.water.visible, ground: A.ground.visible, vis: exterior().map(g => g.visible), view: Object.assign({}, A.view) };
     A.water.visible = false; A.ground.visible = false; G.interior.visible = true; if (G.companionShade) G.companionShade.visible = false;
     document.getElementById('archPanel').hidden = true; panel.hidden = false;
@@ -51,6 +52,7 @@
     if (!on) return; on = false; btn.setAttribute('aria-pressed', 'false');
     A.water.visible = saved.water; A.ground.visible = saved.ground; G.interior.visible = false; if (G.ladder) G.ladder.visible = true; if (G.companionShade) G.companionShade.visible = true;
     exterior().forEach((g, i) => { g.visible = saved.vis[i]; });
+    disposeTree(G.interior); boat.remove(G.interior); G.interior = G.ceiling = G.ladder = null;
     panel.hidden = true; document.getElementById('archPanel').hidden = false;
     A.setView('hero', true); A.renderer.shadowMap.needsUpdate = true; A.wake();
   }

@@ -4,13 +4,14 @@
 const TK = RG.genoa.tack;
 G.tackSail = new T.Group(); G.tackSail.visible = false; G.rig.add(G.tackSail);
 
-const tackSlices = (() => {
-  const yAt = v => GENOA.pt(0, v)[1], n = TK.slices;
+let tackSlicesMemo = null;                                // sail slices, made the first time the radar panel needs them
+const tackSlices = () => tackSlicesMemo || (tackSlicesMemo = (() => {
+  const n = TK.slices;
   return Array.from({ length: n + 1 }, (_, j) => {
     const v = j/n, P = GENOA.pt(0, v), Q = GENOA.pt(1, v), c = GENOA.chord(v)*TK.clothFactor;
     return { v, P, Q, c, theta0: Math.atan2(Math.abs(Q[2]) + .15, c) };          // sheeted angle off the centreline
   });
-})();
+})());
 
 /* Obstacles in plan at height y: circles [x, radius, name]. */
 function tackObstacles(y, radar) {
@@ -44,7 +45,7 @@ function clothPath(P, c, theta, y, radar, side) {
 /* How a radar height fares over one tack. */
 function tackReport(radar) {
   const T0 = TK.time, steps = 80; let touch = 0, total = 0, speed = 0, wrap = 0, partMin = 1, partMax = 0, leech = false;
-  tackSlices.forEach(sl => {
+  tackSlices().forEach(sl => {
     const yC = sl.P[1] + (sl.Q[1] - sl.P[1])*.5;
     if (yC < radar.plate - .6 || yC > radar.plate + .9) return;
     for (let i = 0; i <= steps; i++) {
@@ -65,15 +66,16 @@ function tackReport(radar) {
 
 /* ---------- Animation ---------- */
 const tackAnim = (() => {
-  const nu = 30, mat2 = new T.MeshStandardMaterial({ color: C('#eeeee8'), roughness: .8, side: T.DoubleSide }), nv = tackSlices.length;
-  const geo = new T.BufferGeometry(), pos = new Float32Array(nv*(nu + 1)*3), idx = [];
-  for (let j = 0; j < nv - 1; j++) for (let i = 0; i < nu; i++) { const a = j*(nu + 1) + i, b = a + nu + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
-  geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setIndex(idx);
-  const mesh = new T.Mesh(geo, mat2); mesh.castShadow = true; G.tackSail.add(mesh);
-  let t = 0, radar = null, playing = false;
+  const nu = 30; let geo = null, pos = null, mesh = null, t = 0, radar = null, playing = false;
+  const make = () => {                                  // the sail mesh exists only while a tack is playing
+    const nv = tackSlices().length; geo = new T.BufferGeometry(); pos = new Float32Array(nv*(nu + 1)*3); const idx = [];
+    for (let j = 0; j < nv - 1; j++) for (let i = 0; i < nu; i++) { const a = j*(nu + 1) + i, b = a + nu + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setIndex(idx);
+    mesh = new T.Mesh(geo, new T.MeshStandardMaterial({ color: C('#eeeee8'), roughness: .8, side: T.DoubleSide })); mesh.castShadow = true; G.tackSail.add(mesh);
+  };
   const frame = () => {
     const ph = (t % (2*TK.time + 2*TK.pause))/TK.time, q0 = clamp(ph, 0, 1), q1 = clamp(ph - 1 - TK.pause/TK.time, 0, 1), back = ph > 1 + TK.pause/TK.time;   // over, pause, and back
-    tackSlices.forEach((sl, j) => {
+    tackSlices().forEach((sl, j) => {
       const th = back ? -sl.theta0*Math.cos(Math.PI*q1) : sl.theta0*Math.cos(Math.PI*q0), side = th >= 0 ? 1 : -1;
       const dR = sl.P[0] - RADAR.domeX, yR = lerp(sl.P[1], sl.Q[1], clamp(dR/sl.c, 0, 1));
       const path = clothPath(sl.P, sl.c, th, yR, radar, side).pts;
@@ -86,8 +88,8 @@ const tackAnim = (() => {
     geo.attributes.position.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere();
   };
   return {
-    start(r) { radar = r; playing = true; t = 0; G.tackSail.visible = true; G.genoa.visible = false; G.furledGenoa.visible = false; frame(); },
-    stop() { playing = false; G.tackSail.visible = false; const on = document.querySelector('[data-layer="genoa"]').getAttribute('aria-pressed') === 'true'; G.genoa.visible = on; G.furledGenoa.visible = !on; },
+    start(r) { if (!mesh) make(); radar = r; playing = true; t = 0; G.tackSail.visible = true; G.genoa.visible = false; G.furledGenoa.visible = false; frame(); },
+    stop() { playing = false; G.tackSail.visible = false; if (mesh) { G.tackSail.remove(mesh); disposeTree(mesh); mesh = geo = pos = null; } const on = document.querySelector('[data-layer="genoa"]').getAttribute('aria-pressed') === 'true'; G.genoa.visible = on; G.furledGenoa.visible = !on; },
     tick(dt) { if (!playing) return false; t += dt; frame(); return true; },
     get playing() { return playing; },
   };

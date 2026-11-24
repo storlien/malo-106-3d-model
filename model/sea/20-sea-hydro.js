@@ -38,7 +38,7 @@ const SeaHydro = (() => {
     }
     return out;
   }
-  const SECT = xs.map(sections);
+  let SECT = null;                                       // hull sections, computed the first time the trial opens
 
   /* Area and first moments of the part of an outline below the water at heel (c, s) and waterline d. */
   function wet(poly, c, s, d) {
@@ -58,6 +58,7 @@ const SeaHydro = (() => {
   /* Displaced volume and centre of buoyancy (horizontal H, vertical Y in the heeled frame; x along the boat). */
   function displaced(phi, d) {
     const c = Math.cos(phi), s = Math.sin(phi); let V = 0, H = 0, Y = 0, X = 0;
+    SECT = SECT || xs.map(sections);
     SECT.forEach((list, i) => list.forEach(({ s: sg, p }) => {
       const [A, a, b] = wet(p, c, s, d), w = (i === 0 || i === nSt ? .5 : 1)*dx*sg;
       V += A*w; H += a*w; Y += b*w; X += A*w*xs[i];

@@ -49,7 +49,7 @@ function shadowSectors(sh) {
 }
 
 function buildRadarBeam() {
-  G.radarBeam.clear();
+  disposeTree(G.radarBeam); G.radarBeam.clear();
   const c = radarCentre(radarState.pos), hw = c.y - SPEC.hull.floatSink, sh = radarShadow(c), R = RB.drawRadius;
   // all round: sheets at 0° and ±12.5° (green) and ±25° (yellow); a sector is left open wherever the rig blocks
   // any part of that band in that direction, so the blocked regions show as gaps
@@ -140,6 +140,6 @@ function buildRadarBeam() {
     A = window.alizee; G.radarBeam.visible = on; panel.hidden = !on;
     if (!hooked) { A.hooks.push(dt => tackAnim.tick(dt)); hooked = true; }
     if (!on && tackAnim.playing) { tackAnim.stop(); panel.querySelector('#tackPlay').textContent = 'Play a tack'; }
-    if (on) update(); else { placeRadar(RB.positions.find(p => p.current).id); }
+    if (on) update(); else { placeRadar(RB.positions.find(p => p.current).id); disposeTree(G.radarBeam); G.radarBeam.clear(); }   // nothing of the beam stays in memory
   };
 })();
