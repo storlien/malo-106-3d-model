@@ -173,25 +173,24 @@ mat.foil = mat.anti.clone();           // keel, skeg and rudder: their roots ins
   mat.foil.customProgramCacheKey = () => 'foil';
 })();
 foil(SPEC.keel.fin, mat.foil);
-(function deadwood() {     // horizontal slices from inside the hull down to the flat bottom, each a thick rounded outline in plan
-  const D = SPEC.keel.deadwoodShape, top = sheerY(1.5) - .2, ny = 24, nu = 40, rows = [];
-  const aftAt = y => y <= D.bottom ? D.aftBottom : D.aftBottom - (D.aftBottom - D.aftTop)*Math.pow(clamp((y - D.bottom)/(D.topY - D.bottom), 0, 1.6), .7);
+(function deadwood() {     // horizontal slices from inside the hull down to the flat bottom; slim, flaring into the hull in broad fillets
+  const D = SPEC.keel.deadwoodShape, top = D.topY + .14, ny = 30, nu = 40, rows = [];
+  const span = D.topY - D.bottom, tOf = y => clamp((y - D.bottom)/span, 0, 2);
+  const aftAt = y => D.aftBottom - (D.aftBottom - D.aftTop)*Math.pow(Math.min(tOf(y), 1.4), 2.6);   // near vertical, curving aft only at the top
   for (let j = 0; j <= ny; j++) {
-    const f = j/ny, y = lerp(D.bottom, top, Math.pow(f, 1.3)), lift = Math.max(0, 1 - f*ny/2.5), hw = D.halfWidth*Math.sqrt(1 - lift*lift*.85);   // bottom edge rounded
-    const xa = aftAt(y), xf = D.fwd, row = [];
+    const f = j/ny, y = lerp(D.bottom, top, Math.pow(f, 1.2)), t = tOf(y), lift = Math.max(0, 1 - f*ny/2.5);
+    const hw = (D.halfWidth + D.fillet*Math.pow(Math.max(0, t - .45)/.55, 2.2))*Math.sqrt(1 - lift*lift*.85), xa = aftAt(y), xf = D.fwd, row = [];
     for (let i = 0; i <= nu; i++) {
-      const a = i/nu*Math.PI*2, c = Math.cos(a), sn = Math.sin(a);
-      // aft half: a semicircle of radius hw; forward: a long taper to the fin
+      const a = i/nu*Math.PI*2, c = Math.cos(a), sn = Math.sin(a), ra = Math.min(hw, D.halfWidth*1.2);   // aft end rounded with the slim radius
       let x, z;
-      if (c <= 0) { x = xa + hw + c*hw; z = sn*hw; }
-      else { x = xa + hw + c*(xf - xa - hw); z = sn*hw*Math.pow(1 - c, .35); }
+      if (c <= 0) { x = xa + ra + c*ra; z = sn*(ra + (hw - ra)*Math.min(1, -c*0 + 1 - Math.abs(c))); }
+      else { x = xa + ra + c*(xf - xa - ra); z = sn*hw*Math.pow(1 - c, .35); }
       row.push([x, y, z]);
     }
     rows.push(row);
   }
   grid(G.hull, rows, mat.foil);
-  const cap = rows[0].map(p => [p[0], D.bottom, p[2]]), mid = rows[0].map(p => [p[0], D.bottom, 0]);
-  grid(G.hull, [cap, mid], mat.foil);
+  grid(G.hull, [rows[0].map(p => [p[0], D.bottom, p[2]]), rows[0].map(p => [p[0], D.bottom, 0])], mat.foil);
 })();
 foil(SPEC.keel.skeg, mat.foil);
 foil(SPEC.keel.rudder, mat.foil);
@@ -210,7 +209,7 @@ mat.zinc = M('#b9bec2', { roughness: .45, metalness: .85 });
   rod(G.hull, [f[0], f[1], 0], [p.x + .06, p.y, 0], .016, mat.steel);
   const prop = new T.Group(); prop.position.set(p.x, p.y, 0); prop.rotation.z = shaftLine.angle; G.hull.add(prop);   // in line with the shaft
   // faired boss round the shaft at the aft end of the deadwood, ending just ahead of the hub, with the cutless bearing
-  const SB = SPEC.keel.shaftBoss, x0 = .064 + SB.gap, prof = [[0, x0], [SB.endR*.55, x0], [SB.endR*.75, x0 + .004], [SB.endR, x0 + .02], [SB.r*.97, x0 + .09], [SB.r, x0 + .17], [SB.r*.92, x0 + SB.length*.6], [SB.r*.6, x0 + SB.length*.85], [SB.r*.15, x0 + SB.length], [0, x0 + SB.length]];   // tapers forward into the deadwood
+  const SB = SPEC.keel.shaftBoss, x0 = .064 + SB.gap, prof = [[0, x0], [SB.endR*.62, x0], [SB.endR, x0 + .012], [SB.r, x0 + SB.length*.75], [SB.r, x0 + SB.length], [0, x0 + SB.length]];   // straight cone, its base inside the deadwood   // tapers forward into the deadwood
   const boss = put(prop, new T.LatheGeometry(prof.map(([r, u]) => new T.Vector2(r, u)), 32), mat.anti); boss.rotation.z = -Math.PI/2;
   const bearing = put(prop, new T.RingGeometry(.018, SB.endR*.55, 24), mat.dark); bearing.rotation.y = -Math.PI/2; bearing.position.x = x0 - .001;
   // boss and anode along the shaft axis (x), the anode aft
