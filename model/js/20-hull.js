@@ -163,12 +163,12 @@ function foil(levels, material, parent = G.hull) {
 }
 mat.foil = mat.anti.clone();           // keel, skeg and rudder: their roots inside the hull are never drawn, so nothing shows inside the boat
 (() => {
-  const N = 48, keel = Array.from({ length: N + 1 }, (_, i) => Math.min(keelY(i/N*L), sheerY(i/N*L)).toFixed(4));
+  const N = 200, keel = Array.from({ length: N + 1 }, (_, i) => Math.min(keelY(i/N*L), sheerY(i/N*L)).toFixed(4));
   mat.foil.onBeforeCompile = sh => {
     sh.vertexShader = 'varying vec2 vXY;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvXY = position.xy;');
     sh.fragmentShader = `varying vec2 vXY; const float KEEL[${N + 1}] = float[](${keel.join(',')});\n` + sh.fragmentShader.replace('#include <clipping_planes_fragment>',
       `#include <clipping_planes_fragment>\n float kf = clamp(vXY.x/${L.toFixed(3)}, 0.0, 1.0)*${N}.0; int ki = int(min(kf, ${N - 1}.0));
-       if (vXY.y > mix(KEEL[ki], KEEL[ki + 1], kf - float(ki)) + .015) discard;`);
+       if (vXY.y > mix(KEEL[ki], KEEL[ki + 1], kf - float(ki)) + .003) discard;`);
   };
   mat.foil.customProgramCacheKey = () => 'foil';
 })();
