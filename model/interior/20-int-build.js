@@ -67,7 +67,9 @@ function front(c, w, h, normal, kind = 'door') {
   const sole = INT.sole;
   // saloon, galley and navigation sole, with the aft-cabin entry
   const xs = span(INT.head.aft, INT.wardrobe.fwd, 50);          // one sole from the head and aft cabin forward
-  igrid(xs.map(x => { const h = hin(x, sole + .01); return [[x, sole, -h], [x, sole, 0], [x, sole, h]]; }), intMat.sole, soleUV);
+  const bay = INT.steps.botX - .02;                              // aft of the ladder foot the engine bay is open between the two cabin walls
+  igrid(xs.filter(x => x >= bay).map(x => { const h = hin(x, sole + .01); return [[x, sole, -h], [x, sole, 0], [x, sole, h]]; }), intMat.sole, soleUV);
+  [[INT.aftCabin.wall, -1], [INT.head.inner, 1]].forEach(([w, s]) => igrid(span(INT.head.aft, bay, 8).map(x => [[x, sole, w], [x, sole, s*hin(x, sole + .01)]]), intMat.sole, soleUV));
   // forward cabin floor, a step up, and the head and aft-cabin floors
   const v = INT.vBerth, hf = INT.head, fh = v.floorHalf;
   igrid(span(v.aft - .03, v.floorFwd, 4).map(x => [[x, INT.foreSole, -fh], [x, INT.foreSole, fh]]), intMat.sole, soleUV);
@@ -90,8 +92,6 @@ function front(c, w, h, normal, kind = 'door') {
     return [...span(0, w, 30), ...edges].sort((a, b) => a - b);
   };
   [1, -1].forEach(s => { const g = gridGeo(cx.map(x => { const w = hin(x, sheerY(x) - .04); return across(x, w).slice(0, 36).concat(Array(Math.max(0, 36 - across(x, w).length)).fill(w)).map(a => [x, ceilY(x, a), s*a]); })); put(G.ceiling, g, intMat.headliner, false); });
-  // floor of the starboard cockpit locker
-  igrid(span(.45, INT.head.aft, 8).map(x => [[x, INT.aftSole, INT.engine.half], [x, INT.aftSole, hin(x, INT.aftSole)]]), intMat.wood);
   // mahogany battens along the coachroof
   [-.72, -.36, .36, .72].forEach(z => { const b = put(G.ceiling, new T.BoxGeometry(HO.fwd - CP.fwd - .5, .02, .035), intMat.trim, false); b.position.set((CP.fwd + HO.fwd)/2 - .15, HO.roof - .05, z); });
 
@@ -214,13 +214,14 @@ function front(c, w, h, normal, kind = 'door') {
   ibox([px, py, pz], [.34, .3, .012], intMat.trim); ibox([px, py - .01, pz - .008], [.28, .2, .006], intMat.panel);
   for (let i = 0; i < 3; i++) { const g = iput(new T.CircleGeometry(.022, 18), intMat.white); g.position.set(px + .03 + i*.05, py - .03, pz - .012); g.rotation.y = Math.PI; }
 
-  // companionway steps from the cockpit down to the sole
-  const S = INT.steps, n = S.treads;
+  // companionway steps from the cockpit down to the sole, in their own group so they can be lifted out
+  const S = INT.steps, n = S.treads, before = IG.children.length;
   for (let i = 0; i < n; i++) {
     const f = (i + 1)/(n + 1), x = lerp(S.botX, S.topX, f), y = lerp(s0, CP.threshold, f);
     ibox([x, y, S.z], [.13, .03, S.half*2], intMat.trim);
   }
   [1, -1].forEach(s => rod(IG, [S.botX + .02, s0, S.z + s*(S.half + .02)], [S.topX - .02, CP.threshold, S.z + s*(S.half + .02)], .022, intMat.trim));
+  G.ladder = new T.Group(); IG.children.slice(before).forEach(c => G.ladder.add(c)); IG.add(G.ladder);
 })();
 
 /* ---------- Head, aft cabin and engine box ---------- */
@@ -247,8 +248,6 @@ function front(c, w, h, normal, kind = 'door') {
   hullBlock(A.aft, A.fwd, fy, A.berth, -A.inner, -1, intMat.wood); hullBlock(A.aft, A.fwd, A.berth, A.berth + .11, -A.inner, -1, intMat.cushion, 'top');
   wall([A.aft, A.wall], [A.door[0][0], A.wall]);
   door(A.door);
-  // engine box under the cockpit, between the two cabins and aft of the ladder
-  const E = INT.engine, ey = (fy + CP.sole - .05)/2; ibox([(E.aft + E.fwd)/2, ey, 0], [E.fwd - E.aft, CP.sole - .05 - fy, E.half*2], intMat.wood);
 })();
 
 /* ---------- Warm cabin lights, on only when the interior is open ---------- */

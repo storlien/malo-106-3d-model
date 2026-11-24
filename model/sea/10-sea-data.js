@@ -22,7 +22,7 @@ const SEA = {
     ['Running rigging', 15, 6.00, 5.60, 10],
     ['Genoa on its furler', 36, 8.40, 8.40, 14],
     ['Radar and mast mount', 11.5, 7.75, 6.42, 0],
-    ['Engine and gearbox, Volvo Penta MD17', 165, -0.12, 3.60, 0],
+    ['Engine and gearbox, Yanmar 3JH5E with KM35A', 156, -0.15, 1.90, 0],   // [M owner] engine; weight and centre [E]
   ],
   rest: { y: 0.30, rollGyration: 0.33, pitchGyration: 0.24 },  // hull, deck, interior: height, and gyration radii as fractions of beam and length [E]
   load: { kg: 300, y: 0.40, x: 3.8 },                         // two crew and their stores [E]

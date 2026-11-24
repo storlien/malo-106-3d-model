@@ -35,15 +35,16 @@ G.asBuilt = new T.Group(); G.rails.add(G.asBuilt);   // stern items the solar ar
 G.arch = new T.Group(); boat.add(G.arch);
 
 /* Livery is painted per pixel in the shader, so stripes stay crisp at any zoom. */
-function hullMaterial() {
+function hullMaterial(insideFront = false) {
   const P = SPEC.paint;
   const m = new T.MeshStandardMaterial({ color: 0xffffff, roughness: .3, envMapIntensity: .55, side: T.DoubleSide });
+  m.customProgramCacheKey = () => 'hull' + insideFront;
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uCream: { value: C(P.topsides) }, uNavy: { value: C(P.navy) }, uAnti: { value: C(P.antifoul) } });
+    Object.assign(sh.uniforms, { uInsideFront: { value: insideFront }, uCream: { value: C(P.topsides) }, uNavy: { value: C(P.navy) }, uAnti: { value: C(P.antifoul) } });
     sh.vertexShader = 'attribute float aDown;varying float vDown;varying float vH;varying float vX;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvDown=aDown;vH=position.y;vX=position.x;');
     const BT = SPEC.keel.bowThruster;
-    sh.fragmentShader = 'uniform vec3 uCream,uNavy,uAnti;varying float vDown;varying float vH;varying float vX;\n' +
+    sh.fragmentShader = 'uniform vec3 uCream,uNavy,uAnti;uniform bool uInsideFront;varying float vDown;varying float vH;varying float vX;\n' +
       sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       if (length(vec2(vX - ${BT.x.toFixed(4)}, vH - (${BT.y.toFixed(4)}))) < ${(BT.d/2).toFixed(4)}) discard;   // bow thruster tunnel
       float e=.0022; vec3 c=uCream;
@@ -51,13 +52,20 @@ function hullMaterial() {
       c=mix(c,uNavy,1.-smoothstep(${P.boot[1]}-e,${P.boot[1]}+e,vH));
       c=mix(c,uCream,1.-smoothstep(${P.pin[1]}-e,${P.pin[1]}+e,vH));
       c=mix(c,uAnti,1.-smoothstep(${P.pin[0]}-e,${P.pin[0]}+e,vH));
+      if (gl_FrontFacing == uInsideFront) c = vec3(.86, .85, .81);   // inside of the hull: white-painted GRP, never the topside paint
       diffuseColor.rgb=c;`);
   };
   return m;
 }
 
 (function buildHull() {
-  const NU = 320, NV = 64, hm = hullMaterial();
+  const NU = 320, NV = 64;
+  // which faces of a surface look into the boat, from one triangle near the middle and the outward direction there
+  const hm = (g, out) => {
+    const p = g.attributes.position, ix = g.index, t = Math.floor(ix.count/6)*3, v = k => new V3().fromBufferAttribute(p, ix.getX(t + k));
+    const a = v(0), n = new V3().subVectors(v(1), a).cross(new V3().subVectors(v(2), a));
+    return hullMaterial(n.dot(out) < 0);
+  };
   const starts = []; for (let j = 0; j <= NV; j++) starts.push(transomStart(j/NV));
   [1, -1].forEach(side => {
     const rows = [];
@@ -69,7 +77,7 @@ function hullMaterial() {
     const g = gridGeo(rows), down = [];
     rows.forEach(r => r.forEach(p => down.push(sheerY(p[0]) - p[1])));
     g.setAttribute('aDown', new T.Float32BufferAttribute(down, 1));
-    put(G.hull, g, hm);
+    put(G.hull, g, hm(g, new V3(0, 0, side)));
   });
   // transom panel
   const rows = [];
@@ -81,7 +89,7 @@ function hullMaterial() {
   const g = gridGeo(rows), down = [];
   rows.forEach(r => r.forEach(p => down.push(sheerY(p[0]) - p[1])));
   g.setAttribute('aDown', new T.Float32BufferAttribute(down, 1));
-  put(G.hull, g, hm);
+  put(G.hull, g, hm(g, new V3(-1, 0, 0)));
 })();
 
 /* Raised strake below the sheer band; its ends taper to nothing like the real moulding. */
@@ -153,16 +161,33 @@ function foil(levels, material, parent = G.hull) {
   const tip = secs[secs.length - 1], rows = [tip, tip.map(p => [p[0], p[1], p[2]*.55]), tip.map(p => [p[0], p[1], 0])];
   grid(parent, rows, material);
 }
-foil(SPEC.keel.fin, mat.anti);
-foil(SPEC.keel.deadwood, mat.anti);
-foil(SPEC.keel.skeg, mat.anti);
-foil(SPEC.keel.rudder, mat.anti);
+mat.foil = mat.anti.clone();           // keel, skeg and rudder: their roots inside the hull are never drawn, so nothing shows inside the boat
+(() => {
+  const N = 48, keel = Array.from({ length: N + 1 }, (_, i) => Math.min(keelY(i/N*L), sheerY(i/N*L)).toFixed(4));
+  mat.foil.onBeforeCompile = sh => {
+    sh.vertexShader = 'varying vec2 vXY;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvXY = position.xy;');
+    sh.fragmentShader = `varying vec2 vXY; const float KEEL[${N + 1}] = float[](${keel.join(',')});\n` + sh.fragmentShader.replace('#include <clipping_planes_fragment>',
+      `#include <clipping_planes_fragment>\n float kf = clamp(vXY.x/${L.toFixed(3)}, 0.0, 1.0)*${N}.0; int ki = int(min(kf, ${N - 1}.0));
+       if (vXY.y > mix(KEEL[ki], KEEL[ki + 1], kf - float(ki)) + .015) discard;`);
+  };
+  mat.foil.customProgramCacheKey = () => 'foil';
+})();
+foil(SPEC.keel.fin, mat.foil);
+foil(SPEC.keel.deadwood, mat.foil);
+foil(SPEC.keel.skeg, mat.foil);
+foil(SPEC.keel.rudder, mat.foil);
 
+/* Propeller shaft: a straight line from the gearbox coupling down to the propeller. */
+const shaftLine = (() => {
+  const E = SPEC.keel.engine, p = SPEC.keel.prop, t = E.tilt*Math.PI/180, a = (E.tilt + E.gearAngle)*Math.PI/180;
+  const cx = E.frontX - E.length*Math.cos(t), cy = p.y + (cx - p.x)*Math.tan(a);
+  return { coupling: [cx, cy], tilt: t, angle: a, at: x => [x, p.y + (x - p.x)*Math.tan(a)] };
+})();
 /* Three-bladed polished brass propeller, turning the other way from the first model (owner) with broad, rounded, slightly skewed blades, a brass boss and a zinc anode cone [P]. */
 mat.brass = M('#d9a43c', { roughness: .22, metalness: .9, envMapIntensity: 1.3 });
 mat.zinc = M('#b9bec2', { roughness: .45, metalness: .85 });
 (function propeller() {
-  const p = SPEC.keel.prop, f = SPEC.keel.shaftFrom, R = p.r, pitch = p.pitch, hubR = .042;
+  const p = SPEC.keel.prop, f = shaftLine.at(1.224), R = p.r, pitch = p.pitch, hubR = .042;
   rod(G.hull, [f[0], f[1], 0], [p.x + .06, p.y, 0], .016, mat.steel);
   const prop = new T.Group(); prop.position.set(p.x, p.y, 0); G.hull.add(prop);
   // boss and anode along the shaft axis (x), the anode aft

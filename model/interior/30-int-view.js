@@ -12,6 +12,7 @@
     ['saloonAft', 'Saloon, looking aft', eye(6.05, s0 + h, .1, Math.PI/2, 1.42)],
     ['galley', 'Galley', eye(3.95, s0 + h, .2, .8, 1.2)],
     ['nav', 'Navigation', eye(3.95, s0 + h, -.25, 2.35, 1.2)],
+    ['engine', 'Engine, ladder lifted out', Object.assign(eye(2.78, .48, 0, Math.PI/2, .92), { noLadder: true })],
     ['forward', 'Forward cabin', eye(6.55, s0 + h, 0, -Math.PI/2, 1.3)],
     ['aftCabin', 'Aft cabin and galley', { tx: 2.6 + off.x, ty: -.1 + off.y, tz: -.5, th: -.6, ph: .5, r: 5.5, ortho: false, fov: 40, near: .1, rMin: 1, phMax: 1.72, cut: true }],
     ['head', 'Head and navigation', { tx: 2.6 + off.x, ty: -.1 + off.y, tz: .5, th: -2.5, ph: .5, r: 5.5, ortho: false, fov: 40, near: .1, rMin: 1, phMax: 1.72, cut: true }],
@@ -34,7 +35,7 @@
     place = id; const p = PLACES.find(q => q[0] === id), v = p[2], cut = id === 'cutaway' || id === 'plan' || !!v.cut;
     exterior().forEach((g, i) => { g.visible = cut ? false : saved.vis[i]; });
     G.ceiling.visible = !cut;
-    Object.assign(A.view, v); delete A.view.inside; delete A.view.cut;
+    Object.assign(A.view, v); delete A.view.inside; delete A.view.cut; delete A.view.noLadder; if (G.ladder) G.ladder.visible = !v.noLadder;
     panel.querySelector('#intCurrent').textContent = p[1];
     const el = panel.querySelector(`input[value="${id}"]`); if (el) el.checked = true;
     A.renderer.shadowMap.needsUpdate = true; A.wake();
@@ -48,7 +49,7 @@
   }
   function leave() {
     if (!on) return; on = false; btn.setAttribute('aria-pressed', 'false');
-    A.water.visible = saved.water; A.ground.visible = saved.ground; G.interior.visible = false; if (G.companionShade) G.companionShade.visible = true;
+    A.water.visible = saved.water; A.ground.visible = saved.ground; G.interior.visible = false; if (G.ladder) G.ladder.visible = true; if (G.companionShade) G.companionShade.visible = true;
     exterior().forEach((g, i) => { g.visible = saved.vis[i]; });
     panel.hidden = true; document.getElementById('archPanel').hidden = false;
     A.setView('hero', true); A.renderer.shadowMap.needsUpdate = true; A.wake();

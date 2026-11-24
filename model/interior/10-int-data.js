@@ -29,7 +29,6 @@ const INT = {
   steps: { topX: 2.32, botX: 2.76, z: 0.0, half: 0.26, treads: 4 },   // [B] companionway ladder, rising aft
   head: { aft: 1.80, fwd: 2.95, inner: 0.28, floorAft: 2.30, door: [[2.77, 0.28], [2.95, 0.90]], toilet: [2.04, 0.60], basin: [2.37, 2.90] },   // starboard aft [B][P]
   aftCabin: { aft: 0.42, fwd: 2.37, inner: -0.27, berth: 0.40, floorFwd: 2.74, wall: -0.31, door: [[2.74, -0.31], [2.95, -0.78]] },   // port aft: berth, then a standing area [B][P]
-  engine: { aft: 0.42, fwd: 2.27, half: 0.24 },           // [B] under the cockpit sole
 
   colours: { mahogany: '#8a3f1e', trim: '#6e2f14', cushion: '#aebdc6', headliner: '#f1ede4', laminate: '#d9e0e4', sole: '#7a4524', holly: '#e0c79a' },   // [P]
 };

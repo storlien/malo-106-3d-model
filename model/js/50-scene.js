@@ -142,6 +142,7 @@
   function setLayer(name, on) {
     if (name === 'water') { water.visible = on; ground.visible = !on; }
     if (name === 'canvas') G.canvas.visible = on;
+    if (name === 'bimini') G.bimini.visible = on;
     if (name === 'rig') G.rig.visible = on;
     if (name === 'sail') { G.mainsail.visible = on; G.sailCover.visible = !on; }
     if (name === 'genoa') { G.genoa.visible = on; G.furledGenoa.visible = !on; }

@@ -29,6 +29,7 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
     tube(G.canvas, range(.02, .98, 14).map(f => { const p = hoodSide(f, 0, s); return [p[0], screenTop(p[0]) + .03, p[2] + s*.016]; }), .009, mat.steel);
   });
 
+  const nHood = G.canvas.children.length;                 // everything after this is the bimini, which can be taken off
   /* Bimini roof line in side view: arch, knee, raked aft end */
   const A = [TG.topX - .02, TG.topY + .012], K = [Q.kneeX, Q.kneeY], E = [Q.aftX, Q.aftY], r = .14;
   const toward = (a, b, d) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]); return [a[0] + (b[0] - a[0])*d/l, a[1] + (b[1] - a[1])*d/l]; };
@@ -76,6 +77,7 @@ mat.clearCanvas = M('#b4c5c8', { roughness: .08, metalness: .1, transparent: tru
   const bowT = .27, bow = [...range(-1, 1, 14).map(q => { const [x, y] = prof(bowT), w = halfAt(x) - .03; return [x, y + (Q.crown - .03)*(1 - q*q) - .012, q*w]; })];
   tube(G.canvas, bow, .009, mat.steel);
   [1, -1].forEach(k => { const p = sidePt(bowT, 1, k, -.03), b = sidePt(.14, .03, k, -.03); rod(G.canvas, [p[0], p[1] - .012, p[2]], b, .009, mat.steel); });
+  G.bimini = new T.Group(); G.canvas.children.slice(nHood).forEach(c => G.bimini.add(c)); G.canvas.add(G.bimini);
 })();
 
 /* ---------- Rig ---------- */

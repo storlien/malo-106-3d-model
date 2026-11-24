@@ -88,7 +88,11 @@ const SPEC = {
     skeg: [[0.05, 0.844, 0.424, 0.22], [-0.25, 0.624, 0.424, 0.34], [-0.83, 0.554, 0.424, 0.34]],
     rudder: [[0.05, 0.409, 0.164, 0.14], [-0.82, 0.409, 0.024, 0.12], [-0.84, 0.524, 0.024, 0.11], [-1.34, 0.504, -0.036, 0.10]],
     prop: { x: 0.914, y: -0.42, r: 0.19, blades: 3, pitch: 0.30 },  // [D/P] polished brass, owner's photo; pitch [E]
-    shaftFrom: [1.224, -0.405],
+    shaftFrom: [1.224, -0.405],   // replaced by the line from the gearbox coupling to the propeller (engine below)
+    // Yanmar 3JH5E with KM35A gearbox [M owner], dimensions from Yanmar's drawing 3JH5E_KM35A-2013.06.01.
+    // The engine stands just aft of the companionway ladder, front (belt cover) forward. tilt: front up, degrees [E];
+    // the KM35A output is angled 7° down from the crankshaft [B Yanmar].
+    engine: { name: 'Yanmar 3JH5E, KM35A gearbox', frontX: 2.27, tilt: 7, gearAngle: 7, length: 0.774, kg: 156 },
     bowThruster: { x: 7.90, y: -0.12, d: 0.185 },   // [P] owner's yard photos: about 1 m aft of the bow 'm', 40 % of the way from the boot-top to the keel line; 185 mm tunnel [E]
   },
 
