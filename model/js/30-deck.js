@@ -6,7 +6,7 @@ const teakUV = p => [p[0]/3.4, p[2]/(SPEC.deck.plank*8)];
 function houseSide(x) {
   const side = x > 5.66 ? HO.sideDeck*(1 + (x - 5.66)*.06) : HO.sideDeck, normal = Math.min(HO.maxHalf, Math.max(.05, halfB(x) - side));
   const aftW = (CP.aftInnerHalf + CP.capWidth)/HO.tumble;
-  return lerp(aftW, Math.max(normal, aftW), 1 - Math.pow(1 - clamp((x - HO.aft)/(1.6 - HO.aft), 0, 1), 2.2));     // measured width at the aft end, blending into the side decks
+  return lerp(aftW, x < 4 ? Math.max(normal, aftW) : normal, 1 - Math.pow(1 - clamp((x - HO.aft)/(1.6 - HO.aft), 0, 1), 2.2));     // measured width at the aft end, blending into the side decks; forward it follows the side decks to the front
 }
 function houseHalf(x) {
   if (x <= HO.aft || x >= HO.fwd) return 0;

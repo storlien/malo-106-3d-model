@@ -207,13 +207,15 @@ function ensureObstacles() {
   for (let i = 0; i < rails.length; i += 3) if (rails[i] < PP.foot[0] + .03) pushpit.push(rails[i], rails[i + 1], rails[i + 2]);
   return obstacles = { canvas, rails, pushpit, canvasCells: toCells(canvas), railCells: toCells(rails), pushpitCells: toCells(pushpit) };
 }
+const toeRailTop = x => sheerY(clamp(x, 0, L)) + SPEC.deck.toeRail.height;
+const railTopY = toeRailTop(0);                                    // top of the stern toe rail, at the transom
 function measureArch(b) {
   if (b.report) return b.report;
   ensureObstacles();
   const pts = surfacePoints(b.frame), clear = [];                    // clear = above the deck sockets
   const R = SPEC.rig, B = R.boom, reach = B.fwd - B.aft;
   const s0 = [R.backstay[0], R.backstay[1]], ax = R.backstayTop[0] - s0[0], ay = R.backstayTop[1] - s0[1], ll = ax*ax + ay*ay;
-  let past = -9, stay = 9, boom = 9, head = 9, top = -9, minX = 9, maxX = -9, minZ = 9, maxZ = -9;
+  let past = -9, stay = 9, boom = 9, under = 9, underX = 0, top = -9, minX = 9, maxX = -9, minZ = 9, maxZ = -9;
   for (let i = 0; i < pts.length; i += 3) {
     const x = pts[i], y = pts[i + 1], z = pts[i + 2];
     top = Math.max(top, y); minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
@@ -223,12 +225,12 @@ function measureArch(b) {
     const t = clamp(((x - s0[0])*ax + (y - s0[1])*ay)/ll, 0, 1);
     stay = Math.min(stay, Math.hypot(x - (s0[0] + ax*t), y - (s0[1] + ay*t), z));
     boom = Math.min(boom, Math.hypot(Math.max(0, Math.hypot(x - B.fwd, z) - reach), Math.max(0, Math.abs(y - B.y) - B.h/2)));   // full swing
-    if (Math.abs(z) < .45 && x > 0 && x < .75) head = Math.min(head, y - deckY(x, z));
+    if (Math.abs(z) < .45 && y < under) { under = y; underX = x; }                // underside of the frame, clear of the legs
   }
   const cells = toCells(clear), panelKg = b.count*AC.panel.kg, rear = Object.assign(rearAngles(b.rear), { foreLength: b.foreLength, foreX: b.foreX, uncovered: b.uncovered });
   b.clear = clear; b.cells = cells;
   return b.report = {
-    panelTopAboveWater: top - HS.floatSink, panelTopAboveDeck: top - deckY(.3, 0), headroom: head,
+    panelTopAboveWater: top - HS.floatSink, panelTopAboveRail: top - railTopY, railHeadroom: under - toeRailTop(underX), platformHeadroom: under - SPEC.platform.y,
     width: maxZ - minZ, length: maxX - minX, overhang: Math.max(0, -minX), lengthWithArch: L + Math.max(0, -minX), pastHull: Math.max(0, past),
     panels: b.count, watts: b.count*AC.panel.watts, panelArea: b.area, pipeMm: b.D*1000, steelM: b.steelM, steelKg: b.steelKg, panelKg, totalKg: b.steelKg + panelKg,
     rear, backstayGap: stay - .0045, railGap: surfaceGap(clear, cells, obstacles.rails, obstacles.railCells),
@@ -347,7 +349,7 @@ function renderArchStats(r, q) {
   if (r) groups.push(
     ['Pipe angles and lengths', [['Top frame, forward side', deg(r.rear.topForward)], ['Top frame, aft side', deg(180 - r.rear.topForward)], ['Transom face, side view', deg(r.rear.transomSide)],
       ['Transom face, true angle', deg(r.rear.transomTrue)], ['Transom curve at mount', deg(r.rear.transomCurve)], ['Sideways from ship’s line', deg(r.rear.sideways)], ['Rear pipe length', fmtM(r.rear.length)], ...(r.rear.foreLength ? [['Fore pipe length, vertical', fmtM(r.rear.foreLength)], ['Fore pipes forward of transom', fmtM(r.rear.foreX)], ['Frame not covered by panels', fmtCm(r.rear.uncovered)]] : [])], angleDiagram(r.rear)],
-    ['Height', [['Panel top above water', fmtM(r.panelTopAboveWater)], ['Panel top above deck', fmtM(r.panelTopAboveDeck)], ['Headroom on aft deck', fmtM(r.headroom)]]],
+    ['Height', [['Panel top above water', fmtM(r.panelTopAboveWater)], ['Panel top above toe rail', fmtM(r.panelTopAboveRail)], ['Headroom above toe rail', fmtM(r.railHeadroom)], ['Headroom above stern platform', fmtM(r.platformHeadroom)]]],
     ['Size', [['Width', fmtM(r.width)], ['Length', fmtM(r.length)], ['Overhang past transom', fmtM(r.overhang)], ['Past hull side', fmtM(r.pastHull)], ['Boat length with arch', fmtM(r.lengthWithArch)]]],
     ['Clearance', [gapRow('Backstay', r.backstayGap), gapRow('Rails and pushpit', r.railGap), gapRow('Canvas', r.canvasGap), gapRow('Boom, full swing', r.boomGap)]]);
   if (q) groups.push(['Lifeline panels', [

@@ -87,6 +87,12 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
   const mast = new T.Mesh(new T.ExtrudeGeometry(sh, { depth: RG.mastTop - foot, bevelEnabled: false, curveSegments: 22 }), mat.alu);
   mast.rotation.x = -Math.PI/2; mast.position.set(mx, foot, 0); mast.castShadow = true; G.rig.add(mast);
   box(G.rig, [mx, foot + .025, 0], [.27, .05, .19], mat.steel);                    // mast collar
+  [1, -1].forEach(s => {                                                          // halyard winches on each side of the mast [B]
+    const y = foot + RG.mastWinch.aboveRoof, pad = s*(mW/2 + .012);
+    box(G.rig, [mx, y, pad], [.13, .13, .024], mat.alu);
+    const g = new T.Group(); g.position.set(mx, y, s*(mW/2 + .024)); g.rotation.x = s*Math.PI/2; G.rig.add(g);
+    winch(g, 0, 0, 0, RG.mastWinch.scale);
+  });
   box(G.rig, [mx, RG.mastTop + .025, 0], [.3, .05, .13], mat.dark);               // masthead box
   rod(G.rig, [mx - .05, RG.mastTop + .05, 0], [mx - .05, RG.mastTop + .85, 0], .005, mat.dark);   // VHF whip
   const wind = [mx + .1, RG.mastTop + .22, 0]; rod(G.rig, [mx + .05, RG.mastTop + .05, 0], wind, .007, mat.dark);

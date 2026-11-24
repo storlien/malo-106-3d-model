@@ -132,7 +132,7 @@ const SPEC = {
   screen: {    // fixed windscreen on its moulded base, read from the brochure drawing and photos [D/P]
     base: [[4.16, 0], [4.16, 0.46], [3.36, 0.94], [1.964, 1.02]],  // plan polyline at the base of the glass, [x, z]
     top: [[3.56, 0], [3.56, 0.42], [3.10, 0.80], [2.184, 0.88]],   // one wide centre pane, angled corner panes, long side panes
-    baseY: [[1.964, 1.50], [3.36, 1.585], [4.16, 1.55]],           // [x, height]: the base rises towards the corner mullion
+    baseY: [[1.964, 1.50], [3.36, 1.63], [4.16, 1.74]],            // [x, height]: [B] the moulded base rises steeply to the front, leaving a low centre pane
     topY: [[2.184, 1.82], [3.10, 1.93], [3.56, 2.00]],             // [x, height]: the top edge rises towards the front
   },
 
@@ -156,6 +156,7 @@ const SPEC = {
     mastX: 6.164,              // [D]
     mastTop: 15.78,           // [D]
     mastSize: [0.195, 0.125], // [E] fore-aft, athwart
+    mastWinch: { aboveRoof: 0.78, scale: 0.6 },   // [B] halyard winch on each side of the mast, height read from the brochure
     spreaders: [[7.05, 1.14], [11.65, 0.80]], // [D/E] height, half-length
     spreaderSweep: 0.10,      // [E]
     spreaderBlade: { rootChord: 0.15, tipChord: 0.105, rootThick: 0.03, tipThick: 0.02 },   // [P] wide, flat aluminium blades, from the owner's photo
