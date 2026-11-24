@@ -181,7 +181,7 @@ const SPEC = {
     panelGap: 0.015,        // [E] between neighbouring panels
     pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
     foreAngles: [70, 60, 0],   // Angled arch: fore pipe angle to the toe rail it stands on, degrees; 0 = at the panel edge: the foot stays put and the pipe meets the forward panel edge
-    rearAngles: [0, 60],    // selectable rear pipe angles at the top frame, degrees; 0 = pipe meets the aft panel edge. Add values here to test more.
+    rearAngles: [0, 60],    // selectable rear pipe angles at the top frame, degrees; 0 = unfixed, the pipe meets the aft panel edge at whatever angle the height gives. Add values here to test more.
     // vertical arch heights: y is the top of the fore pipes above the design waterline; 'fit' is solved so the panels fill the frame
     archHeights: [{ id: 'fit', name: 'Closes gap' }, { id: 'current', name: 'Current', y: 2.60 }, { id: 'lower', name: 'Lower', y: 2.40 }],
     foreLimitX: 0.25,       // furthest aft the fore pipes can stand, just forward of the pushpit's aft rail
@@ -196,7 +196,7 @@ const SPEC = {
     // To add a design, copy one entry and change its numbers. It appears on the page automatically.
     // fwdX is the forward edge of the panels. It must stay aft of the backstay unless layout is 'split'.
     designs: [
-      { id: 'vertical', name: 'Vertical arch', note: 'Straight, unbent pipes: vertical fore pipes on the side decks and rear pipes on the transom. Choose the rear angle and height below.',
+      { id: 'vertical', name: 'Vertical arch', note: 'Straight, unbent pipes: vertical fore pipes on the side decks and rear pipes on the transom. The fore pipes stay in one place at every height; choose the rear angle, where it meets the frame and the height below.',
         hoop: { footX: 0.60, footHalf: 1.06, topX: 0.60, topY: 2.60, half: 0.98, bend: 0.20 },
         aftStrut: { footY: 1.00, footHalf: 0.88, standoff: 0.06, straight: true }, fwdX: 0.60 },
 
