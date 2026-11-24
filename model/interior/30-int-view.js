@@ -42,13 +42,13 @@
   function enter() {
     document.dispatchEvent(new CustomEvent('alizee:mode', { detail: 'interior' }));
     on = true; saved = { water: A.water.visible, ground: A.ground.visible, vis: exterior().map(g => g.visible), view: Object.assign({}, A.view) };
-    A.water.visible = false; A.ground.visible = false; G.interior.visible = true;
+    A.water.visible = false; A.ground.visible = false; G.interior.visible = true; if (G.companionShade) G.companionShade.visible = false;
     document.getElementById('archPanel').hidden = true; panel.hidden = false;
     go(place);
   }
   function leave() {
     if (!on) return; on = false; btn.setAttribute('aria-pressed', 'false');
-    A.water.visible = saved.water; A.ground.visible = saved.ground; G.interior.visible = false;
+    A.water.visible = saved.water; A.ground.visible = saved.ground; G.interior.visible = false; if (G.companionShade) G.companionShade.visible = true;
     exterior().forEach((g, i) => { g.visible = saved.vis[i]; });
     panel.hidden = true; document.getElementById('archPanel').hidden = false;
     A.setView('hero', true); A.renderer.shadowMap.needsUpdate = true; A.wake();

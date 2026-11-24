@@ -183,14 +183,21 @@ const footAft = CP.aftRail + CP.benchDepth, benchY = sheerY(0) + SPEC.deck.toeRa
   box(G.deck, [CP.footFwd, (CP.seat + CP.sole)/2, 0], [.012, CP.seat - CP.sole, CP.footHalf*2], mat.gelDeck);
   const sole = [[footAft, CP.sole, -CP.footHalf], [footAft, CP.sole, CP.footHalf]], sole2 = [[CP.footFwd, CP.sole, -CP.footHalf], [CP.footFwd, CP.sole, CP.footHalf]];
   grid(G.deck, [sole, sole2], mat.teak, { uv: teakUV });
-  // companionway opening with washboards in the forward bulkhead
-  const cx = CP.fwd - .002, ch = CP.companionHalf;
-  box(G.deck, [cx - .015, (CP.seat + HO.roof)/2 + .01, 0], [.03, HO.roof - CP.seat - .02, ch*2], mat.dark);
-  for (let i = 0; i < 5; i++) box(G.deck, [cx - .035, CP.seat + .07 + i*.095, 0], [.012, .085, ch*2 - .05], mat.teakDark);
-  [-1, 1].forEach(s => rod(G.deck, [cx - .035, CP.seat, s*ch], [cx - .035, HO.roof, s*ch], .014, mat.teakDark));
-  // sliding hatch garage on the roof ahead of the companionway
-  const gEnd = SPEC.screen.base[0][0] - .06, gx = (CP.fwd + gEnd)/2, gy = roofY(gx, 0);
-  box(G.deck, [gx, gy + .03, 0], [gEnd - CP.fwd, .05, ch*2 + .12], mat.gelDeck);
+  // forward bulkhead of the cockpit, with the tall companionway opening in a teak frame
+  const cx = CP.fwd, ch = CP.companionHalf, th = CP.threshold, Wb = cockpitHalf(cx - .002), top = z => roofY(cx, z) + .002;
+  [1, -1].forEach(s => {
+    grid(G.deck, [[[cx, CP.sole, s*ch], [cx, top(ch), s*ch]], [[cx, CP.sole, s*CP.footHalf], [cx, top(CP.footHalf), s*CP.footHalf]]], mat.gelDeck);
+    grid(G.deck, [[[cx, CP.seat, s*CP.footHalf], [cx, top(CP.footHalf), s*CP.footHalf]], [[cx, CP.seat, s*Wb], [cx, top(Wb), s*Wb]]], mat.gelDeck);
+    box(G.deck, [cx - .012, (th + top(ch))/2, s*(ch + .02)], [.03, top(ch) - th, .045], mat.teakRail);          // frame sides
+  });
+  box(G.deck, [cx, (CP.sole + th)/2, 0], [.012, th - CP.sole, ch*2], mat.gelDeck);                                    // below the sill
+  box(G.deck, [cx - .012, th + .012, 0], [.035, .03, ch*2 + .09], mat.teakRail);                                     // sill
+  G.companionShade = box(G.deck, [cx + .45, (th + top(0))/2, 0], [.01, top(0) - th, ch*2 + .2], mat.dark);         // the dim saloon seen through the opening
+  // sliding hatch: smoked acrylic over the opening, running forward between teak rails to the instrument console
+  const gEnd = SPEC.screen.base[0][0] - .06, gy = roofY((cx + gEnd)/2, 0) + .012;
+  [1, -1].forEach(s => box(G.deck, [(cx + gEnd)/2, gy + .02, s*(ch + .05)], [gEnd - cx, .045, .05], mat.teakRail));
+  box(G.deck, [cx + .33, gy + .03, 0], [.66, .022, ch*2 + .04], new T.MeshStandardMaterial({ color: C('#1b2228'), roughness: .08, metalness: .2, transparent: true, opacity: .82 }));
+  box(G.deck, [cx + .015, gy + .045, 0], [.04, .04, ch*2 + .06], mat.teakRail);                                     // handle along its aft edge
 })();
 
 /* Malö Yachts logo, following the curved, raked front of the trunk. */

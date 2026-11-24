@@ -217,10 +217,10 @@ function front(c, w, h, normal, kind = 'door') {
   // companionway steps from the cockpit down to the sole
   const S = INT.steps, n = S.treads;
   for (let i = 0; i < n; i++) {
-    const f = (i + 1)/(n + 1), x = lerp(S.botX, S.topX, f), y = lerp(s0, CP.sole, f);
+    const f = (i + 1)/(n + 1), x = lerp(S.botX, S.topX, f), y = lerp(s0, CP.threshold, f);
     ibox([x, y, S.z], [.13, .03, S.half*2], intMat.trim);
   }
-  [1, -1].forEach(s => rod(IG, [S.botX + .02, s0, S.z + s*(S.half + .02)], [S.topX - .02, CP.sole, S.z + s*(S.half + .02)], .022, intMat.trim));
+  [1, -1].forEach(s => rod(IG, [S.botX + .02, s0, S.z + s*(S.half + .02)], [S.topX - .02, CP.threshold, S.z + s*(S.half + .02)], .022, intMat.trim));
 })();
 
 /* ---------- Head, aft cabin and engine box ---------- */

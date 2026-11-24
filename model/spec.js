@@ -108,7 +108,7 @@ const SPEC = {
     sideDeck: 0.46,           // [P] side-deck width amidships
     maxHalf: 1.2,             // [P]
     tumble: 0.93,             // [P] top half-width / base half-width
-    teakFrom: 4.284,           // [P] coachroof teak starts forward of the windscreen
+    teakFrom: 2.33,            // [P] teak from the companionway forward, under the windscreen too
     band: { y0: 1.265, y1: 1.325, from: 0.37, to: 6.92 }, // [D] navy stripe
     windows: [2.539, 3.444, 5.124, 6.574], // [D] port-light centres
     windowSize: [0.38, 0.135],          // [P]
@@ -123,11 +123,12 @@ const SPEC = {
     aftInnerHalf: 0.73,       // [M 2026-11-23] inner width between the coamings at their aft end, and so the bench, is 1.46 m
     aftCorner: 0.10,          // how far the rounded aft corners of the well reach forward
     capWidth: 0.15,           // teak-topped coaming that carries the winches
-    fwd: 3.584, halfWidth: 0.86,
-    footHalf: 0.40, footFwd: 3.384,
+    fwd: 2.32, halfWidth: 0.86,   // [B][P] companionway bulkhead, at the aft side of the ladder; forward of it, under the windscreen, is a raised teak deck
+    footHalf: 0.40, footFwd: 2.32,   // [P] the footwell and seats run right up to the bulkhead
     seat: 0.87, sole: 0.47,
     wheel: { aheadOfBench: 0.25, y: 1.30, r: 0.42 },
-    companionHalf: 0.40,
+    companionHalf: 0.28,      // [P] tall, narrow opening with a teak frame
+    threshold: 0.67,          // [P] sill of the companionway, above the footwell sole
   },
 
   screen: {    // fixed windscreen on its moulded base, read from the brochure drawing and photos [D/P]
