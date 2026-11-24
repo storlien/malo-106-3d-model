@@ -96,7 +96,13 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
     winch(g, 0, 0, 0, RG.mastWinch.scale);
   });
   box(G.rig, [mx, RG.mastTop + .025, 0], [.3, .05, .13], mat.dark);               // masthead box
-  rod(G.rig, [mx - .05, RG.mastTop + .05, 0], [mx - .05, RG.mastTop + .85, 0], .005, mat.dark);   // VHF whip
+  (function vhfWhip() {                                                          // VHF whip on a stainless bracket at the aft end of the masthead
+    const V = RG.vhf, x = mx + V.x, z = V.z, y0 = RG.mastTop + .05;
+    box(G.rig, [x + .03, y0 - .005, z], [.11, .012, .05], mat.steel);                          // L bracket off the masthead box
+    rod(G.rig, [x, y0, z], [x, y0 + V.base, z], .013, mat.steel, 14, .011);                 // chromed base and coax connector
+    rod(G.rig, [x, y0 + V.base, z], [x, y0 + V.base + V.length, z], .0065, M('#17191c', { roughness: .45 }), 10, .0032);   // black glass-fibre whip, tapering
+    put(G.rig, new T.SphereGeometry(.0045, 10, 8), mat.steel).position.set(x, y0 + V.base + V.length, z);
+  })();
   const wind = [mx + .1, RG.mastTop + .22, 0]; rod(G.rig, [mx + .05, RG.mastTop + .05, 0], wind, .007, mat.dark);
   rod(G.rig, [wind[0] - .12, wind[1], 0], [wind[0] + .12, wind[1], 0], .004, mat.dark);
 

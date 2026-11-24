@@ -17,6 +17,7 @@ ints = sorted((here/'interior').glob('*.js'))
 parts += [p.read_text('utf-8') for p in ints if p.name < '20']
 parts += [lazy([p for p in ints if '20' <= p.name < '30'], 'buildInteriorGeometry')]
 parts += [p.read_text('utf-8') for p in ints if p.name >= '30']
+parts += [p.read_text('utf-8') for p in sorted((here/'radio').glob('*.js'))]   # HF antenna viewer, kept in its own files; builds nothing until opened
 
 html = (here/'template.html').read_text('utf-8')
 html = html.replace('/*THREE*/', safe((here/'vendor/three.min.js').read_text('utf-8')))

@@ -85,6 +85,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
     <button data-layer="genoa" aria-pressed="false">Genoa</button>
     <button data-layer="rails" aria-pressed="true">Rails</button>
     <button data-layer="radar" aria-pressed="false">Radar beam</button>
+    <button data-layer="hf" aria-pressed="false">HF antenna</button>
     <button data-layer="drawing" aria-pressed="false">Brochure drawing</button>
   </div>
   <div class="group" role="group" aria-label="View">
@@ -301,6 +302,7 @@ const SPEC = {
     // 140 % roller genoa [M owner]: LP (clew square to the luff) = 1.40 x J (forestay foot to the mast). Trim and shape are [P]
     genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6,
       tack: { time: 4, pause: 1.2, slices: 160, clothFactor: 1.04, leechNear: 0.5 } },   // [E] a tack: the sail crosses in about 4 s; cloth slightly longer than the chord
+    vhf: { x: -0.11, z: 0.045, base: 0.07, length: 0.90 },   // [E] 0.9 m glass-fibre VHF whip, relative to the mast's centre at the masthead
     stem: [10.564, 1.32],      // [D] forestay foot
     backstayTop: [5.864, 15.79], // [P] on a short masthead crane aft of the mast, which lets the sail head clear it
     backstay: [0.10, 1.16],   // [D]
@@ -1218,7 +1220,13 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
     winch(g, 0, 0, 0, RG.mastWinch.scale);
   });
   box(G.rig, [mx, RG.mastTop + .025, 0], [.3, .05, .13], mat.dark);               // masthead box
-  rod(G.rig, [mx - .05, RG.mastTop + .05, 0], [mx - .05, RG.mastTop + .85, 0], .005, mat.dark);   // VHF whip
+  (function vhfWhip() {                                                          // VHF whip on a stainless bracket at the aft end of the masthead
+    const V = RG.vhf, x = mx + V.x, z = V.z, y0 = RG.mastTop + .05;
+    box(G.rig, [x + .03, y0 - .005, z], [.11, .012, .05], mat.steel);                          // L bracket off the masthead box
+    rod(G.rig, [x, y0, z], [x, y0 + V.base, z], .013, mat.steel, 14, .011);                 // chromed base and coax connector
+    rod(G.rig, [x, y0 + V.base, z], [x, y0 + V.base + V.length, z], .0065, M('#17191c', { roughness: .45 }), 10, .0032);   // black glass-fibre whip, tapering
+    put(G.rig, new T.SphereGeometry(.0045, 10, 8), mat.steel).position.set(x, y0 + V.base + V.length, z);
+  })();
   const wind = [mx + .1, RG.mastTop + .22, 0]; rod(G.rig, [mx + .05, RG.mastTop + .05, 0], wind, .007, mat.dark);
   rod(G.rig, [wind[0] - .12, wind[1], 0], [wind[0] + .12, wind[1], 0], .004, mat.dark);
 
@@ -2884,6 +2892,7 @@ const tackAnim = (() => {
   canvas.addEventListener('wheel', e => { e.preventDefault(); anim = false; zoom(Math.exp(e.deltaY*.001)); }, { passive: false });
 
   /* Controls */
+  const offLayer = n => { const b = document.querySelector(`[data-layer="${n}"]`); if (b && b.getAttribute('aria-pressed') === 'true') setLayer(n, false); };
   function setLayer(name, on) {
     if (name === 'water') { water.visible = on; ground.visible = !on; }
     if (name === 'canvas') G.canvas.visible = on;
@@ -2894,7 +2903,8 @@ const tackAnim = (() => {
     if (name === 'rails') G.rails.visible = on;
     if (name === 'arch') setArch(on ? lastArch : 'none');
     if (name === 'drawing') overlay.visible = on;
-    if (name === 'radar') radarBeamLayer(on);
+    if (name === 'radar') { if (on) offLayer('hf'); radarBeamLayer(on); }     // the two share the left-hand panel space
+    if (name === 'hf') { if (on) offLayer('radar'); hfAntennaLayer(on); }
     renderer.shadowMap.needsUpdate = true;
     const b = document.querySelector(`[data-layer="${name}"]`); if (b) b.setAttribute('aria-pressed', on);
     needs = 3;
@@ -4013,6 +4023,595 @@ INT.tankReport = [];
   const bar = document.querySelector('.bar'), grp = [...bar.querySelectorAll('.group')].find(g => g.getAttribute('aria-label') === 'Sea trial');
   if (grp) grp.append(btn); else { const g = document.createElement('div'); g.className = 'group'; g.append(btn); bar.append(g); }
   A.interior = { enter, leave, go, places: PLACES.map(p => p[0]) };
+})();
+
+/* ===== HF antenna, part 1: bands, layouts, wire lengths and matching =====
+   The wire is modelled with the rig as thin conductors over the sea and solved by the method of moments
+   (20-radio-mom.js). 30-radio-view.js draws the wire, the currents and the beam pattern, and holds the panel.
+   [E] marks estimates; positions of the wire are the owner's plan: fed at the aftmost starboard corner. */
+const HF = {
+  // amateur bands, IARU region 1 (MHz): low edge, high edge, the frequency shown
+  bands: [
+    { id: '160', name: '160 m', lo: 1.810, hi: 2.000, f: 1.850 },
+    { id: '80', name: '80 m', lo: 3.500, hi: 3.800, f: 3.650 },
+    { id: '60', name: '60 m', lo: 5.3515, hi: 5.3665, f: 5.360 },
+    { id: '40', name: '40 m', lo: 7.000, hi: 7.200, f: 7.100 },
+    { id: '30', name: '30 m', lo: 10.100, hi: 10.150, f: 10.125 },
+    { id: '20', name: '20 m', lo: 14.000, hi: 14.350, f: 14.175 },
+    { id: '17', name: '17 m', lo: 18.068, hi: 18.168, f: 18.118 },
+    { id: '15', name: '15 m', lo: 21.000, hi: 21.450, f: 21.225 },
+    { id: '12', name: '12 m', lo: 24.890, hi: 24.990, f: 24.940 },
+    { id: '10', name: '10 m', lo: 28.000, hi: 29.700, f: 28.500 },
+  ],
+  sea: { er: 80, sigma: 5 },                       // sea water, for the reflection off the sea far from the boat
+  sigma: { copper: 5.8e7, stainless: 1.4e6, alu: 3.5e7 },
+  groundOhm: 3,                                    // [E] tuner earth through a sintered plate or the keel bolts into the sea
+  tunerQ: { L: 100, C: 600 },                      // [E] coil and capacitor quality of a typical automatic tuner
+  radioTuner: 3,                                   // most HF radios' built-in tuners match up to 3:1
+  segment: 0.70,                                   // m, about a fifteenth of a wavelength on 10 m
+  // where the wire runs, in the boat frame
+  feed: { x: 0.35, inset: 0.08, above: 0.05 },     // tuner and deck insulator at the aftmost starboard corner
+  slopeTop: { dx: -0.30, below: 0.60, z: 0.15 },   // insulator below the masthead block, hoisted on a halyard aft of the mast
+  apex: { dx: 0.22, below: 0.45, z: 0.14 },        // over a block just forward of the masthead, clear of the mast
+  bow: { x: 9.70, above: 0.65, z: 0.55 },          // tied off at the starboard side of the bow pulpit
+  rodRise: 15,                                     // degrees the rod points up from horizontal
+  rodMax: 3,                                       // m, longer rods are marked as impractical
+  rods: [
+    { id: 'aft', name: 'Aft', dir: [-1, 0] },
+    { id: 'quarter', name: 'Aft and out', dir: [-0.7071, 0.7071] },
+    { id: 'out', name: 'Out to starboard', dir: [0, 1] },
+  ],
+  // conductors: radius (m) and metal
+  wires: {
+    antenna: [0.0012, 'copper'],  // 2.5 mm² stranded copper
+    lead: [0.008, 'copper'],      // 25 mm copper strap from the tuner to the sea earth
+    post: [0.03, 'alu'],          // compression post and keel bolts, mast to the lead keel
+    mast: [0.08, 'alu'], spreader: [0.02, 'alu'], boom: [0.045, 'alu'], crane: [0.02, 'alu'],
+    forestay: [0.012, 'alu'],     // stay inside the aluminium furler foil
+    stay: [0.0042, 'stainless'], backstay: [0.0045, 'stainless'], bond: [0.003, 'copper'],
+  },
+  layouts: [
+    { id: 'sloper', name: 'End-fed, stern to masthead', matches: ['tuner', 'unun9', 'unun49'],
+      lengths: [['fit', 'Just reaches the masthead'], [8.8, '8.8 m (29 ft)'], [10.1, '10.1 m, half wave on 20 m'], [10.8, '10.8 m (35½ ft)'], [12.5, '12.5 m (41 ft)'], [17.7, '17.7 m (58 ft), on a rod'], [20.1, '20.1 m, half wave on 40 m, on a rod']] },
+    { id: 'vee', name: 'End-fed inverted V, stern over the masthead to the bow', matches: ['tuner', 'unun9', 'unun49'],
+      lengths: [[17.7, '17.7 m (58 ft)'], [20.1, '20.1 m, half wave on 40 m'], [21.6, '21.6 m (71 ft)'], [25.6, '25.6 m (84 ft)'], ['fit', 'All the way to the bow']] },
+    { id: 'dipole', name: 'Inverted-V dipole fed at the masthead', matches: ['balun', 'tuner'],
+      lengths: [[13.1, '2 × 13.1 m, for 60 m'], [9.95, '2 × 9.95 m, for 40 m'], [6.95, '2 × 6.95 m, for 30 m'], [4.97, '2 × 4.97 m, for 20 m'], [3.32, '2 × 3.32 m, for 15 m'], [2.47, '2 × 2.47 m, for 10 m']] },
+  ],
+  matches: {
+    tuner: { name: 'Autotuner at the feed', ratio: 1, tuner: true },
+    unun9: { name: '9:1 unun', ratio: 9 },
+    unun49: { name: '49:1 transformer', ratio: 49 },
+    balun: { name: '1:1 choke balun', ratio: 1 },
+  },
+  pattern: { radius: 13, floorDb: 30, az: 72, el: 30 },   // drawn lobe: metres for the strongest direction, dB shown below it, grid steps
+  vhfTargets: [['Handheld VHF, 2 m up', 2], ['Another yacht\'s masthead, 15 m', 15], ['Coast station, 100 m', 100]],
+};
+
+/* ===== HF antenna, part 2: a thin-wire method-of-moments solver =====
+   Wires are cut into straight segments. The current is a sum of triangle functions, one over each pair of segments
+   meeting at a node, and a half triangle where a wire meets the sea. The sea is a perfect conductor for the currents
+   (an image below it) and real sea water for the reflection that shapes the far-field pattern.
+   Frame: y up from the sea surface, x forward, z to starboard, metres. Time dependence e^{jωt}.
+   Written as one self-contained function so the viewer can also run it in a Web Worker, off the page's thread. */
+function hfMoMFactory() {
+  const C0 = 299792458, MU = 4e-7*Math.PI, EPS = 1/(MU*C0*C0), ETA = MU*C0;
+  const q = (n, t, w) => t.map((x, i) => [[.5 - x/2, w[i]/2], [.5 + x/2, w[i]/2]]).flat().slice(n % 2 ? 1 : 0);
+  const G2 = [[.5 - .5/Math.sqrt(3), .5], [.5 + .5/Math.sqrt(3), .5]], G3 = [[.5 - Math.sqrt(.15), 5/18], [.5, 8/18], [.5 + Math.sqrt(.15), 5/18]];
+  const G4 = q(4, [.3399810435848563, .8611363115940526], [.6521451548625461, .3478548451374538]);
+  const G8 = q(8, [.1834346424956498, .5255324099163290, .7966664774136267, .9602898564975363], [.3626837833783620, .3137066458778873, .2223810344533745, .1012285362903763]);
+
+  /* Wires {a, b, r, metal} → segments, nodes and basis functions. */
+  function build(wires, segLen) {
+    const segs = [], nodes = new Map(), key = p => p.map(v => Math.round(v*1000)).join(',');
+    const node = p => { const k = key(p); if (!nodes.has(k)) nodes.set(k, { p, ends: [] }); return nodes.get(k); };
+    wires.forEach((w, wi) => {
+      const d = w.b.map((v, i) => v - w.a[i]), len = Math.hypot(...d); if (len < 1e-3) return;
+      const n = Math.max(1, Math.round(len/segLen)), t = d.map(v => v/len);
+      for (let i = 0; i < n; i++) {
+        const A = w.a.map((v, k) => v + d[k]*i/n), B = w.a.map((v, k) => v + d[k]*(i + 1)/n);
+        const s = { A, B, t, L: len/n, r: w.r, sigma: HF.sigma[w.metal], wire: wi, mid: A.map((v, k) => (v + B[k])/2), halves: [] };
+        segs.push(s); node(A).ends.push([s, 'A']); node(B).ends.push([s, 'B']);
+      }
+    });
+    // a half: flow along the segment (sg = +1 from A to B), peak at the node (w = 1 at B, 0 at A)
+    const bases = [], half = (s, end, into, b) => {
+      const w = end === 'B' ? 1 : 0, sg = into ? (end === 'B' ? 1 : -1) : (end === 'A' ? 1 : -1);
+      const h = { s, w, sg, div: sg*(w ? 1 : -1)/s.L, b }; s.halves.push(h); return h;
+    };
+    nodes.forEach(nd => {
+      nd.ground = nd.p[1] < 1e-6;
+      if (nd.ground) nd.ends.forEach(([s, e]) => { const b = { node: nd, halves: [] }; b.halves.push(half(s, e, false, bases.length)); bases.push(b); });
+      else for (let k = 1; k < nd.ends.length; k++) {
+        const b = { node: nd, halves: [] }, [s0, e0] = nd.ends[0], [s1, e1] = nd.ends[k];
+        b.halves.push(half(s0, e0, true, bases.length), half(s1, e1, false, bases.length)); bases.push(b);
+      }
+    });
+    return { segs, bases, nodes, N: bases.length, basisAt: p => { const nd = nodes.get(key(p)); return nd ? bases.findIndex(b => b.node === nd) : -1; } };
+  }
+
+  /* ∫∫ w(u) w'(v) e^{-jkR}/R over two segments, for the four pairs of ramps; reduced kernel R² = |r - r'|² + a². */
+  function pairK(o, A2, t2, L2, a, k, out) {
+    out.fill(0);
+    const m2 = [A2[0] + t2[0]*L2/2, A2[1] + t2[1]*L2/2, A2[2] + t2[2]*L2/2];
+    const dm = Math.hypot(o.mid[0] - m2[0], o.mid[1] - m2[1], o.mid[2] - m2[2]), near = dm < 1.6*Math.max(o.L, L2) + 6*a;
+    if (!near) {
+      const GQ = dm > 3*Math.max(o.L, L2) ? G2 : G3;          // far pairs need fewer points
+      for (let p = 0; p < GQ.length; p++) {
+        const u = GQ[p][0], W = GQ[p][1]*o.L, rx = o.A[0] + o.t[0]*o.L*u, ry = o.A[1] + o.t[1]*o.L*u, rz = o.A[2] + o.t[2]*o.L*u;
+        for (let q = 0; q < GQ.length; q++) {
+          const v = GQ[q][0], dx = rx - A2[0] - t2[0]*L2*v, dy = ry - A2[1] - t2[1]*L2*v, dz = rz - A2[2] - t2[2]*L2*v, R = Math.sqrt(dx*dx + dy*dy + dz*dz + a*a);
+          const ww = W*GQ[q][1]*L2/R, c = Math.cos(k*R)*ww, s = -Math.sin(k*R)*ww, f0 = 1 - u, g0 = 1 - v;
+          out[0] += c*f0*g0; out[1] += s*f0*g0; out[2] += c*f0*v; out[3] += s*f0*v; out[4] += c*u*g0; out[5] += s*u*g0; out[6] += c*u*v; out[7] += s*u*v;
+        }
+      }
+      return;
+    }
+    for (const [u, wu] of G8) {
+      const dx = o.A[0] + o.t[0]*o.L*u - A2[0], dy = o.A[1] + o.t[1]*o.L*u - A2[1], dz = o.A[2] + o.t[2]*o.L*u - A2[2], W = wu*o.L;
+      const l0 = dx*t2[0] + dy*t2[1] + dz*t2[2], d2 = Math.max(dx*dx + dy*dy + dz*dz - l0*l0, 0) + a*a, d = Math.sqrt(d2);
+      const I1 = Math.asinh((L2 - l0)/d) + Math.asinh(l0/d), Il = Math.sqrt((L2 - l0)**2 + d2) - Math.sqrt(l0*l0 + d2) + l0*I1;   // ∫1/R, ∫l'/R
+      let s1r = Il/L2, s0r = I1 - Il/L2, s1i = 0, s0i = 0;
+      for (const [v, wv] of G4) {   // the smooth rest, (e^{-jkR} - 1)/R
+        const R = Math.sqrt((v*L2 - l0)**2 + d2), cr = (Math.cos(k*R) - 1)/R*wv*L2, ci = -Math.sin(k*R)/R*wv*L2;
+        s1r += cr*v; s1i += ci*v; s0r += cr*(1 - v); s0i += ci*(1 - v);
+      }
+      const f = [1 - u, u];
+      for (let i = 0; i < 2; i++) { out[i*4] += W*f[i]*s0r; out[i*4 + 1] += W*f[i]*s0i; out[i*4 + 2] += W*f[i]*s1r; out[i*4 + 3] += W*f[i]*s1i; }
+    }
+  }
+
+  /* Impedance matrix at f (MHz), plus lumped resistances {basis: ohms}. */
+  function fill(m, fMHz, loads) {
+    const N = m.N, w = 2*Math.PI*fMHz*1e6, k = w/C0, cA = w*MU/(4*Math.PI), cP = 1/(4*Math.PI*w*EPS);
+    const Zr = new Float64Array(N*N), Zi = new Float64Array(N*N), K = new Float64Array(8), KI = new Float64Array(8), S = m.segs;
+    for (let i = 0; i < S.length; i++) for (let j = i; j < S.length; j++) {
+      const o = S[i], s = S[j], a = Math.max(o.r, s.r);
+      pairK(o, s.A, s.t, s.L, a, k, K);
+      const Ai = [s.A[0], -s.A[1], s.A[2]], ti = [s.t[0], -s.t[1], s.t[2]];
+      pairK(o, Ai, ti, s.L, a, k, KI);
+      const tt = o.t[0]*s.t[0] + o.t[1]*s.t[1] + o.t[2]*s.t[2], ti2 = o.t[0]*ti[0] + o.t[1]*ti[1] + o.t[2]*ti[2];
+      const Ksr = K[0] + K[2] + K[4] + K[6], Ksi = K[1] + K[3] + K[5] + K[7], KIsr = KI[0] + KI[2] + KI[4] + KI[6], KIsi = KI[1] + KI[3] + KI[5] + KI[7];
+      for (const h of o.halves) for (const g of s.halves) {
+        const e = (h.w*2 + g.w)*2, ss = h.sg*g.sg, dd = h.div*g.div;
+        // jωμ/4π (f·f') K  +  1/(4πjωε) (∇·f)(∇·f') K, less the same for the image (whose current and charge are reversed)
+        const vr = ss*(tt*K[e] - ti2*KI[e]), vi = ss*(tt*K[e + 1] - ti2*KI[e + 1]), pr = dd*(Ksr - KIsr), pi = dd*(Ksi - KIsi);
+        const zr = -cA*vi + cP*pi, zi = cA*vr - cP*pr;
+        Zr[h.b*N + g.b] += zr; Zi[h.b*N + g.b] += zi;
+        if (i !== j) { Zr[g.b*N + h.b] += zr; Zi[g.b*N + h.b] += zi; }
+      }
+      if (i === j) {                     // skin-effect loss along the conductor
+        const Rp = Math.sqrt(Math.PI*fMHz*1e6*MU/o.sigma)/(2*Math.PI*o.r);
+        for (const h of o.halves) for (const g of o.halves) Zr[h.b*N + g.b] += Rp*o.L*h.sg*g.sg*(h.w === g.w ? 1/3 : 1/6);
+      }
+    }
+    Object.entries(loads || {}).forEach(([b, R]) => { Zr[b*N + +b] += R; });
+    return { Zr, Zi, k, w };
+  }
+
+  /* Complex Gaussian elimination with partial pivoting; the right-hand side is overwritten with the answer. */
+  function solveLin(N, Zr, Zi, br, bi) {
+    for (let c = 0; c < N; c++) {
+      let p = c, best = 0;
+      for (let r = c; r < N; r++) { const v = Zr[r*N + c]**2 + Zi[r*N + c]**2; if (v > best) { best = v; p = r; } }
+      if (p !== c) { for (let j = 0; j < N; j++) { let t = Zr[c*N + j]; Zr[c*N + j] = Zr[p*N + j]; Zr[p*N + j] = t; t = Zi[c*N + j]; Zi[c*N + j] = Zi[p*N + j]; Zi[p*N + j] = t; } let t = br[c]; br[c] = br[p]; br[p] = t; t = bi[c]; bi[c] = bi[p]; bi[p] = t; }
+      const dr = Zr[c*N + c], di = Zi[c*N + c], dn = dr*dr + di*di;
+      for (let r = c + 1; r < N; r++) {
+        const ar = Zr[r*N + c], ai = Zi[r*N + c]; if (!ar && !ai) continue;
+        const fr = (ar*dr + ai*di)/dn, fi = (ai*dr - ar*di)/dn;
+        const rc = c*N, rr = r*N;
+        for (let j = c; j < N; j++) { const xr = Zr[rc + j], xi = Zi[rc + j]; Zr[rr + j] -= fr*xr - fi*xi; Zi[rr + j] -= fr*xi + fi*xr; }
+        br[r] -= fr*br[c] - fi*bi[c]; bi[r] -= fr*bi[c] + fi*br[c];
+      }
+    }
+    for (let r = N - 1; r >= 0; r--) {
+      let sr = br[r], si = bi[r];
+      for (let j = r + 1; j < N; j++) { sr -= Zr[r*N + j]*br[j] - Zi[r*N + j]*bi[j]; si -= Zr[r*N + j]*bi[j] + Zi[r*N + j]*br[j]; }
+      const dr = Zr[r*N + r], di = Zi[r*N + r], dn = dr*dr + di*di; br[r] = (sr*dr + si*di)/dn; bi[r] = (si*dr - sr*di)/dn;
+    }
+  }
+
+  /* Solve with 1 V across the feed basis. Returns the feed impedance, the currents and the power lost in the metal. */
+  function solve(m, fMHz, feed, loads) {
+    const { Zr, Zi, k, w } = fill(m, fMHz, loads), N = m.N, Ir = new Float64Array(N), Ii = new Float64Array(N);
+    Ir[feed] = 1; solveLin(N, Zr, Zi, Ir, Ii);
+    const den = Ir[feed]**2 + Ii[feed]**2, Z = { re: Ir[feed]/den, im: -Ii[feed]/den };
+    // current at both ends of every segment
+    const seg = m.segs.map(s => { const c = [0, 0, 0, 0]; s.halves.forEach(h => { const o = h.w ? 2 : 0; c[o] += h.sg*Ir[h.b]; c[o + 1] += h.sg*Ii[h.b]; }); return c; });
+    let loss = 0, earth = 0;
+    m.segs.forEach((s, i) => { const [ar, ai, br, bi] = seg[i], Rp = Math.sqrt(Math.PI*fMHz*1e6*MU/s.sigma)/(2*Math.PI*s.r); loss += .5*Rp*s.L*(ar*ar + ai*ai + br*br + bi*bi + ar*br + ai*bi)/3; });
+    Object.entries(loads || {}).forEach(([b, R]) => { earth += .5*R*(Ir[b]**2 + Ii[b]**2); });
+    return { f: fMHz, k, Z, Ir, Ii, seg, Pin: .5*Ir[feed], loss, earth };
+  }
+
+  /* Gain (dBi) towards elevation el and bearing az (radians; bearing from the bow, clockwise to starboard).
+     The image's contribution is weighted by the sea's reflection for each polarisation. */
+  const csqrt = (re, im) => { const m = Math.hypot(re, im), r = Math.sqrt((m + re)/2), i = Math.sqrt(Math.max(0, (m - re)/2)); return [r, im < 0 ? -i : i]; };
+  const cdiv = (ar, ai, br, bi) => { const d = br*br + bi*bi; return [(ar*br + ai*bi)/d, (ai*br - ar*bi)/d]; };
+  function fresnel(el, w) {
+    const er = HF.sea.er, ei = -HF.sea.sigma/(w*EPS), s = Math.sin(el), c2 = Math.cos(el)**2, [qr, qi] = csqrt(er - c2, ei);
+    const Rv = cdiv(er*s - qr, ei*s - qi, er*s + qr, ei*s + qi), Rh = cdiv(s - qr, -qi, s + qr, qi);
+    return { Rv, Rh: [-Rh[0], -Rh[1]] };          // Rh sign flipped: the image of a horizontal current is already reversed
+  }
+  function patternAt(m, sol, el, az, refl) {
+    const r = [Math.cos(el)*Math.cos(az), Math.sin(el), Math.cos(el)*Math.sin(az)];
+    const ev = [-Math.sin(el)*Math.cos(az), Math.cos(el), -Math.sin(el)*Math.sin(az)], eh = [-Math.sin(az), 0, Math.cos(az)];
+    let dvr = 0, dvi = 0, dhr = 0, dhi = 0, ivr = 0, ivi = 0, ihr = 0, ihi = 0;
+    m.segs.forEach((s, n) => {
+      const [ar, ai, br, bi] = sol.seg[n], tv = s.t[0]*ev[0] + s.t[1]*ev[1] + s.t[2]*ev[2], th = s.t[0]*eh[0] + s.t[2]*eh[2];
+      const tvi = -s.t[0]*ev[0] + s.t[1]*ev[1] - s.t[2]*ev[2], thi = -(s.t[0]*eh[0] + s.t[2]*eh[2]);   // image current (-tx, ty, -tz)
+      for (const [u, wu] of G2) {
+        const x = s.A[0] + s.t[0]*s.L*u, y = s.A[1] + s.t[1]*s.L*u, z = s.A[2] + s.t[2]*s.L*u;
+        const Ire = (ar*(1 - u) + br*u)*wu*s.L, Iim = (ai*(1 - u) + bi*u)*wu*s.L;
+        let ph = sol.k*(r[0]*x + r[1]*y + r[2]*z), c = Math.cos(ph), sn = Math.sin(ph), pr = Ire*c - Iim*sn, pi = Ire*sn + Iim*c;
+        dvr += pr*tv; dvi += pi*tv; dhr += pr*th; dhi += pi*th;
+        ph = sol.k*(r[0]*x - r[1]*y + r[2]*z); c = Math.cos(ph); sn = Math.sin(ph); pr = Ire*c - Iim*sn; pi = Ire*sn + Iim*c;
+        ivr += pr*tvi; ivi += pi*tvi; ihr += pr*thi; ihi += pi*thi;
+      }
+    });
+    const { Rv, Rh } = refl, Evr = dvr + Rv[0]*ivr - Rv[1]*ivi, Evi = dvi + Rv[0]*ivi + Rv[1]*ivr, Ehr = dhr + Rh[0]*ihr - Rh[1]*ihi, Ehi = dhi + Rh[0]*ihi + Rh[1]*ihr;
+    const U = ETA*sol.k*sol.k/(32*Math.PI*Math.PI)*(Evr*Evr + Evi*Evi + Ehr*Ehr + Ehi*Ehi);
+    return { G: 4*Math.PI*U/sol.Pin, v: Evr*Evr + Evi*Evi, h: Ehr*Ehr + Ehi*Ehi };
+  }
+  /* Gain over a grid of elevations (0…90°) and bearings (0…360°), in dBi. */
+  function pattern(m, sol, nAz, nEl, extra = 1) {
+    const w = sol.k*C0, g = [];
+    for (let j = 0; j <= nEl; j++) {
+      const el = Math.max(.5, 90*j/nEl)*Math.PI/180, refl = fresnel(el, w), row = [];
+      for (let i = 0; i <= nAz; i++) row.push(10*Math.log10(Math.max(1e-9, patternAt(m, sol, el, i/nAz*2*Math.PI, refl).G*extra)));
+      g.push(row);
+    }
+    let best = { G: -99 }; g.forEach((row, j) => row.forEach((v, i) => { if (v > best.G) best = { G: v, el: Math.max(.5, 90*j/nEl), az: i/nAz*360 }; }));
+    return { g, nAz, nEl, best };
+  }
+  return { build, solve, pattern, patternAt, fresnel, C0 };
+}
+const HFMoM = hfMoMFactory();
+
+/* ===== HF antenna, part 3: the viewer =====
+   An "HF antenna" layer: the wire and its hardware, the current in the wire and the rig, and the beam pattern as a
+   coloured lobe around the boat. The panel picks the layout, wire length, matching and band, and shows the feed
+   impedance, SWR, losses and gain. The solver runs in a Web Worker; nothing is built or held while the layer is off. */
+(function hfViewer() {
+  const ws = SPEC.hull.floatSink, st = { layout: 'sloper', len: { sloper: 'fit', vee: 20.1, dipole: 9.95 }, rod: 'aft', match: { sloper: 'tuner', vee: 'tuner', dipole: 'balun' }, band: '40', bonded: false, show: 'both' };
+  let A = null, on = false, group = null, worker = null, run = 0, cfg = null, res = {}, segs = null;
+  const S = p => [p[0], p[1] - ws, p[2]];                                      // boat frame → solver frame (y from the sea)
+  const W = (a, b, kind) => ({ a: S(a), b: S(b), r: HF.wires[kind][0], metal: HF.wires[kind][1], kind });
+  const sub = (a, b) => a.map((v, i) => v - b[i]), len = v => Math.hypot(...v), along = (a, b, l) => { const d = sub(b, a), n = len(d); return a.map((v, i) => v + d[i]*l/n); };
+
+  /* ---------- Where things are ---------- */
+  function places() {
+    const mx = RG.mastX, top = RG.mastTop, F = HF.feed, Sl = HF.slopeTop, Ap = HF.apex, Bw = HF.bow;
+    return { mx, top, f0: [F.x, sheerY(F.x) + F.above, halfB(F.x) - F.inset], sTop: [mx + Sl.dx, top - Sl.below, Sl.z],
+      apex: [mx + Ap.dx, top - Ap.below, Ap.z], bow: [Bw.x, sheerY(Bw.x) + Bw.above, Math.min(Bw.z, halfB(Bw.x) - .12)] };
+  }
+  function rigWires(bonded) {
+    const mx = RG.mastX, top = RG.mastTop, foot = roofY(mx, 0), [sp0, sp1] = RG.spreaders, out = [], T = [mx, top, 0];
+    const mast = [[mx, ws, 0], [mx, foot, 0], [mx, RG.boom.y, 0], [mx, sp0[0], 0], [mx, sp1[0], 0], T];
+    out.push(W(mast[0], mast[1], 'post')); for (let i = 1; i < mast.length - 1; i++) out.push(W(mast[i], mast[i + 1], 'mast'));
+    out.push(W([mx, RG.boom.y, 0], [RG.boom.aft, RG.boom.y, 0], 'boom'));
+    const ends = [];
+    [1, -1].forEach(s => {
+      const tips = RG.spreaders.map(([y, l]) => [mx - RG.spreaderSweep*l, y, s*l]);
+      out.push(W([mx, sp0[0], 0], tips[0], 'spreader'), W([mx, sp1[0], 0], tips[1], 'spreader'));
+      const cp = chainplate(mx, s), fl = chainplate(mx + .62, s), al = chainplate(mx - .62, s);
+      out.push(W(T, tips[1], 'stay'), W(tips[1], tips[0], 'stay'), W(tips[0], cp, 'stay'), W([mx, sp1[0], 0], tips[0], 'stay'), W([mx, sp0[0], 0], fl, 'stay'), W([mx, sp0[0], 0], al, 'stay'));
+      ends.push(cp, fl, al);
+    });
+    const stem = [RG.stem[0], RG.stem[1], 0], bt = [RG.backstayTop[0], RG.backstayTop[1], 0], bf = [RG.backstay[0], RG.backstay[1], 0];
+    out.push(W(T, stem, 'forestay'), W(T, bt, 'crane'), W(bt, bf, 'backstay'));
+    if (bonded) [...ends, stem, bf].forEach(p => out.push(W(p, [p[0], ws, p[2]], 'bond')));
+    return out;
+  }
+  /* The wire for the chosen layout: solver wires, feed point, earth load, and what to draw. */
+  function layout() {
+    const P = places(), lay = st.layout, Lsel = st.len[lay], wires = rigWires(st.bonded), draw = { wire: [], rod: null, ends: [], halyards: [], tuner: null, balun: null }, info = {};
+    if (lay === 'dipole') {
+      const d1 = len(sub(P.f0, P.apex)), d2 = len(sub(P.bow, P.apex)), l = +Lsel;
+      const aft = along(P.apex, P.f0, Math.min(l, d1)), fore = along(P.apex, P.bow, Math.min(l, d2));
+      wires.push(W(P.apex, aft, 'antenna'), W(P.apex, fore, 'antenna'));
+      draw.wire.push([aft, P.apex, fore]); draw.ends.push(aft, fore); draw.halyards.push([P.apex, [P.mx + .1, P.top, 0]]); draw.balun = P.apex;
+      if (l > d1 - .3) draw.halyards.push([aft, P.f0]); if (l < d2 - .3) draw.halyards.push([fore, P.bow]);
+      info.short = l > Math.min(d1, d2); info.total = 2*l;
+      return { wires, feed: S(P.apex), loads: [], draw, info, P };
+    }
+    const lead = [P.f0[0], ws, P.f0[2]];
+    wires.push(W(lead, P.f0, 'lead')); draw.tuner = P.f0;
+    if (lay === 'sloper') {
+      const D = len(sub(P.sTop, P.f0)), L = Lsel === 'fit' ? D : +Lsel;
+      if (L <= D + 1e-6) { const e = along(P.f0, P.sTop, L); wires.push(W(P.f0, e, 'antenna')); draw.wire.push([P.f0, e]); draw.ends.push(e); draw.halyards.push([e, [P.mx - .08, P.top, 0]]); }
+      else {
+        const R = HF.rods.find(r => r.id === st.rod), k = Math.tan(HF.rodRise*Math.PI/180), u0 = [R.dir[0], k, R.dir[1]], un = len(u0), u = u0.map(v => v/un);
+        const tipAt = t => P.f0.map((v, i) => v + u[i]*t), tot = t => t + len(sub(P.sTop, tipAt(t)));
+        let a = 0, b = L; for (let i = 0; i < 50; i++) { const m = (a + b)/2; if (tot(m) < L) a = m; else b = m; }
+        const tip = tipAt(a); info.rod = a;
+        wires.push(W(P.f0, tip, 'antenna'), W(tip, P.sTop, 'antenna')); draw.wire.push([P.f0, tip, P.sTop]); draw.rod = [P.f0, tip]; draw.ends.push(P.sTop); draw.halyards.push([P.sTop, [P.mx - .08, P.top, 0]]);
+      }
+      info.reach = D; info.total = L;
+    } else {
+      const d1 = len(sub(P.apex, P.f0)), d2 = len(sub(P.bow, P.apex)), fit = d1 + d2, L = Lsel === 'fit' ? fit : Math.min(+Lsel, fit);
+      if (L <= d1) { const e = along(P.f0, P.apex, L); wires.push(W(P.f0, e, 'antenna')); draw.wire.push([P.f0, e]); draw.ends.push(e); }
+      else { const e = along(P.apex, P.bow, L - d1); wires.push(W(P.f0, P.apex, 'antenna'), W(P.apex, e, 'antenna')); draw.wire.push([P.f0, P.apex, e]); draw.ends.push(e); if (L < fit - .3) draw.halyards.push([e, P.bow]); }
+      draw.halyards.push([P.apex, [P.mx + .1, P.top, 0]]); info.reach = fit; info.total = L;
+    }
+    return { wires, feed: S(P.f0), loads: [[[lead[0], 0, lead[2]], HF.groundOhm]], draw, info, P };
+  }
+
+  /* ---------- Matching ---------- */
+  const swr = (Z, ratio) => { const zr = Z.re/ratio, zi = Z.im/ratio, nr = zr - 50, d = (zr + 50)**2 + zi*zi, gr = (nr*(zr + 50) + zi*zi)/d, gi = (zi*(zr + 50) - nr*zi)/d, g = Math.min(.9999, Math.hypot(gr, gi)); return (1 + g)/(1 - g); };
+  /* L network to 50 Ω, the better of its layouts: loss in dB from the coil and capacitor Q. */
+  function tunerLoss(Z) {
+    const R = Math.max(Z.re, .01), X = Z.im, R0 = 50, { L: QL, C: QC } = HF.tunerQ; let best = Infinity;
+    if (R < R0) for (const sg of [1, -1]) {                             // series part beside the load, shunt part at the radio side
+      const Xt = sg*Math.sqrt(R*(R0 - R)), Xs = Xt - X, q = Math.sqrt(R0/R - 1);
+      best = Math.min(best, Math.abs(Xs)/(Xs > 0 ? QL : QC)/R + q/(Xt > 0 ? QC : QL));
+    }
+    const m2 = R*R + X*X, G = R/m2, B = -X/m2;
+    if (G < 1/R0) for (const sg of [1, -1]) {                           // shunt part beside the load, series part at the radio side
+      const Bt = sg*Math.sqrt(G*(1/R0 - G)), Bp = Bt - B, q = Math.sqrt(1/(R0*G) - 1);
+      best = Math.min(best, Math.abs(Bp)/(Bp > 0 ? QC : QL)/G + q/(Bt > 0 ? QL : QC));
+    }
+    return 10*Math.log10(1 + best);
+  }
+
+  /* ---------- Solver in a worker ---------- */
+  function workerFn() {
+    const M = hfMoMFactory();
+    onmessage = e => {
+      const { id, wires, segLen, feed, loads, jobs } = e.data, m = M.build(wires, segLen), fb = m.basisAt(feed), ld = {};
+      loads.forEach(([p, R]) => { const b = m.basisAt(p); if (b >= 0) ld[b] = R; });
+      postMessage({ id, kind: 'model', segs: m.segs.map(s => [s.A, s.B, s.r, wires[s.wire].kind]), N: m.N });
+      jobs.forEach((j, i) => {
+        const s = M.solve(m, j.f, fb, ld), out = { id, kind: 'job', i, tag: j.tag, f: j.f, Z: s.Z, Pin: s.Pin, loss: s.loss, earth: s.earth };
+        if (j.pattern) out.pat = M.pattern(m, s, j.pattern[0], j.pattern[1]);
+        if (j.cur) out.cur = s.seg.map(c => Math.hypot((c[0] + c[2])/2, (c[1] + c[3])/2));
+        if (j.cur) out.curMax = Math.max(...s.seg.map(c => Math.max(Math.hypot(c[0], c[1]), Math.hypot(c[2], c[3]))));
+        postMessage(out);
+      });
+      postMessage({ id, kind: 'done' });
+    };
+  }
+  function makeWorker() {
+    try {
+      const src = `const HF = ${JSON.stringify(HF)};\n${hfMoMFactory.toString()}\n(${workerFn.toString()})();`;
+      const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' })), w = new Worker(url); URL.revokeObjectURL(url); return w;
+    } catch (e) { return null; }
+  }
+  let busy = false;
+  function start(onlyBand) {          // onlyBand: same wire, another band; the other bands and the sweep are kept
+    run++; const id = run, band = HF.bands.find(b => b.id === st.band), jobs = [{ f: band.f, tag: 'main', pattern: [HF.pattern.az, HF.pattern.el], cur: true }];
+    if (onlyBand) { res.main = null; }
+    else {
+      cfg = { L: layout() }; res = { bands: {}, sweep: [] }; segs = null;
+      HF.bands.forEach(b => jobs.push({ f: b.f, tag: 'band:' + b.id, pattern: [24, 18] }));
+      const n = 48, f0 = 1.75, f1 = 30.5; for (let i = 0; i <= n; i++) jobs.push({ f: f0*Math.pow(f1/f0, i/n), tag: 'sweep' });
+    }
+    const L = cfg.L;
+    const msg = { id, wires: L.wires, segLen: HF.segment, feed: L.feed, loads: L.loads, jobs };
+    if (busy && worker) { worker.terminate(); worker = null; }
+    if (!worker) { worker = makeWorker(); if (worker) worker.onmessage = e => receive(e.data); }
+    busy = true; if (!onlyBand) drawHardware(); render();
+    if (worker) worker.postMessage(msg);
+    else setTimeout(() => {                                   // no workers: solve on the page, a step at a time
+      const M = HFMoM, m = M.build(msg.wires, msg.segLen), fb = m.basisAt(msg.feed), ld = {}; msg.loads.forEach(([p, R]) => { ld[m.basisAt(p)] = R; });
+      receive({ id, kind: 'model', segs: m.segs.map(s => [s.A, s.B, s.r, msg.wires[s.wire].kind]) });
+      let i = 0; const step = () => {
+        if (id !== run || !on) return; if (i >= jobs.length) { receive({ id, kind: 'done' }); return; }
+        const j = jobs[i], s = M.solve(m, j.f, fb, ld), out = { id, kind: 'job', i, tag: j.tag, f: j.f, Z: s.Z, Pin: s.Pin, loss: s.loss, earth: s.earth };
+        if (j.pattern) out.pat = M.pattern(m, s, j.pattern[0], j.pattern[1]);
+        if (j.cur) { out.cur = s.seg.map(c => Math.hypot((c[0] + c[2])/2, (c[1] + c[3])/2)); out.curMax = Math.max(...out.cur); }
+        receive(out); i++; setTimeout(step, 0);
+      }; step();
+    }, 0);
+  }
+  function receive(d) {
+    if (!on || d.id !== run) return;
+    if (d.kind === 'model') { segs = d.segs; return; }
+    if (d.kind === 'done') { busy = false; render(); return; }
+    if (d.tag === 'main') { res.main = d; drawResult(); }
+    else if (d.tag.startsWith('band:')) res.bands[d.tag.slice(5)] = d;
+    else res.sweep.push(d);
+    render();
+  }
+
+  /* ---------- 3D ---------- */
+  const cmap = t => { const s = [[0, [43, 58, 140]], [.35, [31, 160, 168]], [.6, [123, 209, 72]], [.8, [242, 208, 59]], [1, [224, 64, 42]]]; t = clamp(t, 0, 1); let i = 0; while (i < s.length - 2 && t > s[i + 1][0]) i++; const [a, ca] = s[i], [b, cb] = s[i + 1], f = (t - a)/(b - a); return ca.map((v, k) => (v + (cb[k] - v)*f)/255); };
+  const copper = () => M('#b8642a', { roughness: .45, metalness: .6 });
+  function clearGroup(name) { const g = group.getObjectByName(name); if (g) { group.remove(g); disposeTree(g); } const n = new T.Group(); n.name = name; group.add(n); return n; }
+  function drawHardware() {
+    const g = clearGroup('hardware'), d = cfg.L.draw, wireMat = copper(), white = M('#f2f0e8', { roughness: .4 }), rope = M('#3a3d42', { roughness: .9 });
+    d.wire.forEach(pl => { for (let i = 0; i < pl.length - 1; i++) rod(g, pl[i], pl[i + 1], .006, wireMat, 6); });
+    d.halyards.forEach(([a, b]) => rod(g, a, b, .003, rope, 5));
+    d.ends.forEach(p => put(g, new T.SphereGeometry(.03, 12, 8), white).position.set(...p));
+    if (d.rod) { rod(g, d.rod[0], d.rod[1], .022, white, 12, .016); }
+    if (d.tuner) box(g, [d.tuner[0] + .12, d.tuner[1] + .07, d.tuner[2] - .08], [.26, .14, .18], M('#8d9399', { roughness: .5 }));
+    if (d.balun) box(g, [d.balun[0], d.balun[1] - .08, d.balun[2]], [.06, .14, .06], mat.dark);
+    A.renderer.shadowMap.needsUpdate = true;
+  }
+  function drawResult() {
+    const r = res.main; if (!r || !segs) return;
+    // currents: a tube over every conductor of the model, coloured by current on a 30 dB scale
+    const g = clearGroup('currents'), pos = [], col = [], idx = [], max = Math.max(...r.cur), n = 6;
+    segs.forEach(([a, b, rad, kind], k) => {
+      if (st.show === 'pattern' && kind !== 'antenna') return;
+      const c = cmap(1 + 20*Math.log10(Math.max(r.cur[k], 1e-9)/max)/30), A0 = new V3(a[0], a[1] + ws, a[2]), B0 = new V3(b[0], b[1] + ws, b[2]);
+      const ax = B0.clone().sub(A0).normalize(), p1 = Math.abs(ax.y) < .9 ? new V3(0, 1, 0) : new V3(1, 0, 0), u = p1.cross(ax).normalize(), v = ax.clone().cross(u);
+      const R = kind === 'antenna' ? .022 : kind === 'mast' ? .115 : kind === 'post' || kind === 'lead' || kind === 'bond' ? .03 : kind === 'boom' ? .07 : kind === 'spreader' ? .035 : .014, base = pos.length/3;
+      for (const P of [A0, B0]) for (let i = 0; i < n; i++) { const t = i/n*Math.PI*2, o = u.clone().multiplyScalar(Math.cos(t)*R).addScaledVector(v, Math.sin(t)*R); pos.push(P.x + o.x, P.y + o.y, P.z + o.z); col.push(...c); }
+      for (let i = 0; i < n; i++) { const j = (i + 1)%n; idx.push(base + i, base + n + i, base + j, base + j, base + n + i, base + n + j); }
+    });
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new T.Float32BufferAttribute(col, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+    const cm = new T.Mesh(geo, new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .85, side: T.DoubleSide })); cm.renderOrder = 3; g.add(cm);
+    // beam pattern: distance from the mast foot at the water grows with gain, floorDb below the strongest direction is the centre
+    const pg = clearGroup('pattern'); if (st.show === 'currents') { A.wake(); return; }
+    const { g: grid, nAz, nEl, best } = r.pat, Rm = HF.pattern.radius, fl = HF.pattern.floorDb, O = [RG.mastX, ws + .03, 0];
+    const rho = v => Rm*Math.max(0, (v - best.G + fl)/fl), P3 = (j, i) => { const el = Math.max(.5, 90*j/nEl)*Math.PI/180, az = i/nAz*2*Math.PI, q = rho(grid[j][i]); return [O[0] + q*Math.cos(el)*Math.cos(az), O[1] + q*Math.sin(el), O[2] + q*Math.cos(el)*Math.sin(az)]; };
+    const lp = [], lc = [], li = [];
+    for (let j = 0; j <= nEl; j++) for (let i = 0; i <= nAz; i++) { lp.push(...P3(j, i)); lc.push(...cmap((grid[j][i] - best.G + fl)/fl)); }
+    for (let j = 0; j < nEl; j++) for (let i = 0; i < nAz; i++) { const a = j*(nAz + 1) + i, b = a + nAz + 1; li.push(a, b, a + 1, a + 1, b, b + 1); }
+    const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.Float32BufferAttribute(lp, 3)); lg.setAttribute('color', new T.Float32BufferAttribute(lc, 3)); lg.setIndex(li);
+    const lobe = new T.Mesh(lg, new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .32, side: T.DoubleSide, depthWrite: false })); lobe.renderOrder = 5; pg.add(lobe);
+    const line = pts => { const l = new T.Line(new T.BufferGeometry().setFromPoints(pts.map(p => new V3(...p))), new T.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: .8 })); l.renderOrder = 6; pg.add(l); };
+    const jb = Math.round(best.el/90*nEl), ib = Math.round(best.az/360*nAz)%nAz, ib2 = (ib + nAz/2)%nAz;
+    line(Array.from({ length: nAz + 1 }, (_, i) => P3(jb, i)));                                                 // round the boat at the best elevation
+    line([...Array.from({ length: nEl + 1 }, (_, j) => P3(j, ib)), ...Array.from({ length: nEl + 1 }, (_, j) => P3(nEl - j, ib2))]);   // the vertical cut through the best bearing
+    A.wake();
+  }
+
+  /* ---------- Panel ---------- */
+  const css = document.createElement('style');
+  css.textContent = `#hfPanel{position:fixed;left:16px;top:96px;width:352px;max-height:calc(100dvh - 250px);overflow:auto;max-width:calc(100vw - 32px)}#hfPanel[hidden]{display:none}
+  @media (max-width:760px){#hfPanel{top:auto;bottom:calc(112px + env(safe-area-inset-bottom,0px));left:8px;right:8px;width:auto;max-height:45dvh}}
+  #hfPanel canvas{display:block;width:100%;margin:6px 0 0}.hf-plots{display:grid;grid-template-columns:1fr;gap:8px}.hf-plots figure:last-child canvas{max-width:230px;margin:6px auto 0}#hfPanel .stats dd.bad{color:#a4331f}.hf-plots figure{margin:0}.hf-plots figcaption,.hf-cap{font-size:11.5px;color:var(--ink2);margin:2px 2px 0}
+  .hf-key{margin:8px 2px 0;font-size:12px;color:var(--ink2)}.hf-key i{display:block;height:9px;margin:3px 0 2px;border-radius:5px;background:linear-gradient(90deg,#2b3a8c,#1fa0a8 35%,#7bd148 60%,#f2d03b 80%,#e0402a)}.hf-key span{display:flex;justify-content:space-between}
+  .hf-table{width:100%;border-collapse:collapse;font-size:12px;margin:2px 0 4px}.hf-table th{text-align:left;font-weight:600;color:var(--ink2);padding:3px 2px;vertical-align:bottom}.hf-table td{padding:4px 2px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}.hf-table tr.me td{font-weight:700}
+  .hf-table td.good{color:#2d7a3a}.hf-table td.bad{color:#a4331f}.hf-busy{font-size:12px;color:var(--ink2);margin:6px 2px 0}`;
+  document.head.append(css);
+  const panel = document.createElement('details'); panel.className = 'arch'; panel.id = 'hfPanel'; panel.open = true; panel.hidden = true;
+  panel.innerHTML = `<summary>HF antenna <span id="hfCurrent"></span></summary><div class="arch-body">
+    <fieldset class="pick" id="hfLayout" style="grid-template-columns:1fr"><legend>Layout</legend></fieldset>
+    <fieldset class="seg"><legend id="hfLenLegend">Wire length</legend><div class="chips" id="hfLen"></div></fieldset>
+    <fieldset class="seg" id="hfRodWrap"><legend>Rod, if the wire is longer than the reach</legend><div id="hfRod"></div></fieldset>
+    <fieldset class="seg"><legend>Matching at the feed</legend><div id="hfMatch"></div></fieldset>
+    <fieldset class="seg"><legend>Band</legend><div class="chips" id="hfBand"></div></fieldset>
+    <fieldset class="seg"><legend>Stays at deck level</legend><div id="hfBond"></div></fieldset>
+    <fieldset class="seg"><legend>Show</legend><div id="hfShow"></div></fieldset>
+    <div class="hf-key"><i></i><span><b style="font-weight:500">Weak</b><b style="font-weight:500">Pattern: ${HF.pattern.floorDb} dB range · currents: 30 dB</b><b style="font-weight:500">Strong</b></span></div>
+    <p class="hf-busy" id="hfBusy"></p>
+    <div class="stats" id="hfStats"></div>
+    <div class="hf-plots"><figure><canvas id="hfEl" width="320" height="190"></canvas><figcaption id="hfElCap"></figcaption></figure><figure><canvas id="hfAz" width="320" height="320"></canvas><figcaption id="hfAzCap"></figcaption></figure></div>
+    <div class="stats"><h2 id="hfSweepTitle">SWR from 1.8 to 30 MHz</h2></div><canvas id="hfSweep" width="660" height="260"></canvas><p class="hf-cap" id="hfSweepCap"></p>
+    <div class="stats" id="hfBands"></div>
+    <div class="stats" id="hfVhf"></div>
+    <p class="fine">Method of moments on thin wires: the antenna wire with the mast, spreaders, stays and boom, all of them connected at the masthead and grounded to the sea through the mast step and the lead keel. The sea is a perfect conductor next to the boat and real sea water for the far-off reflection. Copper and stainless losses are included; the tuner earth is taken as ${HF.groundOhm} Ω. Not modelled: lifelines, pulpit, pushpit, the solar arch, the coax and the sails, all of which shift the figures a little. Treat SWR and gain as estimates, and check with an antenna analyser on board.</p></div>`;
+  document.body.append(panel);
+  const $ = id => panel.querySelector('#' + id);
+  const radios = (id, name, items, get, set) => {
+    const box = $(id); box.innerHTML = '';
+    items.forEach(([v, label, dis]) => {
+      const l = document.createElement('label'), i = document.createElement('input'); i.type = 'radio'; i.name = name; i.value = v; i.checked = String(get()) === String(v); i.disabled = !!dis;
+      i.addEventListener('change', () => { set(v); refresh(); }); l.append(i, document.createTextNode(label)); box.append(l);
+    });
+  };
+  function controls() {
+    const lay = HF.layouts.find(l => l.id === st.layout), P = places();
+    radios('hfLayout', 'hfLayout', HF.layouts.map(l => [l.id, l.name]), () => st.layout, v => { st.layout = v; });
+    const reach = st.layout === 'vee' ? len(sub(P.apex, P.f0)) + len(sub(P.bow, P.apex)) : len(sub(P.sTop, P.f0));
+    $('hfLenLegend').textContent = st.layout === 'dipole' ? 'Leg length' : 'Wire length';
+    radios('hfLen', 'hfLen', lay.lengths.map(([v, label]) => [v, v === 'fit' ? `${label}, ${f1(reach)} m` : label, st.layout === 'vee' && v !== 'fit' && v > reach]), () => st.len[st.layout], v => { st.len[st.layout] = v === 'fit' ? 'fit' : +v; });
+    $('hfRodWrap').hidden = st.layout !== 'sloper';
+    radios('hfRod', 'hfRod', HF.rods.map(r => [r.id, r.name]), () => st.rod, v => { st.rod = v; });
+    if (!lay.matches.includes(st.match[st.layout])) st.match[st.layout] = lay.matches[0];
+    radios('hfMatch', 'hfMatch', lay.matches.map(m => [m, HF.matches[m].name]), () => st.match[st.layout], v => { st.match[st.layout] = v; });
+    radios('hfBand', 'hfBand', HF.bands.map(b => [b.id, b.name]), () => st.band, v => { st.band = v; });
+    radios('hfBond', 'hfBond', [[0, 'Grounded through the mast'], [1, 'Every stay bonded']], () => +st.bonded, v => { st.bonded = !!+v; });
+    radios('hfShow', 'hfShow', [['both', 'Pattern and currents'], ['pattern', 'Pattern'], ['currents', 'Currents']], () => st.show, v => { st.show = v; });
+  }
+  let lastKey = '', lastBand = '';
+  function refresh() {
+    controls();
+    const key = JSON.stringify([st.layout, st.len[st.layout], st.rod, st.bonded]);
+    if (key !== lastKey) { lastKey = key; lastBand = st.band; start(false); }
+    else if (st.band !== lastBand) { lastBand = st.band; start(!busy); }
+    else { drawResult(); render(); }
+  }
+
+  const f0n = v => Math.round(v).toLocaleString('en-GB'), f1 = v => v.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const zTxt = Z => `${f0n(Z.re)} ${Z.im < 0 ? '−' : '+'} j${f0n(Math.abs(Z.im))} Ω`;
+  const bearingTxt = a => { a = ((a%360) + 360)%360; return a < 22.5 || a >= 337.5 ? 'ahead' : a < 67.5 ? 'starboard bow' : a < 112.5 ? 'starboard beam' : a < 157.5 ? 'starboard quarter' : a < 202.5 ? 'astern' : a < 247.5 ? 'port quarter' : a < 292.5 ? 'port beam' : 'port bow'; };
+  const swrTxt = v => v > 50 ? 'over 50' : v.toFixed(v < 10 ? 1 : 0);
+  function judge(r) {                    // SWR the radio sees, and the tuner's loss when there is one
+    const m = HF.matches[st.match[st.layout]], s = swr(r.Z, m.ratio), tl = m.tuner ? tunerLoss(r.Z) : 0;
+    const wire = r.loss/r.Pin, earth = r.earth/r.Pin;
+    return { m, s, tl, wire, earth, radioOk: s <= HF.radioTuner, tunerOk: tl < 3 && Math.hypot(r.Z.re, r.Z.im) < 5000 };
+  }
+  const row = (k, v, c) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`;
+  function render() {
+    if (!on) return;
+    const band = HF.bands.find(b => b.id === st.band), r = res.main, info = cfg ? cfg.L.info : {}, done = Object.keys(res.bands || {}).length;
+    $('hfBusy').textContent = busy ? (r ? `Working through the other bands… ${done}/${HF.bands.length}` : 'Calculating…') : '';
+    if (!r) { $('hfStats').innerHTML = ''; $('hfCurrent').textContent = band.name; return; }
+    const j = judge(r), dB = v => `${v < .05 ? '0.0' : f1(v)} dB`, lossDb = p => -10*Math.log10(Math.max(1e-6, 1 - p));
+    $('hfCurrent').textContent = `${band.name} · ${j.m.tuner ? `tuner loss ${dB(j.tl)}` : `SWR ${swrTxt(j.s)}`}`;
+    const b = r.pat.best, low = r.pat.g[Math.round(10/90*r.pat.nEl)], lowAvg = 10*Math.log10(low.slice(0, -1).reduce((a, v) => a + 10**(v/10), 0)/(low.length - 1));
+    const up = r.pat.g[r.pat.nEl][0];
+    const wireRows = [];
+    if (info.total) wireRows.push(row(st.layout === 'dipole' ? 'Wire, both legs' : 'Wire, feed to end', `${f1(info.total)} m`));
+    if (info.reach) wireRows.push(row(st.layout === 'vee' ? 'Stern to masthead to bow' : 'Stern corner to masthead', `${f1(info.reach)} m`));
+    if (info.rod !== undefined) wireRows.push(row('Rod needed', `${f1(info.rod)} m`, info.rod > HF.rodMax ? 'bad' : ''));
+    if (info.short) wireRows.push(row('Legs', 'Cut short: do not fit', 'bad'));
+    $('hfStats').innerHTML = `<h2>The wire</h2><dl>${wireRows.join('')}</dl>
+      <h2>At the feed, ${band.name} (${band.f.toFixed(3)} MHz)</h2><dl>
+      ${row('Impedance', zTxt(r.Z))}
+      ${row(j.m.ratio > 1 ? `SWR after the ${j.m.name}` : 'SWR on 50 Ω coax', swrTxt(j.s), !j.m.tuner && j.s > HF.radioTuner ? 'bad' : '')}
+      ${j.m.tuner ? row('Autotuner', j.tunerOk ? `matches, loses ${dB(j.tl)}` : `hard to match, about ${dB(j.tl)} lost`, j.tunerOk ? '' : 'bad') : row(`Radio's own tuner (up to ${HF.radioTuner}:1)`, j.radioOk ? 'copes' : 'cannot match', j.radioOk ? '' : 'bad')}
+      ${row('Lost in the wire and rig', dB(lossDb(j.wire)))}${j.earth > 1e-4 ? row('Lost in the tuner earth', dB(lossDb(j.earth))) : ''}</dl>
+      <h2>Beam</h2><dl>
+      ${row('Strongest direction', `${f1(b.G - j.tl)} dBi`)}${row('at elevation', `${f0n(b.el)}°, ${bearingTxt(b.az)}`)}
+      ${row('Average at 10° elevation, for long distance', `${f1(lowAvg - j.tl)} dBi`)}${row('Straight up, for nearby stations', `${f1(up - j.tl)} dBi`)}</dl>`;
+    plots(r); sweep(); bandTable();
+  }
+
+  /* ---------- Plots ---------- */
+  const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#14275f';
+  function polar(cv, pts, half, labels) {   // pts: [angle rad (0 = right, ccw), dB rel to max]
+    const c = cv.getContext('2d'), Wd = cv.width, H = cv.height, cx = Wd/2, cy = half ? H - 26 : H/2, R = half ? Math.min(Wd/2 - 14, H - 40) : Wd/2 - 22, fl = HF.pattern.floorDb;
+    c.clearRect(0, 0, Wd, H); c.lineWidth = 1.2; c.strokeStyle = 'rgba(20,39,95,.18)'; c.fillStyle = cssVar('--ink2'); c.font = '20px system-ui,sans-serif';
+    for (const d of [0, 10, 20]) { const rr = R*(fl - d)/fl; c.beginPath(); c.arc(cx, cy, rr, half ? Math.PI : 0, Math.PI*2); c.stroke(); }
+    const rays = half ? [0, 30, 60, 90, 120, 150, 180] : [0, 45, 90, 135, 180, 225, 270, 315];
+    rays.forEach(a => { const t = a*Math.PI/180; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + R*Math.cos(t), cy - R*Math.sin(t)); c.stroke(); });
+    c.beginPath(); pts.forEach(([t, d], i) => { const rr = R*Math.max(0, (d + fl)/fl), x = cx + rr*Math.cos(t), y = cy - rr*Math.sin(t); if (i) c.lineTo(x, y); else c.moveTo(x, y); });
+    if (!half) c.closePath(); c.fillStyle = 'rgba(31,160,168,.22)'; c.fill(); c.strokeStyle = cssVar('--ink'); c.lineWidth = 3; c.stroke();
+    c.fillStyle = cssVar('--ink2'); labels.forEach(([txt, x, y, al]) => { c.textAlign = al || 'center'; c.fillText(txt, x, y); });
+  }
+  function plots(r) {
+    const { g, nAz, nEl, best } = r.pat, ib = Math.round(best.az/360*nAz)%nAz, ib2 = (ib + nAz/2)%nAz, el = [];
+    for (let j = 0; j <= nEl; j++) el.push([Math.max(.5, 90*j/nEl)*Math.PI/180, g[j][ib] - best.G]);
+    for (let j = nEl; j >= 0; j--) el.push([Math.PI - Math.max(.5, 90*j/nEl)*Math.PI/180, g[j][ib2] - best.G]);
+    const cv = $('hfEl'); polar(cv, el, true, [[bearingTxt(best.az), cv.width - 4, cv.height - 4, 'right'], [bearingTxt(best.az + 180), 4, cv.height - 4, 'left'], ['up', cv.width/2, 22]]);
+    $('hfElCap').textContent = `Side view of the beam, ${bearingTxt(best.az)} to ${bearingTxt(best.az + 180)}. Rings every 10 dB.`;
+    const jb = Math.round(best.el/90*nEl), az = [];
+    for (let i = 0; i <= nAz; i++) az.push([Math.PI/2 - i/nAz*2*Math.PI, g[jb][i] - best.G]);   // bow up, starboard right
+    const ca = $('hfAz'); polar(ca, az, false, [['bow', ca.width/2, 18], ['stern', ca.width/2, ca.height - 4], ['stbd', ca.width - 4, ca.height/2 + 6, 'right'], ['port', 4, ca.height/2 + 6, 'left']]);
+    $('hfAzCap').textContent = `From above at ${f0n(best.el)}° elevation, bow up.`;
+  }
+  function sweep() {
+    const cv = $('hfSweep'), c = cv.getContext('2d'), Wd = cv.width, H = cv.height, l = 52, rgt = 10, t = 12, bt = 30, m = HF.matches[st.match[st.layout]];
+    const fx = f => l + (Wd - l - rgt)*Math.log(f/1.75)/Math.log(30.5/1.75), sy = s => t + (H - t - bt)*(1 - Math.log(Math.min(s, 100))/Math.log(100));
+    c.clearRect(0, 0, Wd, H); c.font = '21px system-ui,sans-serif'; c.lineWidth = 1;
+    HF.bands.forEach(b => { c.fillStyle = b.id === st.band ? 'rgba(20,39,95,.22)' : 'rgba(20,39,95,.09)'; const x0 = fx(b.lo), x1 = Math.max(fx(b.hi), x0 + 3); c.fillRect(x0, t, x1 - x0, H - t - bt); c.fillStyle = cssVar('--ink2'); c.textAlign = 'center'; c.fillText(b.id, (x0 + x1)/2, H - 6); });
+    [1, 2, 3, 5, 10, 30, 100].forEach(s => { c.strokeStyle = s === HF.radioTuner ? 'rgba(164,51,31,.55)' : 'rgba(20,39,95,.14)'; c.beginPath(); c.moveTo(l, sy(s)); c.lineTo(Wd - rgt, sy(s)); c.stroke(); c.fillStyle = cssVar('--ink2'); c.textAlign = 'right'; c.fillText(s, l - 6, sy(s) + 6); });
+    const pts = (res.sweep || []).slice().sort((a, b) => a.f - b.f);
+    if (pts.length > 1) { c.beginPath(); pts.forEach((p, i) => { const x = fx(p.f), y = sy(swr(p.Z, m.ratio)); if (i) c.lineTo(x, y); else c.moveTo(x, y); }); c.strokeStyle = cssVar('--ink'); c.lineWidth = 3; c.stroke(); }
+    $('hfSweepTitle').textContent = m.tuner ? 'SWR into 50 Ω at the feed, before the tuner' : `SWR after the ${m.name}`;
+    $('hfSweepCap').textContent = m.tuner ? 'Frequency from 1.8 to 30 MHz across, amateur bands shaded and named in metres. An autotuner hides this from the radio; high SWR here means more loss in the tuner. Red line: 3:1.' : `Frequency from 1.8 to 30 MHz across, amateur bands shaded and named in metres. Red line: 3:1, what most radios' own tuners can take. Dips are where the wire resonates.`;
+  }
+  function bandTable() {
+    const m = HF.matches[st.match[st.layout]], rows = HF.bands.map(b => {
+      const r = res.bands[b.id]; if (!r) return `<tr><td>${b.name}</td><td colspan="4">…</td></tr>`;
+      const j = judge(r), g = r.pat.best, cls = me => b.id === st.band ? ' class="me"' : '';
+      const fit = m.tuner ? `<td class="${j.tunerOk ? (j.tl < 1 ? 'good' : '') : 'bad'}">${j.tl < .05 ? '0.0' : f1(j.tl)} dB</td>` : `<td class="${j.s <= 2 ? 'good' : j.s > HF.radioTuner ? 'bad' : ''}">${swrTxt(j.s)}</td>`;
+      return `<tr${cls()}><td>${b.name}</td><td>${zTxt(r.Z)}</td>${fit}<td>${f1(g.G - j.tl)} dBi</td><td>${f0n(g.el)}°</td></tr>`;
+    }).join('');
+    $('hfBands').innerHTML = `<h2>Every band with this wire</h2><table class="hf-table"><thead><tr><th>Band</th><th>Impedance</th><th>${m.tuner ? 'Tuner loss' : 'SWR'}</th><th>Best gain</th><th>Angle</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="fine">Best gain after ${m.tuner ? 'the tuner\'s loss' : 'losses in the wire and rig'}, and the elevation where it points. Low angles reach far; high angles cover the nearest few hundred miles.</p>`;
+    const V = RG.vhf, h = RG.mastTop + .05 + V.base + V.length/2 - ws, rng = t => 2.23*(Math.sqrt(h) + Math.sqrt(t));
+    $('hfVhf').innerHTML = `<h2>VHF whip at the masthead, ${f1(h)} m above the water</h2><dl>${HF.vhfTargets.map(([k, t]) => row(k, `${f0n(rng(t))} nm`)).join('')}</dl>`;
+  }
+
+  /* ---------- On and off ---------- */
+  window.hfAntennaLayer = v => {
+    A = window.alizee;
+    if (v === on) return; on = v; panel.hidden = !on;
+    if (on) { group = new T.Group(); group.name = 'hfAntenna'; boat.add(group); lastKey = ''; refresh(); }
+    else {
+      run++; busy = false; if (worker) { worker.terminate(); worker = null; }
+      if (group) { boat.remove(group); disposeTree(group); group = null; } res = {}; segs = null; cfg = null;   // nothing of it stays in memory
+      A.renderer.shadowMap.needsUpdate = true; A.wake();
+    }
+  };
+  document.addEventListener('alizee:mode', () => { if (on) window.alizee.setLayer('hf', false); });
+  window.hfAntenna = { state: st, layout: () => layout(), swr, tunerLoss };   // for scripted checks
 })();
 </script>
 </body>

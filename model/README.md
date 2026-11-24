@@ -47,4 +47,8 @@ The site is the static page `public/index.html`, which is committed. Vercel only
   - `interior/26-int-tanks.js`: the 220 l diesel and water tanks, shaped to the hull
   - `interior/28-int-fit.js`: trims every interior surface to the inside of the hull
   - `interior/30-int-view.js`: the places to look from and the panel
+- `radio/`: the **HF antenna** layer, kept apart in the same way. It builds nothing until switched on and frees everything when switched off.
+  - `radio/10-radio-data.js`: amateur bands, wire layouts and lengths, matching, conductor sizes and the sea
+  - `radio/20-radio-mom.js`: a thin-wire method-of-moments solver over the sea: feed impedance, currents, losses and gain
+  - `radio/30-radio-view.js`: the wire and its hardware, currents in the wire and rig, the beam pattern, and the panel; the solver runs in a Web Worker
 - `make_overlays.py`: extracts the drawing overlays from the brochure

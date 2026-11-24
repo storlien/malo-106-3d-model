@@ -139,6 +139,7 @@
   canvas.addEventListener('wheel', e => { e.preventDefault(); anim = false; zoom(Math.exp(e.deltaY*.001)); }, { passive: false });
 
   /* Controls */
+  const offLayer = n => { const b = document.querySelector(`[data-layer="${n}"]`); if (b && b.getAttribute('aria-pressed') === 'true') setLayer(n, false); };
   function setLayer(name, on) {
     if (name === 'water') { water.visible = on; ground.visible = !on; }
     if (name === 'canvas') G.canvas.visible = on;
@@ -149,7 +150,8 @@
     if (name === 'rails') G.rails.visible = on;
     if (name === 'arch') setArch(on ? lastArch : 'none');
     if (name === 'drawing') overlay.visible = on;
-    if (name === 'radar') radarBeamLayer(on);
+    if (name === 'radar') { if (on) offLayer('hf'); radarBeamLayer(on); }     // the two share the left-hand panel space
+    if (name === 'hf') { if (on) offLayer('radar'); hfAntennaLayer(on); }
     renderer.shadowMap.needsUpdate = true;
     const b = document.querySelector(`[data-layer="${name}"]`); if (b) b.setAttribute('aria-pressed', on);
     needs = 3;
