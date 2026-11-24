@@ -210,8 +210,8 @@ const SPEC = {
         fatigue: { side: 0.5 },              // ± g at the arch top in everyday rolling: ±13° at 4.2 s in 3 m seas (sea trial)
       },
       // supporting pipes; presets combine them
-      braces: { knee: { down: 0.35, inboard: 0.32 }, side: { low: 0.55, along: 0.5 }, stays: { forward: 0.75, outboard: 0.10 }, aftBar: { up: 0.8 } },   // aftBar: 1.8 m clear over the stern platform
-      braceNames: [['knee', 'Knee braces'], ['planX', 'X under panels'], ['aftBar', 'Rear truss'], ['side', 'Side diagonals'], ['stays', 'Forward stays'], ['sleeves', 'Foot sleeves']],
+      braces: { knee: { down: 0.35, inboard: 0.32 }, side: { low: 0.55, along: 0.5 }, stays: { forward: 0.75, outboard: 0.10 }, aftBar: { up: 0.8 }, rungs: { above: 0.25, below: 0.2 } },   // aftBar: 1.8 m clear over the stern platform
+      braceNames: [['knee', 'Knee braces'], ['planX', 'X under panels'], ['aftBar', 'Rear truss'], ['side', 'Side diagonals'], ['stays', 'Forward stays'], ['sleeves', 'Foot sleeves'], ['rungs2', '2 side rungs'], ['rungs3', '3 side rungs'], ['rungs4', '4 side rungs']],
       // presets from the analysis with 32 mm pipe (all vertical and angled layouts tried):
       // coastal passes every case except someone hanging from the aft tube; offshore passes all, hanging at the limit; bluewater passes all with margin
       presets: [['off', 'None', []], ['coastal', 'Coastal', ['knee', 'sleeves']], ['offshore', 'Offshore', ['knee', 'stays', 'sleeves']], ['bluewater', 'Bluewater', ['knee', 'aftBar', 'stays', 'sleeves']]],

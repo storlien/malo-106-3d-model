@@ -315,8 +315,8 @@ const SPEC = {
         fatigue: { side: 0.5 },              // ± g at the arch top in everyday rolling: ±13° at 4.2 s in 3 m seas (sea trial)
       },
       // supporting pipes; presets combine them
-      braces: { knee: { down: 0.35, inboard: 0.32 }, side: { low: 0.55, along: 0.5 }, stays: { forward: 0.75, outboard: 0.10 }, aftBar: { up: 0.8 } },   // aftBar: 1.8 m clear over the stern platform
-      braceNames: [['knee', 'Knee braces'], ['planX', 'X under panels'], ['aftBar', 'Rear truss'], ['side', 'Side diagonals'], ['stays', 'Forward stays'], ['sleeves', 'Foot sleeves']],
+      braces: { knee: { down: 0.35, inboard: 0.32 }, side: { low: 0.55, along: 0.5 }, stays: { forward: 0.75, outboard: 0.10 }, aftBar: { up: 0.8 }, rungs: { above: 0.25, below: 0.2 } },   // aftBar: 1.8 m clear over the stern platform
+      braceNames: [['knee', 'Knee braces'], ['planX', 'X under panels'], ['aftBar', 'Rear truss'], ['side', 'Side diagonals'], ['stays', 'Forward stays'], ['sleeves', 'Foot sleeves'], ['rungs2', '2 side rungs'], ['rungs3', '3 side rungs'], ['rungs4', '4 side rungs']],
       // presets from the analysis with 32 mm pipe (all vertical and angled layouts tried):
       // coastal passes every case except someone hanging from the aft tube; offshore passes all, hanging at the limit; bluewater passes all with margin
       presets: [['off', 'None', []], ['coastal', 'Coastal', ['knee', 'sleeves']], ['offshore', 'Offshore', ['knee', 'stays', 'sleeves']], ['bluewater', 'Bluewater', ['knee', 'aftBar', 'stays', 'sleeves']]],
@@ -2088,7 +2088,7 @@ function renderArchStats(r, q) {
   if (r) rows.push([`Pipe, ${num(r.pipeMm, 0)} mm`, `${num(r.steelM, 1)} m`], ['Arch steel weight (est.)', `${num(r.steelKg, 1)} kg`]);
   if (r) rows.push(['Arch panel weight', `${num(r.panelKg, 1)} kg`], ['Arch total weight (est.)', `${num(r.totalKg, 1)} kg`]);
   if (rows.length) groups.push(['Power and materials', rows]);
-  groups.push([RADAR.name + ' radar', [['Top above water', fmtM(RADAR.top - HS.floatSink)], ['Bottom above water', fmtM(RADAR.bottom - HS.floatSink)], ['Size', `Ø${num(RADAR.diameter*1000, 0)} × ${num(RADAR.height*1000, 0)} mm`], ['Mast mount', RADAR.mount], ['Mount above spreaders', fmtCm(RADAR.spreaderGap)], ['Radome to mast', `${num(RADAR.mastGap*100, 1)} cm`], ['Radar weight', `${num(RADAR.kg, 1)} kg`]]]);
+  // the radar and its mast mount stay in the weight and stability model, but are not listed here
   document.getElementById('archStats').innerHTML = groups.map(([h, list, before]) =>
     `<h2>${h}</h2>${before || ''}<dl>${list.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
 }
@@ -2169,7 +2169,11 @@ function initArchUI(kick) {
   addRadios('archBracePresetPick', 'archBracePreset', [...ST.presets.map(q => [q[0], q[1]]), ['custom', 'Custom']], v => { const q = ST.presets.find(p => p[0] === v); if (q) setArch(lastArch, { braces: q[2] }); });
   ST.braceNames.forEach(([v, label]) => {
     const l = document.createElement('label'), i = document.createElement('input'); i.type = 'checkbox'; i.name = 'archBrace'; i.value = v;
-    i.addEventListener('change', () => setArch(lastArch, { braces: [...document.querySelectorAll('input[name="archBrace"]:checked')].map(x => x.value) }));
+    i.addEventListener('change', () => {
+      let list = [...document.querySelectorAll('input[name="archBrace"]:checked')].map(x => x.value);
+      if (i.checked && v.startsWith('rungs')) list = list.filter(x => !x.startsWith('rungs') || x === v);   // one set of side rungs at a time
+      setArch(lastArch, { braces: list });
+    });
     l.append(i, document.createTextNode(label)); document.getElementById('archBracePick').append(l);
   });
   addRadios('archHeightPick', 'archHeight', AC.archHeights.map(q => [q.id, q.name]), v => setArch(lastArch, { height: v }));
@@ -2215,6 +2219,12 @@ function archBraces({ list, pipe, footPlate, legs, yRail, railFwd, railAft, fram
     const rl = [1, -1].map(s => legs.find(l => l.kind === 'rear' && l.s === s)), [a, b] = rl.map(l => at(l, B.aftBar.up)), tx = (rl[0].top[0] + rl[1].top[0])/2;
     cross(tx); pipe([a, b]); pipe([a, [tx, yRail, 0]]); pipe([b, [tx, yRail, 0]]);
   }
+  const rungs = list.find(id => id.startsWith('rungs'));
+  if (rungs) [1, -1].forEach(s => {                      // horizontal pipes between the fore and rear pipe on each side, evenly up the legs
+    const f = legs.find(l => l.kind === 'fore' && l.s === s), r = legs.find(l => l.kind === 'rear' && l.s === s), n = +rungs.slice(5);
+    const y0 = Math.max(f.base[1], r.base[1]) + B.rungs.above, y1 = yRail - B.rungs.below, onLeg = (l, y) => at(l, (y - l.base[1])/(l.top[1] - l.base[1]));
+    for (let k = 0; k < n; k++) { const y = n === 1 ? y0 : lerp(y0, y1, k/(n - 1)); pipe([onLeg(f, y), onLeg(r, y)]); }
+  });
   if (on('planX')) [1, -1].forEach(s => pipe([[railFwd, yRail, s*frameHalf], [railAft, yRail, -s*frameHalf]]));   // X under the panels
 }
 

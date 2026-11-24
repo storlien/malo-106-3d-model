@@ -427,7 +427,7 @@ function renderArchStats(r, q) {
   if (r) rows.push([`Pipe, ${num(r.pipeMm, 0)} mm`, `${num(r.steelM, 1)} m`], ['Arch steel weight (est.)', `${num(r.steelKg, 1)} kg`]);
   if (r) rows.push(['Arch panel weight', `${num(r.panelKg, 1)} kg`], ['Arch total weight (est.)', `${num(r.totalKg, 1)} kg`]);
   if (rows.length) groups.push(['Power and materials', rows]);
-  groups.push([RADAR.name + ' radar', [['Top above water', fmtM(RADAR.top - HS.floatSink)], ['Bottom above water', fmtM(RADAR.bottom - HS.floatSink)], ['Size', `Ø${num(RADAR.diameter*1000, 0)} × ${num(RADAR.height*1000, 0)} mm`], ['Mast mount', RADAR.mount], ['Mount above spreaders', fmtCm(RADAR.spreaderGap)], ['Radome to mast', `${num(RADAR.mastGap*100, 1)} cm`], ['Radar weight', `${num(RADAR.kg, 1)} kg`]]]);
+  // the radar and its mast mount stay in the weight and stability model, but are not listed here
   document.getElementById('archStats').innerHTML = groups.map(([h, list, before]) =>
     `<h2>${h}</h2>${before || ''}<dl>${list.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>`).join('');
 }
@@ -508,7 +508,11 @@ function initArchUI(kick) {
   addRadios('archBracePresetPick', 'archBracePreset', [...ST.presets.map(q => [q[0], q[1]]), ['custom', 'Custom']], v => { const q = ST.presets.find(p => p[0] === v); if (q) setArch(lastArch, { braces: q[2] }); });
   ST.braceNames.forEach(([v, label]) => {
     const l = document.createElement('label'), i = document.createElement('input'); i.type = 'checkbox'; i.name = 'archBrace'; i.value = v;
-    i.addEventListener('change', () => setArch(lastArch, { braces: [...document.querySelectorAll('input[name="archBrace"]:checked')].map(x => x.value) }));
+    i.addEventListener('change', () => {
+      let list = [...document.querySelectorAll('input[name="archBrace"]:checked')].map(x => x.value);
+      if (i.checked && v.startsWith('rungs')) list = list.filter(x => !x.startsWith('rungs') || x === v);   // one set of side rungs at a time
+      setArch(lastArch, { braces: list });
+    });
     l.append(i, document.createTextNode(label)); document.getElementById('archBracePick').append(l);
   });
   addRadios('archHeightPick', 'archHeight', AC.archHeights.map(q => [q.id, q.name]), v => setArch(lastArch, { height: v }));

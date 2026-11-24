@@ -29,6 +29,12 @@ function archBraces({ list, pipe, footPlate, legs, yRail, railFwd, railAft, fram
     const rl = [1, -1].map(s => legs.find(l => l.kind === 'rear' && l.s === s)), [a, b] = rl.map(l => at(l, B.aftBar.up)), tx = (rl[0].top[0] + rl[1].top[0])/2;
     cross(tx); pipe([a, b]); pipe([a, [tx, yRail, 0]]); pipe([b, [tx, yRail, 0]]);
   }
+  const rungs = list.find(id => id.startsWith('rungs'));
+  if (rungs) [1, -1].forEach(s => {                      // horizontal pipes between the fore and rear pipe on each side, evenly up the legs
+    const f = legs.find(l => l.kind === 'fore' && l.s === s), r = legs.find(l => l.kind === 'rear' && l.s === s), n = +rungs.slice(5);
+    const y0 = Math.max(f.base[1], r.base[1]) + B.rungs.above, y1 = yRail - B.rungs.below, onLeg = (l, y) => at(l, (y - l.base[1])/(l.top[1] - l.base[1]));
+    for (let k = 0; k < n; k++) { const y = n === 1 ? y0 : lerp(y0, y1, k/(n - 1)); pipe([onLeg(f, y), onLeg(r, y)]); }
+  });
   if (on('planX')) [1, -1].forEach(s => pipe([[railFwd, yRail, s*frameHalf], [railAft, yRail, -s*frameHalf]]));   // X under the panels
 }
 
