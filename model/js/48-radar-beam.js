@@ -48,46 +48,9 @@ function shadowSectors(sh) {
   return out;
 }
 
-/* The beam as the installation guide draws it: a flat cross-section through the radome, green within ±12.5°,
-   yellow from 12.5° to 25°, nothing outside. It turns to face the viewer, so it always shows the slice across the
-   line of sight; directions the rig blocks are left out, and the lower edge lies on the water. */
-const beamFan = (() => {
-  const geo = new T.BufferGeometry(), mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .42, side: T.DoubleSide, depthWrite: false }));
-  mesh.renderOrder = 5; mesh.frustumCulled = false;
-  let c = null, sh = null, R = 30, lastAz = null;
-  const green = new T.Color(RB.mainColour), yellow = new T.Color(RB.fullColour), cam = new V3(), inv = new T.Matrix4();
-  const build = az => {
-    const water = SPEC.hull.floatSink + .02, r0 = SPEC.rig.radar.diameter/2, nr = 16, pos = [], col = [], idx = [];
-    const P = (a, e, r) => [c.x + r*Math.cos(e)*Math.cos(a), Math.max(water, c.y + r*Math.sin(e)), r*Math.cos(e)*Math.sin(a)];
-    const elIdx = d => clamp(Math.round((d + RB.full)/(2*RB.full)*sh.el - .5), 0, sh.el - 1);
-    [az + Math.PI/2, az - Math.PI/2].forEach(a => {
-      const ai = ((Math.round(a/(Math.PI*2)*sh.az)%sh.az) + sh.az)%sh.az;
-      for (let d = -RB.full; d < RB.full - 1e-6; d += 1.25) {
-        if (sh.hit[ai*sh.el + elIdx(d + .625)]) continue;
-        const e0 = d*Math.PI/180, e1 = (d + 1.25)*Math.PI/180, cc = Math.abs(d + .625) < RB.main ? green : yellow, b = pos.length/3;
-        for (let k = 0; k <= nr; k++) { const r = r0 + (R - r0)*k/nr; pos.push(...P(a, e0, r), ...P(a, e1, r)); for (let q = 0; q < 2; q++) col.push(cc.r, cc.g, cc.b); }
-        for (let k = 0; k < nr; k++) { const p = b + 2*k; idx.push(p, p + 2, p + 1, p + 1, p + 2, p + 3); }
-      }
-    });
-    geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new T.Float32BufferAttribute(col, 3)); geo.setIndex(idx);
-    geo.computeBoundingSphere();
-  };
-  return {
-    set(c_, sh_, R_) { c = c_; sh = sh_; R = R_; lastAz = null; G.radarBeam.add(mesh); },
-    tick() {
-      if (!c || !G.radarBeam.visible) return false;
-      boat.updateMatrixWorld(); inv.copy(boat.matrixWorld).invert(); cam.copy(window.alizee.camera.position).applyMatrix4(inv);
-      const az = Math.atan2(cam.z, cam.x - c.x), step = Math.PI*2/sh.az;
-      if (lastAz !== null && Math.abs(az - lastAz) < step/2) return false;
-      lastAz = az; build(az); return true;
-    },
-  };
-})();
-
 function buildRadarBeam() {
   G.radarBeam.clear();
   const c = radarCentre(radarState.pos), hw = c.y - SPEC.hull.floatSink, sh = radarShadow(c), R = RB.drawRadius;
-  beamFan.set(c, sh, R);
   // all round: sheets at 0° and ±12.5° (green) and ±25° (yellow); a sector is left open wherever the rig blocks
   // any part of that band in that direction, so the blocked regions show as gaps
   const water = SPEC.hull.floatSink + .02, r0 = SPEC.rig.radar.diameter/2, na = sh.az;
@@ -134,7 +97,7 @@ function buildRadarBeam() {
     <div class="radar-key"><span><i style="background:${RB.fullColour}"></i>Full beam ±${RB.full}°</span><span><i style="background:${RB.mainColour}"></i>Half power ±${RB.main}°</span><span>Gaps: blocked by the rig</span></div>
     <div class="sea-run"><button id="tackPlay">Play a tack</button></div>
     <div class="stats" id="radarStats"></div><div class="stats" id="tackStats"></div>
-    <p class="fine">The beam is drawn as the guide does, as a slice across your line of sight; orbit to sweep it round. Seen exactly from the side the slice points straight ahead and astern, where the furled genoa and the mast block it. Beam from the Lowrance Broadband 3G installation guide. Shadows are found by tracing the beam past the mast, spreaders and rigging. Ranges use the standard radar horizon, 2.21 × √height in nautical miles.</p></div>`;
+    <p class="fine">Beam from the Lowrance Broadband 3G installation guide. Shadows are found by tracing the beam past the mast, spreaders and rigging. Ranges use the standard radar horizon, 2.21 × √height in nautical miles.</p></div>`;
   document.body.append(panel);
   RB.positions.forEach(p => {
     const l = document.createElement('label'), i = document.createElement('input'); i.type = 'radio'; i.name = 'radarPos'; i.value = p.id;
@@ -175,7 +138,7 @@ function buildRadarBeam() {
   let A = null;
   window.radarBeamLayer = on => {
     A = window.alizee; G.radarBeam.visible = on; panel.hidden = !on;
-    if (!hooked) { A.hooks.push(dt => tackAnim.tick(dt)); A.hooks.push(() => beamFan.tick()); hooked = true; }
+    if (!hooked) { A.hooks.push(dt => tackAnim.tick(dt)); hooked = true; }
     if (!on && tackAnim.playing) { tackAnim.stop(); panel.querySelector('#tackPlay').textContent = 'Play a tack'; }
     if (on) update(); else { placeRadar(RB.positions.find(p => p.current).id); }
   };
