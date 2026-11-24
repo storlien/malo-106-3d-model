@@ -180,12 +180,12 @@ const SPEC = {
     panelCounts: [2, 3, 4],
     panelGap: 0.015,        // [E] between neighbouring panels
     pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
-    foreAngles: [70, 60, 0],   // Angled arch: fore pipe angle to the toe rail it stands on, degrees; 0 = at the panel edge: the foot stays put and the pipe meets the forward panel edge
+    foreAngles: [60, 0],   // Angled arch: fore pipe angle to the toe rail it stands on, degrees; 0 = at the panel edge: the foot stays put and the pipe meets the forward panel edge
     rearAngles: [0, 60],    // selectable rear pipe angles at the top frame, degrees; 0 = unfixed, the pipe meets the aft panel edge at whatever angle the height gives. Add values here to test more.
-    // vertical arch heights: y is the top of the fore pipes above the design waterline; 'fit' is solved so the panels fill the frame
-    archHeights: [{ id: 'fit', name: 'Closes gap' }, { id: 'current', name: 'Current', y: 2.60 }, { id: 'lower', name: 'Lower', y: 2.40 }],
-    foreLimitX: 0.25,       // furthest aft the fore pipes can stand, just forward of the pushpit's aft rail
-    minFitY: 2.20,          // 'Closes gap' never goes below this height
+    // vertical and angled arch heights: headroom from the top of the stern toe rail to the underside of the frame.
+    // The bimini top is 1.25 m above the helm bench [M], which is 0.10 m below the toe rail [M].
+    archHeights: [{ id: 'bimini', name: 'Same as bimini', headroom: 1.15 }, { id: 'middle', name: 'Middle', headroom: 1.27 }, { id: 'highest', name: 'Highest', headroom: 1.47 }],
+    foreLimitX: 0.25,       // where the vertical arch's fore pipes stand, just forward of the pushpit's aft rail
     pipeWall: 0.002,        // [E] used for the weight estimate
     backstaySlot: 0.09,     // half-width of the opening around the backstay in the split layout
     warnGap: 0.05,          // clearances below this are flagged as tight
@@ -203,7 +203,6 @@ const SPEC = {
       { id: 'angled', alias: 'low', name: 'Angled arch', note: 'Straight, unbent pipes: fore pipes leaning aft from the stern toe rail and rear pipes on the transom. Low weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },
         foreStraight: true,   // two straight fore pipes instead of a bent hoop; their angle is chosen on the page (foreAngles)
-        heights: [{ id: 'lower', name: 'Lower', y: 2.16 }, { id: 'current', name: 'Current', y: 2.26 }, { id: 'higher', name: 'Higher', y: 2.40 }, { id: 'highest', name: 'Highest', y: 2.55 }],   // top of the pipe frame above the design waterline
         aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.46 },
 
       { id: 'tall', name: 'Standing height', note: 'You can stand upright on the aft deck. More weight and windage up high, so the frame must be stiffer.',
