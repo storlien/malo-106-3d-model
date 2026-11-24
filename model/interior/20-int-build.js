@@ -66,13 +66,13 @@ function front(c, w, h, normal, kind = 'door') {
 (function shell() {
   const sole = INT.sole;
   // saloon, galley and navigation sole, with the aft-cabin entry
-  const xs = span(2.33, INT.wardrobe.fwd, 40);
-  igrid(xs.map(x => { const h = hin(x, sole + .01); return [[x, sole, -h], [x, sole, 0], [x, sole, Math.min(h, x < INT.head.fwd ? INT.head.inner : h)]]; }), intMat.sole, soleUV);
+  const xs = span(INT.head.aft, INT.wardrobe.fwd, 50);          // one sole from the head and aft cabin forward
+  igrid(xs.map(x => { const h = hin(x, sole + .01); return [[x, sole, -h], [x, sole, 0], [x, sole, h]]; }), intMat.sole, soleUV);
   // forward cabin floor, a step up, and the head and aft-cabin floors
   const v = INT.vBerth, hf = INT.head, fh = v.floorHalf;
   igrid(span(v.aft - .03, v.floorFwd, 4).map(x => [[x, INT.foreSole, -fh], [x, INT.foreSole, fh]]), intMat.sole, soleUV);
   ibox([v.aft - .04, (sole + INT.foreSole)/2, 0], [.04, INT.foreSole - sole, fh*2], intMat.trim);
-  igrid(span(hf.aft, hf.fwd, 8).map(x => [[x, INT.aftSole, hf.inner], [x, INT.aftSole, hin(x, INT.aftSole)]]), intMat.laminate);
+  for (let k = 0; k < 9; k++) ibox([(hf.floorAft + hf.door[0][0])/2, INT.aftSole + .012, hf.inner + .05 + k*.065], [hf.door[0][0] - hf.floorAft, .02, .045], intMat.trim);   // slatted head floor
 
   // hull lining from the sole up to the deck, both sides
   const lx = span(.45, 8.86, 90);
@@ -217,36 +217,38 @@ function front(c, w, h, normal, kind = 'door') {
   // companionway steps from the cockpit down to the sole
   const S = INT.steps, n = S.treads;
   for (let i = 0; i < n; i++) {
-    const f = (i + 1)/(n + 1), x = lerp(S.botX, S.topX, (i + .5)/n), y = lerp(s0, CP.seat, f);
+    const f = (i + 1)/(n + 1), x = lerp(S.botX, S.topX, f), y = lerp(s0, CP.sole, f);
     ibox([x, y, S.z], [.13, .03, S.half*2], intMat.trim);
   }
-  [1, -1].forEach(s => rod(IG, [S.botX + .02, s0, S.z + s*(S.half + .02)], [S.topX - .04, CP.seat, S.z + s*(S.half + .02)], .022, intMat.trim));
+  [1, -1].forEach(s => rod(IG, [S.botX + .02, s0, S.z + s*(S.half + .02)], [S.topX - .02, CP.sole, S.z + s*(S.half + .02)], .022, intMat.trim));
 })();
 
 /* ---------- Head, aft cabin and engine box ---------- */
 (function aft() {
-  const H = INT.head, fy = INT.aftSole, top = 1.32;
-  // walls: inboard with a door, and athwartships fore and aft; light laminate inside, mahogany outside
-  igrid([[ [H.aft, fy, H.inner], [H.aft, top, H.inner] ], [ [H.aft + .45, fy, H.inner], [H.aft + .45, top, H.inner] ]], intMat.wood);
-  ibox([(H.aft + .45 + H.fwd)/2, (1.15 + top)/2, H.inner], [H.fwd - H.aft - .45, top - 1.15, .03], intMat.wood);
-  front([(H.aft + .45 + H.fwd)/2, (INT.sole + 1.15)/2, H.inner - .003], H.fwd - H.aft - .5, 1.15 - INT.sole - .05, [0, -1]);
-  [H.aft, H.fwd].forEach(x => igrid(span(fy, top, 6).map(y => [[x, y, H.inner], [x, y, Math.max(H.inner, hin(x, y))]]), intMat.laminate));
-  // toilet and the moulded basin counter
+  const H = INT.head, A = INT.aftCabin, fy = INT.aftSole, ceil = x => CP.seat - .04;
+  const wall = (a, b, m = intMat.wood) => igrid(span(fy, ceil(), 6).map(y => [[a[0], y, a[1]], [b[0], y, b[1]]]), m);   // straight wall, sole to ceiling
+  const door = ([a, b]) => {                                     // angled door with a framed panel and a steel handle
+    wall(a, b, intMat.trim); const mx = (a[0] + b[0])/2, mz = (a[1] + b[1])/2, ang = Math.atan2(b[0] - a[0], b[1] - a[1]), w = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const p = ibox([mx, (fy + ceil())/2, mz], [.012, (ceil() - fy)*.7, w*.7], intMat.wood); p.rotation.y = ang;
+    const hnd = ibox([lerp(a[0], b[0], .85), fy + .95, lerp(a[1], b[1], .85)], [.03, .02, .1], intMat.steel); hnd.rotation.y = ang;
+  };
+  // head: inboard wall beside the ladder, forward wall, angled door; light laminate inside
+  wall([H.aft, H.inner], [H.door[0][0], H.inner]);
+  wall([H.door[1][0], H.door[1][1]], [H.door[1][0], hin(H.door[1][0], .2)]);
+  door(H.door);
+  igrid(span(fy, ceil(), 6).map(y => [[H.aft, y, H.inner], [H.aft, y, Math.max(H.inner, hin(H.aft, y))]]), intMat.laminate);
   const [tx, tz] = H.toilet; const bowl = iput(new T.CylinderGeometry(.17, .13, .36, 20), intMat.white); bowl.position.set(tx, fy + .18, tz); bowl.scale.set(1.2, 1, 1);
   const lid = iput(new T.CylinderGeometry(.18, .18, .03, 20), intMat.white); lid.position.set(tx, fy + .38, tz); lid.scale.set(1.2, 1, 1);
-  const zi = Math.min(...span(H.basin[0], H.basin[1], 4).map(x => hin(x, .4))) - .4;
+  const zi = H.door[1][1] + .02;                                 // basin counter outboard of the floor
   hullBlock(H.basin[0], H.basin[1], fy, fy + .78, zi, 1, intMat.wood); hullBlock(H.basin[0], H.basin[1], fy + .78, fy + .8, zi - .01, 1, intMat.white, 'top');
-  const basin = iput(new T.CircleGeometry(.16, 24), new T.MeshStandardMaterial({ color: C('#e8e6e0'), roughness: .2 })); basin.rotation.x = -Math.PI/2; basin.scale.set(1.3, 1, 1); basin.position.set((H.basin[0] + H.basin[1])/2, fy + .805, zi + .2);
+  const basin = iput(new T.CircleGeometry(.14, 24), new T.MeshStandardMaterial({ color: C('#e8e6e0'), roughness: .2 })); basin.rotation.x = -Math.PI/2; basin.scale.set(1.5, 1, 1); basin.position.set((H.basin[0] + H.basin[1])/2, fy + .805, zi + .16);
 
-  // aft cabin: a wide berth under the cockpit seat, with its bulkhead and door
-  const A = INT.aftCabin;
-  hullBlock(A.aft, A.fwd - .05, fy, A.berth, -A.inner, -1, intMat.wood); hullBlock(A.aft, A.fwd - .05, A.berth, A.berth + .11, -A.inner, -1, intMat.cushion, 'top');
-  igrid(span(fy, 1.3, 8).map(y => [[A.fwd, y, -.95], [A.fwd, y, -Math.max(.95, hin(A.fwd, y))]]), intMat.wood);
-  ibox([A.fwd, (.95 + 1.3)/2, (A.inner - .95)/2 - .01], [.03, .35, .95 + A.inner], intMat.wood);
-  ibox([A.fwd, (INT.sole + .95)/2, -(.95 + .30)/2 - .3], [.03, .95 - INT.sole, .02], intMat.trim);
-  // engine box under the cockpit sole, behind the steps
-  const E = INT.engine, ey = (INT.aftSole + CP.sole - .05)/2; ibox([(E.aft + E.fwd)/2, ey, 0], [E.fwd - E.aft, CP.sole - .05 - INT.aftSole, E.half*2], intMat.wood);
-  front([E.fwd + .002, ey, 0], .4, .5, [1, 0]);
+  // aft cabin: the berth aft, a standing area forward of it, an inboard wall beside the ladder and an angled door
+  hullBlock(A.aft, A.fwd, fy, A.berth, -A.inner, -1, intMat.wood); hullBlock(A.aft, A.fwd, A.berth, A.berth + .11, -A.inner, -1, intMat.cushion, 'top');
+  wall([A.aft, A.wall], [A.door[0][0], A.wall]);
+  door(A.door);
+  // engine box under the cockpit, between the two cabins and aft of the ladder
+  const E = INT.engine, ey = (fy + CP.sole - .05)/2; ibox([(E.aft + E.fwd)/2, ey, 0], [E.fwd - E.aft, CP.sole - .05 - fy, E.half*2], intMat.wood);
 })();
 
 /* ---------- Warm cabin lights, on only when the interior is open ---------- */

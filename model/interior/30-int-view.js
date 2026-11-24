@@ -22,7 +22,7 @@
   panel.innerHTML = `<summary>Interior <span id="intCurrent"></span></summary><div class="arch-body">
     <fieldset class="pick" id="intPick"><legend>Where to look</legend></fieldset>
     <p class="note">Inside, drag to look around and scroll to step closer. In the plan, <b>Brochure drawing</b> lays the builder's plan over it. The layout follows the brochure's accommodation plan, scaled to the model, and the owner's photos.</p>
-    <p class="fine">The companionway steps come down from the model's companionway at the forward end of the cockpit. The brochure plan draws them under the cockpit, about 0.7 m further aft.</p></div>`;
+</div>`;
   document.body.append(panel);
   PLACES.forEach(([id, label]) => {
     const l = document.createElement('label'), i = document.createElement('input'); i.type = 'radio'; i.name = 'intPlace'; i.value = id;

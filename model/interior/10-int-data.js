@@ -7,7 +7,7 @@
 const INT = {
   sole: -0.38,            // [E] saloon sole, which gives about 1.8 m headroom under the coachroof ("full standing height" [B])
   foreSole: -0.12,        // [E] forward cabin sole, a step up
-  aftSole: -0.22,         // [E] head and aft-cabin floor
+  aftSole: -0.38,         // [B] head and aft-cabin floors are level with the saloon sole
   lining: 0.022,          // hull lining thickness
 
   saloon: { aft: 4.15, fwd: 6.30 },                       // [B]
@@ -24,9 +24,11 @@ const INT = {
   stove: { x: 3.22, z: -0.80 },                           // [B][P] gimballed cooker with oven in the outboard counter, facing the centreline
   sink: { x: 3.78, z: -0.42, half: [0.16, 0.22] },        // [B][P] in the forward leg
   nav: { aft: 2.94, fwd: 4.02, inner: 0.88, seatFwd: 3.36, table: 0.78 },   // starboard, the navigator faces forward [B]
-  steps: { topX: 3.56, botX: 4.12, z: 0.18, half: 0.25, treads: 4 },   // [E] from the model's companionway down to the sole, a little to starboard as on the plan [B]
-  head: { aft: 1.80, fwd: 2.94, inner: 0.28, toilet: [2.08, 0.62], basin: [2.36, 2.86] },   // starboard aft [B][P]
-  aftCabin: { aft: 0.42, fwd: 2.33, inner: -0.24, berth: 0.40 },   // port aft, under the cockpit seat [B][P]
+  // Aft end, from the owner's marked-up brochure plan (2026-11-24): ladder on the centreline between the head and the aft cabin,
+  // each with an angled door in its forward inboard corner
+  steps: { topX: 2.32, botX: 2.76, z: 0.0, half: 0.26, treads: 4 },   // [B] companionway ladder, rising aft
+  head: { aft: 1.80, fwd: 2.95, inner: 0.28, floorAft: 2.30, door: [[2.77, 0.28], [2.95, 0.90]], toilet: [2.04, 0.60], basin: [2.37, 2.90] },   // starboard aft [B][P]
+  aftCabin: { aft: 0.42, fwd: 2.37, inner: -0.27, berth: 0.40, floorFwd: 2.74, wall: -0.31, door: [[2.74, -0.31], [2.95, -0.78]] },   // port aft: berth, then a standing area [B][P]
   engine: { aft: 0.42, fwd: 2.27, half: 0.24 },           // [B] under the cockpit sole
 
   colours: { mahogany: '#8a3f1e', trim: '#6e2f14', cushion: '#aebdc6', headliner: '#f1ede4', laminate: '#d9e0e4', sole: '#7a4524', holly: '#e0c79a' },   // [P]
