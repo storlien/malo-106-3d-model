@@ -11,9 +11,10 @@
 
   /* ---------- Where things are ---------- */
   function places() {
-    const mx = RG.mastX, top = RG.mastTop, F = HF.feed, Sl = HF.slopeTop, Ap = HF.apex, Bw = HF.bow;
-    return { mx, top, f0: [F.x, sheerY(F.x) + F.above, halfB(F.x) - F.inset], sTop: [mx + Sl.dx, top - Sl.below, Sl.z],
-      apex: [mx + Ap.dx, top - Ap.below, Ap.z], bow: [Bw.x, sheerY(Bw.x) + Bw.above, Math.min(Bw.z, halfB(Bw.x) - .12)] };
+    const mx = RG.mastX, top = RG.mastTop, F = HF.feed, Bw = HF.bow, V = RG.vhf, K = HF.blockBelow;
+    const block = [mx + V.x, top + .05 - V.sheave - .012, V.block], under = d => [block[0], block[1] - V.sheave - d, block[2]];
+    return { mx, top, block, f0: [F.x, sheerY(F.x) + F.above, halfB(F.x) - F.inset], sTop: under(K.sloper), vTop: under(K.vee), dTop: under(K.dipole),
+      bow: [Bw.x, sheerY(Bw.x) + Bw.above, Math.min(Bw.z, halfB(Bw.x) - .12)] };
   }
   function rigWires(bonded) {
     const mx = RG.mastX, top = RG.mastTop, foot = roofY(mx, 0), [sp0, sp1] = RG.spreaders, out = [], T = [mx, top, 0];
@@ -36,11 +37,12 @@
   /* The wire for the chosen layout: solver wires, feed point, earth load, and what to draw. */
   function layout() {
     const P = places(), lay = st.layout, Lsel = st.len[lay], wires = rigWires(st.bonded), draw = { wire: [], rod: null, ends: [], halyards: [], tuner: null, balun: null }, info = {};
+    if (lay === 'dipole') P.apex = P.dTop; else if (lay === 'vee') P.apex = P.vTop;
     if (lay === 'dipole') {
       const d1 = len(sub(P.f0, P.apex)), d2 = len(sub(P.bow, P.apex)), l = +Lsel;
       const aft = along(P.apex, P.f0, Math.min(l, d1)), fore = along(P.apex, P.bow, Math.min(l, d2));
       wires.push(W(P.apex, aft, 'antenna'), W(P.apex, fore, 'antenna'));
-      draw.wire.push([aft, P.apex, fore]); draw.ends.push(aft, fore); draw.halyards.push([P.apex, [P.mx + .1, P.top, 0]]); draw.balun = P.apex;
+      draw.wire.push([aft, P.apex, fore]); draw.ends.push(aft, fore); draw.halyards.push([P.apex, P.block]); draw.balun = P.apex;
       if (l > d1 - .3) draw.halyards.push([aft, P.f0]); if (l < d2 - .3) draw.halyards.push([fore, P.bow]);
       info.short = l > Math.min(d1, d2); info.total = 2*l;
       return { wires, feed: S(P.apex), loads: [], draw, info, P };
@@ -49,20 +51,20 @@
     wires.push(W(lead, P.f0, 'lead')); draw.tuner = P.f0;
     if (lay === 'sloper') {
       const D = len(sub(P.sTop, P.f0)), L = Lsel === 'fit' ? D : +Lsel;
-      if (L <= D + 1e-6) { const e = along(P.f0, P.sTop, L); wires.push(W(P.f0, e, 'antenna')); draw.wire.push([P.f0, e]); draw.ends.push(e); draw.halyards.push([e, [P.mx - .08, P.top, 0]]); }
+      if (L <= D + 1e-6) { const e = along(P.f0, P.sTop, L); wires.push(W(P.f0, e, 'antenna')); draw.wire.push([P.f0, e]); draw.ends.push(e); draw.halyards.push([e, P.block]); }
       else {
         const R = HF.rods.find(r => r.id === st.rod), k = Math.tan(HF.rodRise*Math.PI/180), u0 = [R.dir[0], k, R.dir[1]], un = len(u0), u = u0.map(v => v/un);
         const tipAt = t => P.f0.map((v, i) => v + u[i]*t), tot = t => t + len(sub(P.sTop, tipAt(t)));
         let a = 0, b = L; for (let i = 0; i < 50; i++) { const m = (a + b)/2; if (tot(m) < L) a = m; else b = m; }
         const tip = tipAt(a); info.rod = a;
-        wires.push(W(P.f0, tip, 'antenna'), W(tip, P.sTop, 'antenna')); draw.wire.push([P.f0, tip, P.sTop]); draw.rod = [P.f0, tip]; draw.ends.push(P.sTop); draw.halyards.push([P.sTop, [P.mx - .08, P.top, 0]]);
+        wires.push(W(P.f0, tip, 'antenna'), W(tip, P.sTop, 'antenna')); draw.wire.push([P.f0, tip, P.sTop]); draw.rod = [P.f0, tip]; draw.ends.push(P.sTop); draw.halyards.push([P.sTop, P.block]);
       }
       info.reach = D; info.total = L;
     } else {
       const d1 = len(sub(P.apex, P.f0)), d2 = len(sub(P.bow, P.apex)), fit = d1 + d2, L = Lsel === 'fit' ? fit : Math.min(+Lsel, fit);
       if (L <= d1) { const e = along(P.f0, P.apex, L); wires.push(W(P.f0, e, 'antenna')); draw.wire.push([P.f0, e]); draw.ends.push(e); }
       else { const e = along(P.apex, P.bow, L - d1); wires.push(W(P.f0, P.apex, 'antenna'), W(P.apex, e, 'antenna')); draw.wire.push([P.f0, P.apex, e]); draw.ends.push(e); if (L < fit - .3) draw.halyards.push([e, P.bow]); }
-      draw.halyards.push([P.apex, [P.mx + .1, P.top, 0]]); info.reach = fit; info.total = L;
+      if (L <= d1) draw.halyards.push([draw.ends[0], P.block]); info.reach = fit; info.total = L;
     }
     return { wires, feed: S(P.f0), loads: [[[lead[0], 0, lead[2]], HF.groundOhm]], draw, info, P };
   }
@@ -226,7 +228,7 @@
   function controls() {
     const lay = HF.layouts.find(l => l.id === st.layout), P = places();
     radios('hfLayout', 'hfLayout', HF.layouts.map(l => [l.id, l.name]), () => st.layout, v => { st.layout = v; });
-    const reach = st.layout === 'vee' ? len(sub(P.apex, P.f0)) + len(sub(P.bow, P.apex)) : len(sub(P.sTop, P.f0));
+    const reach = st.layout === 'vee' ? len(sub(P.vTop, P.f0)) + len(sub(P.bow, P.vTop)) : len(sub(P.sTop, P.f0));
     $('hfLenLegend').textContent = st.layout === 'dipole' ? 'Leg length' : 'Wire length';
     radios('hfLen', 'hfLen', lay.lengths.map(([v, label]) => [v, v === 'fit' ? `${label}, ${f1(reach)} m` : label, st.layout === 'vee' && v !== 'fit' && v > reach]), () => st.len[st.layout], v => { st.len[st.layout] = v === 'fit' ? 'fit' : +v; });
     $('hfRodWrap').hidden = st.layout !== 'sloper';
@@ -325,7 +327,7 @@
     }).join('');
     $('hfBands').innerHTML = `<h2>Every band with this wire</h2><table class="hf-table"><thead><tr><th>Band</th><th>Impedance</th><th>${m.tuner ? 'Tuner loss' : 'SWR'}</th><th>Best gain</th><th>Angle</th></tr></thead><tbody>${rows}</tbody></table>
       <p class="fine">Best gain after ${m.tuner ? 'the tuner\'s loss' : 'losses in the wire and rig'}, and the elevation where it points. Low angles reach far; high angles cover the nearest few hundred miles.</p>`;
-    const V = RG.vhf, h = RG.mastTop + .05 + V.base + V.length/2 - ws, rng = t => 2.23*(Math.sqrt(h) + Math.sqrt(t));
+    const V = RG.vhf, h = RG.mastTop + .05 + V.armThick + V.base + V.length/2 - ws, rng = t => 2.23*(Math.sqrt(h) + Math.sqrt(t));
     $('hfVhf').innerHTML = `<h2>VHF whip at the masthead, ${f1(h)} m above the water</h2><dl>${HF.vhfTargets.map(([k, t]) => row(k, `${f0n(rng(t))} nm`)).join('')}</dl>`;
   }
 

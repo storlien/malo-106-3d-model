@@ -302,7 +302,9 @@ const SPEC = {
     // 140 % roller genoa [M owner]: LP (clew square to the luff) = 1.40 x J (forestay foot to the mast). Trim and shape are [P]
     genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6,
       tack: { time: 4, pause: 1.2, slices: 160, clothFactor: 1.04, leechNear: 0.5 } },   // [E] a tack: the sail crosses in about 4 s; cloth slightly longer than the chord
-    vhf: { x: -0.11, z: 0.045, base: 0.07, length: 0.90 },   // [E] 0.9 m glass-fibre VHF whip, relative to the mast's centre at the masthead
+    // [M owner] flat stainless bar 0.20 m long out to starboard on top of the masthead; the HF wire's block hangs from it
+    // 0.10 m out, level with the top of the masthead, and the 0.9 m VHF whip stands at its end. x: fore-aft from the mast's centre [E]
+    vhf: { x: -0.05, arm: 0.20, armWidth: 0.025, armThick: 0.005, block: 0.10, sheave: 0.022, base: 0.07, length: 0.90 },
     stem: [10.564, 1.32],      // [D] forestay foot
     backstayTop: [5.864, 15.79], // [P] on a short masthead crane aft of the mast, which lets the sail head clear it
     backstay: [0.10, 1.16],   // [D]
@@ -1220,9 +1222,13 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
     winch(g, 0, 0, 0, RG.mastWinch.scale);
   });
   box(G.rig, [mx, RG.mastTop + .025, 0], [.3, .05, .13], mat.dark);               // masthead box
-  (function vhfWhip() {                                                          // VHF whip on a stainless bracket at the aft end of the masthead
-    const V = RG.vhf, x = mx + V.x, z = V.z, y0 = RG.mastTop + .05;
-    box(G.rig, [x + .03, y0 - .005, z], [.11, .012, .05], mat.steel);                          // L bracket off the masthead box
+  (function vhfWhip() {                                                          // flat bar out to starboard: antenna block halfway, VHF whip at the end
+    const V = RG.vhf, x = mx + V.x, z = V.arm - .012, y0 = RG.mastTop + .05 + V.armThick;
+    box(G.rig, [x, y0 - V.armThick/2, V.arm/2], [V.armWidth, V.armThick, V.arm], mat.steel);   // the bar, from the mast's centre line
+    const by = RG.mastTop + .05 - V.sheave - .012;                                            // block hangs under the bar, sheave level with the masthead top
+    box(G.rig, [x, (y0 - V.armThick + by)/2, V.block], [.008, y0 - V.armThick - by, .018], mat.steel);   // shackle
+    const sv = put(G.rig, new T.CylinderGeometry(V.sheave, V.sheave, .014, 20), M('#202327', { roughness: .6 })); sv.position.set(x, by, V.block);
+    sv.rotation.set(Math.PI/2, 0, 0);                                                        // axle athwartships: the sheave turns fore and aft, the way the wire runs
     rod(G.rig, [x, y0, z], [x, y0 + V.base, z], .013, mat.steel, 14, .011);                 // chromed base and coax connector
     rod(G.rig, [x, y0 + V.base, z], [x, y0 + V.base + V.length, z], .0065, M('#17191c', { roughness: .45 }), 10, .0032);   // black glass-fibre whip, tapering
     put(G.rig, new T.SphereGeometry(.0045, 10, 8), mat.steel).position.set(x, y0 + V.base + V.length, z);
@@ -4051,8 +4057,8 @@ const HF = {
   segment: 0.70,                                   // m, about a fifteenth of a wavelength on 10 m
   // where the wire runs, in the boat frame
   feed: { x: 0.35, inset: 0.08, above: 0.05 },     // tuner and deck insulator at the aftmost starboard corner
-  slopeTop: { dx: -0.30, below: 0.60, z: 0.15 },   // insulator below the masthead block, hoisted on a halyard aft of the mast
-  apex: { dx: 0.22, below: 0.45, z: 0.14 },        // over a block just forward of the masthead, clear of the mast
+  // the owner's block, under the flat bar 0.10 m to starboard of the masthead (SPEC.rig.vhf): how far below it the wire's top is
+  blockBelow: { sloper: 0.30, vee: 0.02, dipole: 0.25 },   // end insulator and a short rope; the V runs over the sheave; the dipole's centre hangs from it
   bow: { x: 9.70, above: 0.65, z: 0.55 },          // tied off at the starboard side of the bow pulpit
   rodRise: 15,                                     // degrees the rod points up from horizontal
   rodMax: 3,                                       // m, longer rods are marked as impractical
@@ -4281,9 +4287,10 @@ const HFMoM = hfMoMFactory();
 
   /* ---------- Where things are ---------- */
   function places() {
-    const mx = RG.mastX, top = RG.mastTop, F = HF.feed, Sl = HF.slopeTop, Ap = HF.apex, Bw = HF.bow;
-    return { mx, top, f0: [F.x, sheerY(F.x) + F.above, halfB(F.x) - F.inset], sTop: [mx + Sl.dx, top - Sl.below, Sl.z],
-      apex: [mx + Ap.dx, top - Ap.below, Ap.z], bow: [Bw.x, sheerY(Bw.x) + Bw.above, Math.min(Bw.z, halfB(Bw.x) - .12)] };
+    const mx = RG.mastX, top = RG.mastTop, F = HF.feed, Bw = HF.bow, V = RG.vhf, K = HF.blockBelow;
+    const block = [mx + V.x, top + .05 - V.sheave - .012, V.block], under = d => [block[0], block[1] - V.sheave - d, block[2]];
+    return { mx, top, block, f0: [F.x, sheerY(F.x) + F.above, halfB(F.x) - F.inset], sTop: under(K.sloper), vTop: under(K.vee), dTop: under(K.dipole),
+      bow: [Bw.x, sheerY(Bw.x) + Bw.above, Math.min(Bw.z, halfB(Bw.x) - .12)] };
   }
   function rigWires(bonded) {
     const mx = RG.mastX, top = RG.mastTop, foot = roofY(mx, 0), [sp0, sp1] = RG.spreaders, out = [], T = [mx, top, 0];
@@ -4306,11 +4313,12 @@ const HFMoM = hfMoMFactory();
   /* The wire for the chosen layout: solver wires, feed point, earth load, and what to draw. */
   function layout() {
     const P = places(), lay = st.layout, Lsel = st.len[lay], wires = rigWires(st.bonded), draw = { wire: [], rod: null, ends: [], halyards: [], tuner: null, balun: null }, info = {};
+    if (lay === 'dipole') P.apex = P.dTop; else if (lay === 'vee') P.apex = P.vTop;
     if (lay === 'dipole') {
       const d1 = len(sub(P.f0, P.apex)), d2 = len(sub(P.bow, P.apex)), l = +Lsel;
       const aft = along(P.apex, P.f0, Math.min(l, d1)), fore = along(P.apex, P.bow, Math.min(l, d2));
       wires.push(W(P.apex, aft, 'antenna'), W(P.apex, fore, 'antenna'));
-      draw.wire.push([aft, P.apex, fore]); draw.ends.push(aft, fore); draw.halyards.push([P.apex, [P.mx + .1, P.top, 0]]); draw.balun = P.apex;
+      draw.wire.push([aft, P.apex, fore]); draw.ends.push(aft, fore); draw.halyards.push([P.apex, P.block]); draw.balun = P.apex;
       if (l > d1 - .3) draw.halyards.push([aft, P.f0]); if (l < d2 - .3) draw.halyards.push([fore, P.bow]);
       info.short = l > Math.min(d1, d2); info.total = 2*l;
       return { wires, feed: S(P.apex), loads: [], draw, info, P };
@@ -4319,20 +4327,20 @@ const HFMoM = hfMoMFactory();
     wires.push(W(lead, P.f0, 'lead')); draw.tuner = P.f0;
     if (lay === 'sloper') {
       const D = len(sub(P.sTop, P.f0)), L = Lsel === 'fit' ? D : +Lsel;
-      if (L <= D + 1e-6) { const e = along(P.f0, P.sTop, L); wires.push(W(P.f0, e, 'antenna')); draw.wire.push([P.f0, e]); draw.ends.push(e); draw.halyards.push([e, [P.mx - .08, P.top, 0]]); }
+      if (L <= D + 1e-6) { const e = along(P.f0, P.sTop, L); wires.push(W(P.f0, e, 'antenna')); draw.wire.push([P.f0, e]); draw.ends.push(e); draw.halyards.push([e, P.block]); }
       else {
         const R = HF.rods.find(r => r.id === st.rod), k = Math.tan(HF.rodRise*Math.PI/180), u0 = [R.dir[0], k, R.dir[1]], un = len(u0), u = u0.map(v => v/un);
         const tipAt = t => P.f0.map((v, i) => v + u[i]*t), tot = t => t + len(sub(P.sTop, tipAt(t)));
         let a = 0, b = L; for (let i = 0; i < 50; i++) { const m = (a + b)/2; if (tot(m) < L) a = m; else b = m; }
         const tip = tipAt(a); info.rod = a;
-        wires.push(W(P.f0, tip, 'antenna'), W(tip, P.sTop, 'antenna')); draw.wire.push([P.f0, tip, P.sTop]); draw.rod = [P.f0, tip]; draw.ends.push(P.sTop); draw.halyards.push([P.sTop, [P.mx - .08, P.top, 0]]);
+        wires.push(W(P.f0, tip, 'antenna'), W(tip, P.sTop, 'antenna')); draw.wire.push([P.f0, tip, P.sTop]); draw.rod = [P.f0, tip]; draw.ends.push(P.sTop); draw.halyards.push([P.sTop, P.block]);
       }
       info.reach = D; info.total = L;
     } else {
       const d1 = len(sub(P.apex, P.f0)), d2 = len(sub(P.bow, P.apex)), fit = d1 + d2, L = Lsel === 'fit' ? fit : Math.min(+Lsel, fit);
       if (L <= d1) { const e = along(P.f0, P.apex, L); wires.push(W(P.f0, e, 'antenna')); draw.wire.push([P.f0, e]); draw.ends.push(e); }
       else { const e = along(P.apex, P.bow, L - d1); wires.push(W(P.f0, P.apex, 'antenna'), W(P.apex, e, 'antenna')); draw.wire.push([P.f0, P.apex, e]); draw.ends.push(e); if (L < fit - .3) draw.halyards.push([e, P.bow]); }
-      draw.halyards.push([P.apex, [P.mx + .1, P.top, 0]]); info.reach = fit; info.total = L;
+      if (L <= d1) draw.halyards.push([draw.ends[0], P.block]); info.reach = fit; info.total = L;
     }
     return { wires, feed: S(P.f0), loads: [[[lead[0], 0, lead[2]], HF.groundOhm]], draw, info, P };
   }
@@ -4496,7 +4504,7 @@ const HFMoM = hfMoMFactory();
   function controls() {
     const lay = HF.layouts.find(l => l.id === st.layout), P = places();
     radios('hfLayout', 'hfLayout', HF.layouts.map(l => [l.id, l.name]), () => st.layout, v => { st.layout = v; });
-    const reach = st.layout === 'vee' ? len(sub(P.apex, P.f0)) + len(sub(P.bow, P.apex)) : len(sub(P.sTop, P.f0));
+    const reach = st.layout === 'vee' ? len(sub(P.vTop, P.f0)) + len(sub(P.bow, P.vTop)) : len(sub(P.sTop, P.f0));
     $('hfLenLegend').textContent = st.layout === 'dipole' ? 'Leg length' : 'Wire length';
     radios('hfLen', 'hfLen', lay.lengths.map(([v, label]) => [v, v === 'fit' ? `${label}, ${f1(reach)} m` : label, st.layout === 'vee' && v !== 'fit' && v > reach]), () => st.len[st.layout], v => { st.len[st.layout] = v === 'fit' ? 'fit' : +v; });
     $('hfRodWrap').hidden = st.layout !== 'sloper';
@@ -4595,7 +4603,7 @@ const HFMoM = hfMoMFactory();
     }).join('');
     $('hfBands').innerHTML = `<h2>Every band with this wire</h2><table class="hf-table"><thead><tr><th>Band</th><th>Impedance</th><th>${m.tuner ? 'Tuner loss' : 'SWR'}</th><th>Best gain</th><th>Angle</th></tr></thead><tbody>${rows}</tbody></table>
       <p class="fine">Best gain after ${m.tuner ? 'the tuner\'s loss' : 'losses in the wire and rig'}, and the elevation where it points. Low angles reach far; high angles cover the nearest few hundred miles.</p>`;
-    const V = RG.vhf, h = RG.mastTop + .05 + V.base + V.length/2 - ws, rng = t => 2.23*(Math.sqrt(h) + Math.sqrt(t));
+    const V = RG.vhf, h = RG.mastTop + .05 + V.armThick + V.base + V.length/2 - ws, rng = t => 2.23*(Math.sqrt(h) + Math.sqrt(t));
     $('hfVhf').innerHTML = `<h2>VHF whip at the masthead, ${f1(h)} m above the water</h2><dl>${HF.vhfTargets.map(([k, t]) => row(k, `${f0n(rng(t))} nm`)).join('')}</dl>`;
   }
 

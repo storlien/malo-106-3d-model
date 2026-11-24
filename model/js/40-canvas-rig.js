@@ -96,9 +96,13 @@ function chainplate(x, s) { const z = s*(halfB(x) - RG.chainplateInset); return 
     winch(g, 0, 0, 0, RG.mastWinch.scale);
   });
   box(G.rig, [mx, RG.mastTop + .025, 0], [.3, .05, .13], mat.dark);               // masthead box
-  (function vhfWhip() {                                                          // VHF whip on a stainless bracket at the aft end of the masthead
-    const V = RG.vhf, x = mx + V.x, z = V.z, y0 = RG.mastTop + .05;
-    box(G.rig, [x + .03, y0 - .005, z], [.11, .012, .05], mat.steel);                          // L bracket off the masthead box
+  (function vhfWhip() {                                                          // flat bar out to starboard: antenna block halfway, VHF whip at the end
+    const V = RG.vhf, x = mx + V.x, z = V.arm - .012, y0 = RG.mastTop + .05 + V.armThick;
+    box(G.rig, [x, y0 - V.armThick/2, V.arm/2], [V.armWidth, V.armThick, V.arm], mat.steel);   // the bar, from the mast's centre line
+    const by = RG.mastTop + .05 - V.sheave - .012;                                            // block hangs under the bar, sheave level with the masthead top
+    box(G.rig, [x, (y0 - V.armThick + by)/2, V.block], [.008, y0 - V.armThick - by, .018], mat.steel);   // shackle
+    const sv = put(G.rig, new T.CylinderGeometry(V.sheave, V.sheave, .014, 20), M('#202327', { roughness: .6 })); sv.position.set(x, by, V.block);
+    sv.rotation.set(Math.PI/2, 0, 0);                                                        // axle athwartships: the sheave turns fore and aft, the way the wire runs
     rod(G.rig, [x, y0, z], [x, y0 + V.base, z], .013, mat.steel, 14, .011);                 // chromed base and coax connector
     rod(G.rig, [x, y0 + V.base, z], [x, y0 + V.base + V.length, z], .0065, M('#17191c', { roughness: .45 }), 10, .0032);   // black glass-fibre whip, tapering
     put(G.rig, new T.SphereGeometry(.0045, 10, 8), mat.steel).position.set(x, y0 + V.base + V.length, z);

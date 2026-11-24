@@ -24,8 +24,8 @@ const HF = {
   segment: 0.70,                                   // m, about a fifteenth of a wavelength on 10 m
   // where the wire runs, in the boat frame
   feed: { x: 0.35, inset: 0.08, above: 0.05 },     // tuner and deck insulator at the aftmost starboard corner
-  slopeTop: { dx: -0.30, below: 0.60, z: 0.15 },   // insulator below the masthead block, hoisted on a halyard aft of the mast
-  apex: { dx: 0.22, below: 0.45, z: 0.14 },        // over a block just forward of the masthead, clear of the mast
+  // the owner's block, under the flat bar 0.10 m to starboard of the masthead (SPEC.rig.vhf): how far below it the wire's top is
+  blockBelow: { sloper: 0.30, vee: 0.02, dipole: 0.25 },   // end insulator and a short rope; the V runs over the sheave; the dipole's centre hangs from it
   bow: { x: 9.70, above: 0.65, z: 0.55 },          // tied off at the starboard side of the bow pulpit
   rodRise: 15,                                     // degrees the rod points up from horizontal
   rodMax: 3,                                       // m, longer rods are marked as impractical

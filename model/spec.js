@@ -192,7 +192,9 @@ const SPEC = {
     // 140 % roller genoa [M owner]: LP (clew square to the luff) = 1.40 x J (forestay foot to the mast). Trim and shape are [P]
     genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6,
       tack: { time: 4, pause: 1.2, slices: 160, clothFactor: 1.04, leechNear: 0.5 } },   // [E] a tack: the sail crosses in about 4 s; cloth slightly longer than the chord
-    vhf: { x: -0.11, z: 0.045, base: 0.07, length: 0.90 },   // [E] 0.9 m glass-fibre VHF whip, relative to the mast's centre at the masthead
+    // [M owner] flat stainless bar 0.20 m long out to starboard on top of the masthead; the HF wire's block hangs from it
+    // 0.10 m out, level with the top of the masthead, and the 0.9 m VHF whip stands at its end. x: fore-aft from the mast's centre [E]
+    vhf: { x: -0.05, arm: 0.20, armWidth: 0.025, armThick: 0.005, block: 0.10, sheave: 0.022, base: 0.07, length: 0.90 },
     stem: [10.564, 1.32],      // [D] forestay foot
     backstayTop: [5.864, 15.79], // [P] on a short masthead crane aft of the mast, which lets the sail head clear it
     backstay: [0.10, 1.16],   // [D]
