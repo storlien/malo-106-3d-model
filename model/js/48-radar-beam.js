@@ -88,6 +88,28 @@ function buildRadarBeam() {
   G.radarBeam.clear();
   const c = radarCentre(radarState.pos), hw = c.y - SPEC.hull.floatSink, sh = radarShadow(c), R = RB.drawRadius;
   beamFan.set(c, sh, R);
+  // all round: sheets at 0° and ±12.5° (green) and ±25° (yellow); a sector is left open wherever the rig blocks
+  // any part of that band in that direction, so the blocked regions show as gaps
+  const water = SPEC.hull.floatSink + .02, r0 = SPEC.rig.radar.diameter/2, na = sh.az;
+  const elIdx = d => clamp(Math.round((d + RB.full)/(2*RB.full)*sh.el - .5), 0, sh.el - 1);
+  const blockedIn = (i, d0, d1) => { for (let j = elIdx(d0); j <= elIdx(d1); j++) if (sh.hit[i*sh.el + j]) return true; return false; };
+  const sheet = (deg, d0, d1, colour, opacity) => {
+    const e = deg*Math.PI/180, len = e < 0 ? Math.min(R, (c.y - water)/Math.sin(-e)) : RB.upRadius, nr = 20, pos = [], idx = [];
+    const P = (a, r) => [c.x + r*Math.cos(e)*Math.cos(a), Math.max(water, c.y + r*Math.sin(e)), r*Math.cos(e)*Math.sin(a)];
+    for (let i = 0; i < na; i++) {
+      if (blockedIn(i, d0, d1)) continue;
+      const a0 = i/na*Math.PI*2, a1 = (i + 1)/na*Math.PI*2;
+      for (let k = 0; k < nr; k++) {
+        const ra = r0 + (len - r0)*(k/nr)**1.5, rb = r0 + (len - r0)*((k + 1)/nr)**1.5, b = pos.length/3;
+        pos.push(...P(a0, ra), ...P(a1, ra), ...P(a1, rb), ...P(a0, rb)); idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      }
+    }
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+    const m = new T.Mesh(g, new T.MeshBasicMaterial({ color: colour, transparent: true, opacity, side: T.DoubleSide, depthWrite: false })); m.renderOrder = 4; G.radarBeam.add(m);
+  };
+  sheet(0, -RB.main, RB.main, RB.mainColour, .22);
+  sheet(RB.main, -RB.main, RB.main, RB.mainColour, .14); sheet(-RB.main, -RB.main, RB.main, RB.mainColour, .14);
+  sheet(RB.full, RB.main, RB.full, RB.fullColour, .16); sheet(-RB.full, -RB.full, -RB.main, RB.fullColour, .16);
   // rings on the water where the beam edges reach it
   const ring = (r, colour) => {
     const pts = []; for (let i = 0; i <= 128; i++) { const a = i/128*Math.PI*2; pts.push(new V3(c.x + r*Math.cos(a), SPEC.hull.floatSink + .03, r*Math.sin(a))); }   // on the water surface, in the boat's frame
