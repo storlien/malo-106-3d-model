@@ -104,7 +104,7 @@
     i.addEventListener('change', () => pick(v)); l.append(i, document.createTextNode(label)); panel.querySelector('#' + host).append(l);
   });
   const set = (k, v) => { state[k] = v; restart(); };
-  radios('seaHs', 'seaHs', SEA.heights.map(h => [h, String(h).replace('.', '·')]), v => set('Hs', +v));
+  radios('seaHs', 'seaHs', SEA.heights.map(h => [h, String(h)]), v => set('Hs', +v));
   radios('seaTp', 'seaTp', SEA.periods.map(p => [p, String(p)]), v => set('Tp', +v));
   radios('seaHead', 'seaHead', SEA.headings.map(h => [h[0], h[1]]), v => set('heading', v));
   radios('seaMode', 'seaMode', SEA.modes.map(m => [m.id, m.name]), v => set('mode', v));
