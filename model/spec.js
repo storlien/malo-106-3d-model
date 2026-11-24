@@ -1,4 +1,4 @@
-/* SY Alizée (Malö 36): every dimension of the model lives in this file.
+/* SY Alizée (Malö 106): every dimension of the model lives in this file.
  *
  * Axes, in metres:  x = forward from the aft face of the transom
  *                   y = up from the design waterline
@@ -17,7 +17,7 @@
  */
 const SPEC = {
   name: 'Alizée',
-  type: 'Malö 36',
+  type: 'Malö 106',
 
   hull: {
     length: 10.60,        // [B] standard stern, confirmed by owner

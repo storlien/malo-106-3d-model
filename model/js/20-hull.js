@@ -140,7 +140,7 @@ foil(SPEC.keel.deadwood, mat.anti);
 foil(SPEC.keel.skeg, mat.anti);
 foil(SPEC.keel.rudder, mat.anti);
 
-/* Three-bladed polished brass propeller with broad, rounded, slightly skewed blades, a brass boss and a zinc anode cone [P]. */
+/* Three-bladed polished brass propeller, turning the other way from the first model (owner) with broad, rounded, slightly skewed blades, a brass boss and a zinc anode cone [P]. */
 mat.brass = M('#d9a43c', { roughness: .22, metalness: .9, envMapIntensity: 1.3 });
 mat.zinc = M('#b9bec2', { roughness: .45, metalness: .85 });
 (function propeller() {
@@ -159,7 +159,7 @@ mat.zinc = M('#b9bec2', { roughness: .45, metalness: .85 });
     for (let i = 0; i <= nr; i++) {
       const q = i/nr, rho = lerp(hubR*.9, R, q), c = half(q), skew = .22*q*q, rt = [], rb = [];
       for (let k = 0; k <= nc; k++) {
-        const u = -1 + 2*k/nc, a = th0 + skew + u*c/rho, x = -pitch/(2*Math.PI)*(u*c/rho), t = .006*(1 - q*.7)*Math.sqrt(Math.max(0, 1 - u*u));
+        const u = -1 + 2*k/nc, a = th0 - skew - u*c/rho, x = -pitch/(2*Math.PI)*(u*c/rho), t = .006*(1 - q*.7)*Math.sqrt(Math.max(0, 1 - u*u));
         const P = (dx) => [x + dx, rho*Math.cos(a), rho*Math.sin(a)];
         rt.push(P(t)); rb.push(P(-t));
       }

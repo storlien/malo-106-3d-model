@@ -32,4 +32,9 @@ The site is the static page `public/index.html`, which is committed. Vercel only
 - `js/40-canvas-rig.js`: canvas, rig, rails, stern and bow gear
 - `js/45-solar-arch.js`: builds the solar arch designs and measures them
 - `js/50-scene.js`: light, water, cameras, controls
+- `sea/`: the **Sea trial** viewer, kept apart from the model. It reads the boat as configured (solar arch included) and nothing in `js/` depends on it.
+  - `sea/10-sea-data.js`: published Malö 106 data, masses, sea states and coefficients
+  - `sea/20-sea-hydro.js`: weight, hydrostatics and the righting-arm curve from the hull lines
+  - `sea/30-sea-motion.js`: irregular waves and the heave, pitch and roll solver
+  - `sea/40-sea-view.js`: the wave surface, the boat's motion and the panel
 - `make_overlays.py`: extracts the drawing overlays from the brochure

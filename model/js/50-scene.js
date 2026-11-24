@@ -157,7 +157,7 @@
     if (b.dataset.layer === 'drawing' && on && !view.ortho) setView('side');
   }));
 
-  let last = performance.now(), lastWave = 0;
+  let last = performance.now(), lastWave = 0; const hooks = [];
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(.05, (now - last)/1000); last = now;
@@ -171,6 +171,7 @@
       waterT.a.value.set(t*.011, t*.007); waterT.b.value.set(-t*.009, t*.013);
       waveFlags(t); needs = Math.max(needs, 1);
     }
+    hooks.forEach(f => { if (f(dt, now)) needs = Math.max(needs, 1); });   // add-ons such as the sea trial move the boat
     if (needs <= 0) return;
     needs--;
     renderer.render(scene, placeCamera());
@@ -178,7 +179,8 @@
   initArchUI(() => { needs = 3; renderer.shadowMap.needsUpdate = true; }); resize(); setView('hero', true); requestAnimationFrame(frame);
 
   // Small API for scripted renders and comparison against photos
-  window.alizee = { SPEC, setView, setLayer, view, render() { resize(); renderer.render(scene, placeCamera()); }, hullHalf, sheerY, keelY, halfB,
+  window.alizee = { SPEC, setView, setLayer, view, scene, renderer, water, ground, hooks, centre, wake() { needs = Math.max(needs, 2); },
+    get camera() { return view.ortho ? ortho : persp; }, render() { resize(); renderer.render(scene, placeCamera()); }, hullHalf, sheerY, keelY, halfB,
     archReport, setArch, archDesigns: () => SPEC.solarArches.designs.map(d => d.id),
     measure() {                        // true geometry, for checking the model against the spec
       boat.updateMatrixWorld(true); const inv = new T.Matrix4().copy(boat.matrixWorld).invert();

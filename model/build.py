@@ -9,6 +9,7 @@ safe = lambda s: s.replace('</script', '<\\/script')
 
 parts = [f"const OVERLAYS={{profile:'{uri('profile')}',plan:'{uri('plan')}',logo:'{uri('malo-logo')}'}};", (here/'spec.js').read_text('utf-8')]
 parts += [p.read_text('utf-8') for p in sorted((here/'js').glob('*.js'))]
+parts += [p.read_text('utf-8') for p in sorted((here/'sea').glob('*.js'))]   # sea trial viewer, kept in its own files
 
 html = (here/'template.html').read_text('utf-8')
 html = html.replace('/*THREE*/', safe((here/'vendor/three.min.js').read_text('utf-8')))
