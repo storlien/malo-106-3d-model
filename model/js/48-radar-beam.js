@@ -63,12 +63,15 @@ function buildRadarBeam() {
         const cc = blocked ? dark : base; col.push(cc.r, cc.g, cc.b);
       }
     }
-    for (let i = 0; i < na; i++) for (let k = 0; k < nr; k++) { const p = i*(nr + 1) + k, q = p + nr + 1; idx.push(p, q, p + 1, q, q + 1, p + 1); }
+    for (let i = 0; i < na; i++) {
+      if (sh.hit[i*sh.el + j] || sh.hit[((i + 1)%na)*sh.el + j]) continue;          // blocked by the rig: leave the beam out
+      for (let k = 0; k < nr; k++) { const p = i*(nr + 1) + k, q = p + nr + 1; idx.push(p, q, p + 1, q, q + 1, p + 1); }
+    }
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.setIndex(idx);
     const m = new T.Mesh(g, new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity, side: T.DoubleSide, depthWrite: false })); m.renderOrder = 5; G.radarBeam.add(m);
   };
-  cone(RB.full, RB.fullColour, .16); cone(-RB.full, RB.fullColour, .16);
-  cone(RB.main, RB.mainColour, .24); cone(-RB.main, RB.mainColour, .24);
+  cone(RB.full, RB.fullColour, .24); cone(-RB.full, RB.fullColour, .24);
+  cone(RB.main, RB.mainColour, .34); cone(-RB.main, RB.mainColour, .34);
   // rings on the water where the beam edges reach it
   const ring = (r, colour) => {
     const pts = []; for (let i = 0; i <= 128; i++) { const a = i/128*Math.PI*2; pts.push(new V3(c.x + r*Math.cos(a), SPEC.hull.floatSink + .03, r*Math.sin(a))); }   // on the water surface, in the boat's frame
@@ -90,7 +93,7 @@ function buildRadarBeam() {
   const panel = document.createElement('details'); panel.className = 'arch'; panel.id = 'radarPanel'; panel.open = true; panel.hidden = true;
   panel.innerHTML = `<summary>Radar beam <span id="radarCurrent"></span></summary><div class="arch-body">
     <fieldset class="pick" id="radarPick" style="grid-template-columns:1fr"><legend>Radar height on the mast</legend></fieldset>
-    <div class="radar-key"><span><i style="background:${RB.fullColour}"></i>Full beam ±${RB.full}°</span><span><i style="background:${RB.mainColour}"></i>Half power ±${RB.main}°</span><span><i style="background:${RB.shadowColour}"></i>Blocked</span></div>
+    <div class="radar-key"><span><i style="background:${RB.fullColour}"></i>Full beam ±${RB.full}°</span><span><i style="background:${RB.mainColour}"></i>Half power ±${RB.main}°</span><span>Gaps: blocked by the rig</span></div>
     <div class="sea-run"><button id="tackPlay">Play a tack</button></div>
     <div class="stats" id="radarStats"></div><div class="stats" id="tackStats"></div>
     <p class="fine">Beam from the Lowrance Broadband 3G installation guide. Shadows are found by tracing the beam past the mast, spreaders and rigging. Ranges use the standard radar horizon, 2.21 × √height in nautical miles.</p></div>`;

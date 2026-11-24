@@ -176,7 +176,7 @@ const SPEC = {
     // plate: height of the mount plate (the radome's bottom); null = the owner's position, just above the lower spreaders.
     radarBeam: {
       full: 25, main: 12.5, minRange: 61, drawRadius: 40, upRadius: 12, shadowReach: 3.5, azSteps: 180, elSteps: 26, reportLoss: 0.05,
-      fullColour: '#f2a541', mainColour: '#e0482b', shadowColour: '#2a1a2e',
+      fullColour: '#f2d03b', mainColour: '#3fbf5a', shadowColour: '#2a1a2e',   // yellow: full beam, green: half power; blocked parts are not drawn
       positions: [
         { id: 'belowLower', name: 'Below the lower spreaders', plate: 6.67 },
         { id: 'aboveLower', name: 'Just above the lower spreaders (now)', plate: null, current: true },
