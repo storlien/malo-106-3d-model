@@ -296,7 +296,8 @@ const SPEC = {
     },
     mainsail: { headBelowTop: 0.20, clewInset: 0.14, headWidth: 0.16, roach: 0.22, camber: 0.05, battens: [0.23, 0.44, 0.64, 0.83], logoV: 0.69 }, // [P] owner's photo
     // 140 % roller genoa [M owner]: LP (clew square to the luff) = 1.40 x J (forestay foot to the mast). Trim and shape are [P]
-    genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6 },
+    genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6,
+      tack: { time: 4, pause: 1.2, slices: 160, clothFactor: 1.04, leechNear: 0.5 } },   // [E] a tack: the sail crosses in about 4 s; cloth slightly longer than the chord
     stem: [10.564, 1.32],      // [D] forestay foot
     backstayTop: [5.864, 15.79], // [P] on a short masthead crane aft of the mast, which lets the sail head clear it
     backstay: [0.10, 1.16],   // [D]
@@ -2548,15 +2549,17 @@ function buildRadarBeam() {
 /* ---------- Panel ---------- */
 (function radarPanel() {
   const css = document.createElement('style');
-  css.textContent = `#radarPanel{position:fixed;left:16px;top:96px;width:300px;max-width:calc(100vw - 32px)}#radarPanel[hidden]{display:none}
+  css.textContent = `#radarPanel{position:fixed;left:16px;top:96px;width:340px;max-height:calc(100dvh - 250px);overflow:auto;max-width:calc(100vw - 32px)}#radarPanel[hidden]{display:none}
   @media (max-width:760px){#radarPanel{top:auto;bottom:calc(112px + env(safe-area-inset-bottom,0px));left:8px;right:8px;width:auto;max-height:45dvh}}
+  .tack-table{width:100%;border-collapse:collapse;font-size:12px;margin:2px 0 4px}.tack-table th{text-align:left;font-weight:600;color:var(--ink2);padding:3px 2px;vertical-align:bottom}.tack-table td{padding:4px 2px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
   .radar-key{display:flex;gap:12px;margin:8px 2px 0;font-size:12px;color:var(--ink2)}.radar-key i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}`;
   document.head.append(css);
   const panel = document.createElement('details'); panel.className = 'arch'; panel.id = 'radarPanel'; panel.open = true; panel.hidden = true;
   panel.innerHTML = `<summary>Radar beam <span id="radarCurrent"></span></summary><div class="arch-body">
     <fieldset class="pick" id="radarPick" style="grid-template-columns:1fr"><legend>Radar height on the mast</legend></fieldset>
     <div class="radar-key"><span><i style="background:${RB.fullColour}"></i>Full beam ±${RB.full}°</span><span><i style="background:${RB.mainColour}"></i>Half power ±${RB.main}°</span><span><i style="background:${RB.shadowColour}"></i>Blocked</span></div>
-    <div class="stats" id="radarStats"></div>
+    <div class="sea-run"><button id="tackPlay">Play a tack</button></div>
+    <div class="stats" id="radarStats"></div><div class="stats" id="tackStats"></div>
     <p class="fine">Beam from the Lowrance Broadband 3G installation guide. Shadows are found by tracing the beam past the mast, spreaders and rigging. Ranges use the standard radar horizon, 2.21 × √height in nautical miles.</p></div>`;
   document.body.append(panel);
   RB.positions.forEach(p => {
@@ -2565,8 +2568,18 @@ function buildRadarBeam() {
   });
   const f1 = v => v.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 }), f0 = v => Math.round(v).toLocaleString('en-GB');
   const side = (a, b) => { const m = ((a + b)/2)%360; return m < 22.5 || m > 337.5 ? 'ahead' : m < 157.5 ? (m < 67.5 ? 'starboard bow' : m < 112.5 ? 'starboard beam' : 'starboard quarter') : m < 202.5 ? 'astern' : m < 247.5 ? 'port quarter' : m < 292.5 ? 'port beam' : 'port bow'; };
+  const tackTable = () => {
+    const pc = v => `${f0(v*100)} %`, rows = RB.positions.map(p => {
+      const r = tackReport(radarCentre(p.id)), me = p.id === radarState.pos ? ' style="font-weight:700"' : '';
+      return `<tr${me}><td>${p.name.replace(' (now)', ', now')}</td><td>${r.touches ? `${f1(r.speed)} m/s` : '—'}</td><td>${r.touches ? `${f0(r.wrapDeg)}°` : '—'}</td><td>${r.touches ? `${f0(r.partMin*100)}–${f0(r.partMax*100)} %${r.leech ? ', leech' : ''}` : 'Clear'}</td><td>${r.touches ? pc(r.share) : '—'}</td></tr>`;
+    }).join('');
+    panel.querySelector('#tackStats').innerHTML = `<h2>Genoa against the radome in a tack</h2>
+      <table class="tack-table"><thead><tr><th>Radar height</th><th>Cloth speed</th><th>Bend</th><th>Part of sail, from luff</th><th>Time touching</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="fine">A ${TK.time}-second tack with the ${Math.round(RG.genoa.overlap*100)} % genoa. Lower cloth speed and less bend are gentler; the leech, with its UV strip and leech line, is the roughest part to drag across.</p>`;
+  };
   function update() {
     placeRadar(radarState.pos);
+    if (tackAnim.playing) tackAnim.start(radarCentre(radarState.pos));
     const r = buildRadarBeam(), hz = t => 2.21*(Math.sqrt(r.hw) + Math.sqrt(t)), row = (k, v, c) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`;
     panel.querySelector('#radarCurrent').textContent = `${f1(r.hw)} m above water`;
     panel.querySelector(`input[value="${radarState.pos}"]`).checked = true;
@@ -2576,14 +2589,116 @@ function buildRadarBeam() {
       ${row('Sea-level target', `${f1(hz(0))} nm`)}${row('Small boat, 3 m high', `${f1(hz(3))} nm`)}${row('Ship, 15 m high', `${f1(hz(15))} nm`)}</dl>
       <h2>Close to the boat</h2><dl>
       ${row('Full beam reaches the water at', `${f0(r.rFull)} m`)}${row('Half-power beam reaches the water at', `${f0(r.rMain)} m`)}
-      ${row('Shortest range of the radar', `${f0(RB.minRange)} m`)}</dl>
+      ${row('Shortest range of the radar, from datasheet', `${f0(RB.minRange)} m`)}</dl>
       <h2>Shadows from the rig</h2><dl>${row('Beam power lost all round', `${f1(lost*100)} %`)}${sec || row('Shadow sectors', 'None')}</dl>`;
-    A.renderer.shadowMap.needsUpdate = true; A.wake();
+    tackTable(); A.renderer.shadowMap.needsUpdate = true; A.wake();
   }
+  panel.querySelector('#tackPlay').addEventListener('click', e => {
+    if (tackAnim.playing) { tackAnim.stop(); e.target.textContent = 'Play a tack'; } else { tackAnim.start(radarCentre(radarState.pos)); e.target.textContent = 'Stop the tack'; }
+    A.renderer.shadowMap.needsUpdate = true; A.wake();
+  });
+  let hooked = false;
   let A = null;
   window.radarBeamLayer = on => {
     A = window.alizee; G.radarBeam.visible = on; panel.hidden = !on;
+    if (!hooked) { A.hooks.push(dt => tackAnim.tick(dt)); hooked = true; }
+    if (!on && tackAnim.playing) { tackAnim.stop(); panel.querySelector('#tackPlay').textContent = 'Play a tack'; }
     if (on) update(); else { placeRadar(RB.positions.find(p => p.current).id); }
+  };
+})();
+
+/* The genoa tacking past the mast and radome. Each horizontal slice of the sail swings about the forestay from
+   one side to the other; where it meets the radome or the mast it wraps around them and slides across.
+   This gives an animation and, for each radar height, how hard the sail works the radome during a tack. */
+const TK = RG.genoa.tack;
+G.tackSail = new T.Group(); G.tackSail.visible = false; G.rig.add(G.tackSail);
+
+const tackSlices = (() => {
+  const yAt = v => GENOA.pt(0, v)[1], n = TK.slices;
+  return Array.from({ length: n + 1 }, (_, j) => {
+    const v = j/n, P = GENOA.pt(0, v), Q = GENOA.pt(1, v), c = GENOA.chord(v)*TK.clothFactor;
+    return { v, P, Q, c, theta0: Math.atan2(Math.abs(Q[2]) + .15, c) };          // sheeted angle off the centreline
+  });
+})();
+
+/* Obstacles in plan at height y: circles [x, radius, name]. */
+function tackObstacles(y, radar) {
+  const out = [];
+  if (y >= radar.plate && y <= radar.plate + SPEC.rig.radar.height) out.push([RADAR.domeX, SPEC.rig.radar.diameter/2, 'radar']);
+  if (y < RG.mastTop) out.push([RG.mastX, RG.mastSize[0]/2, 'mast']);
+  return out;
+}
+
+/* Path of one slice of cloth in plan, from the luff at angle theta (+ = starboard), wrapping round obstacles.
+   Returns points [x, z, s] along the cloth and any contacts { name, wrap (rad), at (m from the luff) }. */
+function clothPath(P, c, theta, y, radar, side) {
+  const pts = [[P[0], 0, 0]], contacts = [], obs = tackObstacles(y, radar).sort((a, b) => b[0] - a[0]);
+  let x = P[0], z = 0, s = 0, h = Math.PI - theta;                                // heading angle in the (x, z) plane; π = straight aft
+  const step = (len, hh) => { const L = Math.min(len, c - s); x += Math.cos(hh)*L; z += Math.sin(hh)*L; s += L; pts.push([x, z, s]); };
+  obs.forEach(([cx, r, name]) => {
+    if (s >= c) return;
+    const wx = cx - x, wz = -z, D = Math.hypot(wx, wz); if (D <= r + 1e-3) return;
+    const along = wx*Math.cos(h) + wz*Math.sin(h), off = wx*Math.sin(h) - wz*Math.cos(h);
+    if (along <= 0 || Math.abs(off) >= r) return;                                  // the straight cloth misses it
+    const psi = Math.atan2(wz, wx); let ht = psi - side*Math.asin(r/D); while (ht - h > Math.PI) ht -= 2*Math.PI; while (h - ht > Math.PI) ht += 2*Math.PI;
+    const wrap = Math.abs(ht - h);
+    step(Math.sqrt(D*D - r*r), ht);
+    contacts.push({ name, wrap, at: s });
+    const k = Math.max(2, Math.ceil(wrap/.12)); for (let i = 1; i <= k; i++) step(r*wrap/k, ht + (h - ht)*i/k);
+  });
+  if (s < c) step(c - s, h);
+  return { pts, contacts };
+}
+
+/* How a radar height fares over one tack. */
+function tackReport(radar) {
+  const T0 = TK.time, steps = 80; let touch = 0, total = 0, speed = 0, wrap = 0, partMin = 1, partMax = 0, leech = false;
+  tackSlices.forEach(sl => {
+    const yC = sl.P[1] + (sl.Q[1] - sl.P[1])*.5;
+    if (yC < radar.plate - .6 || yC > radar.plate + .9) return;
+    for (let i = 0; i <= steps; i++) {
+      const f = i/steps, th = sl.theta0*Math.cos(Math.PI*f), w = sl.theta0*Math.PI/T0*Math.sin(Math.PI*f), side = th >= 0 ? 1 : -1;
+      const yAt = s => lerp(sl.P[1], sl.Q[1], s/sl.c), path = clothPath(sl.P, sl.c, th, sl.P[1], radar, side);
+      // re-test against the radome with the cloth's height where it would reach it
+      const dR = sl.P[0] - RADAR.domeX, yR = yAt(dR);
+      const p2 = clothPath(sl.P, sl.c, th, yR, radar, side), hit = p2.contacts.find(q => q.name === 'radar');
+      total++;
+      if (!hit) continue;
+      touch++; speed = Math.max(speed, w*hit.at); wrap = Math.max(wrap, hit.wrap);
+      partMin = Math.min(partMin, hit.at/sl.c); partMax = Math.max(partMax, hit.at/sl.c);
+      if (sl.c - hit.at < TK.leechNear) leech = true;
+    }
+  });
+  return { touches: touch > 0, share: total ? touch/total : 0, speed, wrapDeg: wrap*180/Math.PI, partMin, partMax, leech };
+}
+
+/* ---------- Animation ---------- */
+const tackAnim = (() => {
+  const nu = 30, mat2 = new T.MeshStandardMaterial({ color: C('#eeeee8'), roughness: .8, side: T.DoubleSide }), nv = tackSlices.length;
+  const geo = new T.BufferGeometry(), pos = new Float32Array(nv*(nu + 1)*3), idx = [];
+  for (let j = 0; j < nv - 1; j++) for (let i = 0; i < nu; i++) { const a = j*(nu + 1) + i, b = a + nu + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setIndex(idx);
+  const mesh = new T.Mesh(geo, mat2); mesh.castShadow = true; G.tackSail.add(mesh);
+  let t = 0, radar = null, playing = false;
+  const frame = () => {
+    const ph = (t % (2*TK.time + 2*TK.pause))/TK.time, q0 = clamp(ph, 0, 1), q1 = clamp(ph - 1 - TK.pause/TK.time, 0, 1), back = ph > 1 + TK.pause/TK.time;   // over, pause, and back
+    tackSlices.forEach((sl, j) => {
+      const th = back ? -sl.theta0*Math.cos(Math.PI*q1) : sl.theta0*Math.cos(Math.PI*q0), side = th >= 0 ? 1 : -1;
+      const dR = sl.P[0] - RADAR.domeX, yR = lerp(sl.P[1], sl.Q[1], clamp(dR/sl.c, 0, 1));
+      const path = clothPath(sl.P, sl.c, th, yR, radar, side).pts;
+      for (let i = 0; i <= nu; i++) {
+        const s = sl.c*i/nu; let k = 1; while (k < path.length - 1 && path[k][2] < s) k++;
+        const a = path[k - 1], b = path[k], q = b[2] > a[2] ? (s - a[2])/(b[2] - a[2]) : 0, o = (j*(nu + 1) + i)*3;
+        pos[o] = lerp(a[0], b[0], q); pos[o + 1] = lerp(sl.P[1], sl.Q[1], i/nu) - RG.genoa.footRound*Math.sin(Math.PI*i/nu)*Math.pow(1 - sl.v, 8); pos[o + 2] = lerp(a[1], b[1], q);
+      }
+    });
+    geo.attributes.position.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere();
+  };
+  return {
+    start(r) { radar = r; playing = true; t = 0; G.tackSail.visible = true; G.genoa.visible = false; G.furledGenoa.visible = false; frame(); },
+    stop() { playing = false; G.tackSail.visible = false; const on = document.querySelector('[data-layer="genoa"]').getAttribute('aria-pressed') === 'true'; G.genoa.visible = on; G.furledGenoa.visible = !on; },
+    tick(dt) { if (!playing) return false; t += dt; frame(); return true; },
+    get playing() { return playing; },
   };
 })();
 

@@ -187,7 +187,8 @@ const SPEC = {
     },
     mainsail: { headBelowTop: 0.20, clewInset: 0.14, headWidth: 0.16, roach: 0.22, camber: 0.05, battens: [0.23, 0.44, 0.64, 0.83], logoV: 0.69 }, // [P] owner's photo
     // 140 % roller genoa [M owner]: LP (clew square to the luff) = 1.40 x J (forestay foot to the mast). Trim and shape are [P]
-    genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6 },
+    genoa: { overlap: 1.40, tackF: 0.05, headF: 0.965, clewY: 2.35, clewZ: 1.72, headWidth: 0.13, hollow: 0.10, footRound: 0.05, camber: 0.085, uvWidth: 0.34, uvPrint: '#0b1845', twist: 6,
+      tack: { time: 4, pause: 1.2, slices: 160, clothFactor: 1.04, leechNear: 0.5 } },   // [E] a tack: the sail crosses in about 4 s; cloth slightly longer than the chord
     stem: [10.564, 1.32],      // [D] forestay foot
     backstayTop: [5.864, 15.79], // [P] on a short masthead crane aft of the mast, which lets the sail head clear it
     backstay: [0.10, 1.16],   // [D]
