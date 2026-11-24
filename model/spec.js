@@ -175,7 +175,7 @@ const SPEC = {
     // Lowrance Broadband 3G beam [B installation guide 2011-12-19]: full vertical beam ±25°, half power within ±12.5°, horizontal 5.2°, shortest range 200 ft.
     // plate: height of the mount plate (the radome's bottom); null = the owner's position, just above the lower spreaders.
     radarBeam: {
-      full: 25, main: 12.5, minRange: 61, drawRadius: 40, upRadius: 12, shadowReach: 3.5, azSteps: 180, elSteps: 26, reportLoss: 0.05,
+      full: 25, main: 12.5, minRange: 61, drawRadius: 30, upRadius: 12, shadowReach: 3.5, azSteps: 180, elSteps: 26, reportLoss: 0.05,
       fullColour: '#f2d03b', mainColour: '#3fbf5a', shadowColour: '#2a1a2e',   // yellow: full beam, green: half power; blocked parts are not drawn
       positions: [
         { id: 'belowLower', name: 'Below the lower spreaders', plate: 6.67 },
