@@ -68,9 +68,11 @@ function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current', for
     let topY = (opt && opt.y) || d.hoop.topY, foreX = d.hoop.topX;
     if (rearAngle) {
       const tanR = Math.tan(rearAngle*Math.PI/180);
-      if (heightId === 'fit') topY = Math.max(AC.minFitY, A.footY + (footAt - (AC.foreLimitX - depth))*tanR - D);
-      const frameAft = footAt - (topY + D - A.footY)/tanR;
-      foreX = clamp(frameAft + depth, AC.foreLimitX, d.hoop.topX);
+      // the fore pipes stand where the 'Closes gap' height puts them; other heights move only the rear pipes and panels
+      const fitY = Math.max(AC.minFitY, A.footY + (footAt - (AC.foreLimitX - depth))*tanR - D), at = y => footAt - (y + D - A.footY)/tanR;
+      if (heightId === 'fit') topY = fitY;
+      const frameAft = at(topY);
+      foreX = clamp(at(fitY) + depth, AC.foreLimitX, d.hoop.topX);
       shift = frameAft - Math.min(...rawPanels.map(q => q[1]));
     } else {                                            // a lower frame meets the sloping backstay further aft
       const R = SPEC.rig, stayX = R.backstay[0] + (topY + D - R.backstay[1])*(R.backstayTop[0] - R.backstay[0])/(R.backstayTop[1] - R.backstay[1]);
@@ -117,7 +119,7 @@ function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current', for
   // straight fore pipes lean aft from the toe rail to the frame at the chosen angle
   const foreFoot = (() => {
     if (!foreStraight) return null;
-    if (!foreAngle) return { x: H.footX, topX: H.topX };            // unfixed: the foot stays put and the angle follows the height
+    if (!foreAngle) return { x: H.footX, topX: fwd };                // at the panel edge: the foot stays put and the pipe meets the forward edge of the panels
     // the angle is set between the pipe and the toe rail, which follows the sheer
     const sheerDeg = x => Math.atan2(sheerY(x + .05) - sheerY(x - .05), .1)*180/Math.PI;
     const capEnd = SPEC.deck.toeRail.sternCapTo - .075, run = x => (yRail - deckY(x, H.footHalf))/Math.tan((foreAngle - sheerDeg(x))*Math.PI/180);
@@ -463,7 +465,7 @@ function initArchUI(kick) {
   addRadios('archPanelPick', 'archPanels', AC.panelCounts.map(n => [n, `${n} panels`]), v => setArch(lastArch, { panels: +v }));
   addRadios('archOrientPick', 'archOrient', [['across', 'Long side across'], ['fore', 'Long side fore-aft']], v => setArch(lastArch, { orient: v }));
   addRadios('archRearPick', 'archRear', AC.rearAngles.map(a => [a, a ? `${a}°` : 'At panel edge']), v => setArch(lastArch, { rear: +v }));
-  addRadios('archForePick', 'archFore', AC.foreAngles.map(a => [a, a ? `${a}°` : 'Unfixed']), v => setArch(lastArch, { fore: +v }));
+  addRadios('archForePick', 'archFore', AC.foreAngles.map(a => [a, a ? `${a}°` : 'At panel edge']), v => setArch(lastArch, { fore: +v }));
   fillHeights = list => {                               // each design family has its own preset heights
     if (heightList === list) return; heightList = list; document.getElementById('archHeightPick').replaceChildren();
     addRadios('archHeightPick', 'archHeight', list.map(q => [q.id, q.name]), v => setArch(lastArch, { height: v }));

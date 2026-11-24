@@ -180,7 +180,7 @@ const SPEC = {
     panelCounts: [2, 3, 4],
     panelGap: 0.015,        // [E] between neighbouring panels
     pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
-    foreAngles: [70, 60, 0],   // Angled arch: fore pipe angle to the toe rail it stands on, degrees; 0 = unfixed, the foot stays put and the height is free
+    foreAngles: [70, 60, 0],   // Angled arch: fore pipe angle to the toe rail it stands on, degrees; 0 = at the panel edge: the foot stays put and the pipe meets the forward panel edge
     rearAngles: [0, 60],    // selectable rear pipe angles at the top frame, degrees; 0 = pipe meets the aft panel edge. Add values here to test more.
     // vertical arch heights: y is the top of the fore pipes above the design waterline; 'fit' is solved so the panels fill the frame
     archHeights: [{ id: 'fit', name: 'Closes gap' }, { id: 'current', name: 'Current', y: 2.60 }, { id: 'lower', name: 'Lower', y: 2.40 }],
