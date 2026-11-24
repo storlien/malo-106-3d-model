@@ -44,6 +44,8 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .d-stub{stroke:var(--ink);stroke-width:3}.d-ref{stroke:var(--ink2);stroke-width:1.2;stroke-dasharray:4 3}.d-arc{fill:none;stroke:#b4471f;stroke-width:1.8}
 .d-lead{stroke:#b4471f;stroke-width:1}
 .d-val{fill:#a4331f;font-size:13px;font-weight:700}.d-tag{fill:var(--ink2);font-size:11px}
+.stress-legend{margin:2px 2px 8px;font-size:12px;color:var(--ink2)}.stress-legend i{display:block;height:10px;margin:4px 0 2px;border-radius:5px;background:linear-gradient(90deg,#dfe3e6,#f08a7a,#8c0a12)}
+.stress-legend b{display:flex;justify-content:space-between;font-weight:500}.stress-legend em{font-style:normal}
 .fine{margin:11px 2px 0;font-size:12px;line-height:1.4;color:var(--ink2)}
 @media (max-width:760px){.arch{top:auto;right:8px;left:8px;width:auto;max-width:none;bottom:calc(112px + env(safe-area-inset-bottom,0px));max-height:calc(100dvh - 210px)}}
 @media (max-width:620px){button{padding:9px 10px;font-size:13px}.title{left:16px}}
@@ -65,6 +67,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
       <fieldset class="seg" id="archHeightWrap"><legend>Headroom above toe rail</legend><div id="archHeightPick"></div></fieldset>
       <fieldset class="seg"><legend>Pipe diameter</legend><div id="archPipePick"></div></fieldset>
       <fieldset class="seg" id="archBraceWrap"><legend>Supporting pipes</legend><div id="archBracePresetPick"></div><div id="archBracePick" class="chips"></div></fieldset>
+      <fieldset class="seg" id="archStressWrap"><legend>Stress colours</legend><div id="archStressPick"></div></fieldset>
     </div>
     <fieldset class="seg"><legend>Panels along lifelines</legend><div id="archSidePick"></div></fieldset>
     <p class="note" id="archNote"></p>
@@ -304,6 +307,7 @@ const SPEC = {
       E: 193e9, yield: 205e6, gamma: 1.25,   // 316L welded tube: the weld zone is annealed, so its yield is used; utilisation = stress / (yield / gamma)
       fatigueRange: 40,                      // MPa stress range for welded tube joints over millions of rolls (about FAT 40)
       sleeveLength: 0.3,                     // m of inner sleeve at each foot
+      colourScale: { avg: 0.6, max: 1.0 },  // stress colours: deep red at this share of the allowed stress
       panelFrame: 0.6,                       // panel end frames (aluminium, bolted) as a fraction of the pipe's bending stiffness
       warnUtil: 0.8, swayLimit: 15, minFreq: 4, element: 0.2, extraKg: 4,   // extraKg: cables, antenna, ensign
       cases: {
@@ -2055,7 +2059,7 @@ function measureSides(sb, b) {
 
 /* ---------- Selection and page panel ---------- */
 const archBuilt = {}, sideBuilt = {};
-const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1], orient: 'across', sides: 0, rear: 60, height: 'highest', fore: AC.foreAngles[0], edge: 'rear', braces: [] };
+const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1], orient: 'across', sides: 0, rear: 60, height: 'highest', fore: AC.foreAngles[0], edge: 'rear', braces: [], stress: 'off' };
 let fillEdges = () => {}, edgeList = '', currentArch = 'none', lastArch = AC.designs[0].id, currentBuilt = null, currentSide = null, archKick = () => {};
 const archById = id => AC.designs.find(d => d.id === id || d.alias === id);
 const num = (v, n) => v.toLocaleString('en-GB', { minimumFractionDigits: n, maximumFractionDigits: n });
@@ -2071,7 +2075,7 @@ function renderArchStats(r, q) {
       ['Inward lean, front view', deg(r.fore.sideways)], ['Fore pipe length', fmtM(r.fore.length)], ['Fore pipe foot from transom', fmtM(r.fore.footX)]]]] : []),
     ['Height', [['Panel top above water', fmtM(r.panelTopAboveWater)], ['Panel top above toe rail', fmtM(r.panelTopAboveRail)], ['Headroom above toe rail', fmtM(r.railHeadroom)], ['Headroom above stern platform', fmtM(r.platformHeadroom)]]],
     ['Size', [['Width', fmtM(r.width)], ['Length', fmtM(r.length)], ['Overhang past transom', fmtM(r.overhang)], ['Past hull side', fmtM(r.pastHull)], ['Boat length with arch', fmtM(r.lengthWithArch)]]],
-    ...(r.strength ? [[`Strength, ${num(r.strength.section.D*1000, 0)} × ${num(r.strength.section.t*1000, 1)} mm 316 stainless`, strengthRows(r.strength)]] : []),
+    ...(r.strength ? [[`Strength, ${num(r.strength.section.D*1000, 0)} × ${num(r.strength.section.t*1000, 1)} mm 316 stainless`, strengthRows(r.strength), stressLegend(archState.stress)]] : []),
     ['Clearance', [gapRow('Backstay', r.backstayGap), gapRow('Rails and pushpit', r.railGap), gapRow('Canvas', r.canvasGap), gapRow('Boom, full swing', r.boomGap)]]);
   if (q) groups.push(['Lifeline panels', [
     ['Panels', `${q.perSide} per side`],
@@ -2099,6 +2103,7 @@ function setArch(id, opts = {}) {
   if (AC.sidePanels.counts.includes(opts.sides)) archState.sides = opts.sides;
   if (AC.rearAngles.includes(opts.rear)) archState.rear = opts.rear;
   if (AC.foreAngles.includes(opts.fore)) archState.fore = opts.fore;
+  if (['off', 'avg', 'max'].includes(opts.stress)) archState.stress = opts.stress;
   if (Array.isArray(opts.braces)) archState.braces = ST.braceNames.map(q => q[0]).filter(k => opts.braces.includes(k));
   const oldHeight = { fit: 'highest', current: 'highest', higher: 'highest', lower: 'middle' }, oldMount = { edge: 'rear', free: 'fore' };
   const hId = oldHeight[opts.height] || opts.height; if (AC.archHeights.some(q => q.id === hId)) archState.height = hId;
@@ -2143,10 +2148,12 @@ function setArch(id, opts = {}) {
   currentSide = n ? (sideBuilt[n] || (sideBuilt[n] = buildSidePanels(n))) : null;
   if (currentSide) currentSide.group.visible = true;
   const r = currentBuilt ? measureArch(currentBuilt) : null, q = currentSide ? measureSides(currentSide, currentBuilt) : null;
+  const stressOn = !!(r && r.strength && r.strength.stressMap); document.getElementById('archStressWrap').hidden = !stressOn;
+  if (currentBuilt) showStress(currentBuilt, stressOn ? archState.stress : 'off');
   renderArchStats(r, q);
   document.getElementById('archCurrent').textContent = d ? `${d.name}, ${n ? `${archState.panels} + ${n*2}` : archState.panels} panels` : n ? `No arch, ${n*2} panels` : 'No arch';
   document.getElementById('archNote').textContent = d ? d.note : 'The boat as she is today, with the ensign staff and antenna in their original places.';
-  [['archDesign', id], ['archPanels', archState.panels], ['archOrient', archState.orient], ['archPipe', archState.pipe], ['archSides', n], ['archRear', archState.rear], ['archFore', archState.fore], ['archEdge', o.edge], ['archHeight', archState.height]].forEach(([k, v]) => { const el = document.querySelector(`input[name="${k}"][value="${v}"]`); if (el) el.checked = true; });
+  [['archDesign', id], ['archPanels', archState.panels], ['archOrient', archState.orient], ['archPipe', archState.pipe], ['archSides', n], ['archRear', archState.rear], ['archFore', archState.fore], ['archEdge', o.edge], ['archStress', archState.stress], ['archHeight', archState.height]].forEach(([k, v]) => { const el = document.querySelector(`input[name="${k}"][value="${v}"]`); if (el) el.checked = true; });
   try { history.replaceState(null, '', (d ? `#arch=${id}&panels=${archState.panels}&layout=${archState.orient}&pipe=${Math.round(archState.pipe*1000)}&rear=${archState.rear}&height=${archState.height}${angled ? `&fore=${archState.fore}` : ''}${edges.length > 1 ? `&edge=${o.edge}` : ''}${o.braces.length ? `&braces=${o.braces.join('.')}` : ''}` : '#arch=none') + `&sides=${n}`); } catch (e) { /* not available in some file:// contexts */ }
   archKick();
 }
@@ -2176,6 +2183,7 @@ function initArchUI(kick) {
     });
     l.append(i, document.createTextNode(label)); document.getElementById('archBracePick').append(l);
   });
+  addRadios('archStressPick', 'archStress', [['off', 'Off'], ['avg', 'Average'], ['max', 'Worst load']], v => setArch(lastArch, { stress: v }));
   addRadios('archHeightPick', 'archHeight', AC.archHeights.map(q => [q.id, q.name]), v => setArch(lastArch, { height: v }));
   fillEdges = list => {                                 // the choices depend on which pipes have a fixed angle
     const k = list.map(q => q[0]).join(); if (k === edgeList) return; edgeList = k; document.getElementById('archEdgePick').replaceChildren();
@@ -2345,16 +2353,17 @@ function archStrength(b) {
   };
   // 6. stresses and foot loads for one load vector
   const g = 9.81;
-  const evaluate = F => {
+  const evaluate = (F, perEl) => {
     const u = solve(F); let sMax = 0, where = null;
     const reac = new Map();
-    Ts.forEach(e => {
+    Ts.forEach((e, ei) => {
       const ue = e.dof.map(d => u[d]), ul = new Float64Array(12);
       for (let blk = 0; blk < 4; blk++) for (let r = 0; r < 3; r++) { let v = 0; for (let q = 0; q < 3; q++) v += e.R[r][q]*ue[blk*3 + q]; ul[blk*3 + r] = v; }
       const f = new Float64Array(12); for (let r = 0; r < 12; r++) { let v = 0; for (let q = 0; q < 12; q++) v += e.k[r*12 + q]*ul[q]; f[r] = v; }
       if (e.steel) [0, 6].forEach(o => {
         const Nx = f[o], Tq = f[o + 3], M = Math.hypot(f[o + 4], f[o + 5]), sig = Math.abs(Nx)/e.A + M/e.W, tau = Math.abs(Tq)/(2*e.W), vm = Math.sqrt(sig*sig + 3*tau*tau);
         if (vm > sMax) { sMax = vm; where = nodes[o ? e.j : e.i]; }
+        if (perEl && vm/1e6 > perEl[ei]) perEl[ei] = vm/1e6;
       });
       [[e.i, 0], [e.j, 6]].forEach(([nd, o]) => {
         if (!fixed.has(nd)) return;
@@ -2373,7 +2382,8 @@ function archStrength(b) {
   // 7. load cases
   const C = ST.cases, out = [], allow = ST.yield/ST.gamma;
   const q = .5*1.225*C.wind.speed**2*C.wind.cn, area = b.panels.length*AC.panel.length*AC.panel.width;
-  const run = (id, name, F, factor = 1) => { const r = evaluate(F); out.push({ id, name, stress: r.stress*factor, util: r.stress*factor/(allow/1e6), foot: r.foot*factor, footM: r.footM*factor, where: r.where }); return r; };
+  const perCase = [];                                   // each case's stress in every element, as a fraction of what it may carry
+  const run = (id, name, F, factor = 1) => { const el = new Float64Array(Ts.length), r = evaluate(F, el); perCase.push(el.map(v => v*factor/(allow/1e6))); out.push({ id, name, stress: r.stress*factor, util: r.stress*factor/(allow/1e6), foot: r.foot*factor, footM: r.footM*factor, where: r.where }); return r; };
   run('knock', `Knockdown, ${C.knock.side} g sideways`, inertia(0, -C.knock.down, C.knock.side));
   run('slam', `Slamming, ${C.slam.down} g down`, inertia(0, -C.slam.down, C.slam.side));
   run('pitch', `Pitching, ${C.pitch.fore} g fore and aft`, inertia(C.pitch.fore, -C.pitch.down, 0));
@@ -2382,7 +2392,9 @@ function archStrength(b) {
   { const F = add(inertia(0, -1, 0), near(b.railFwd, b.yRail, b.frameHalf), [0, 0, -C.person.push]); run('push', `Person thrown against a corner, ${C.person.push/1000} kN`, F); }
   { const F = add(inertia(0, -1, 0), near(b.railAft, b.yRail, 0), [0, -C.person.hang, 0]); run('hang', `Person hanging from the aft tube, ${C.person.hang/1000} kN`, F); }
   // fatigue: stress range from everyday rolling, both ways
-  const fatR = evaluate(inertia(0, 0, C.fatigue.side)), fat = fatR.stress*2;
+  const fatEl = new Float64Array(Ts.length), fatR = evaluate(inertia(0, 0, C.fatigue.side), fatEl), fat = fatR.stress*2;
+  perCase.push(fatEl.map(v => v*2/ST.fatigueRange));
+  const elements = Ts.map((e, k) => e.steel ? { a: nodes[e.i], b: nodes[e.j], avg: perCase.reduce((a, c) => a + c[k], 0)/perCase.length, max: Math.max(...perCase.map(c => c[k])) } : null).filter(Boolean);
   // sway: 1 kN at the top corner, and natural frequencies by Rayleigh's method
   const push = evaluate(add(new Float64Array(N), near(b.railFwd, b.yRail, b.frameHalf), [0, 0, 1000])).u, cn = near(b.railFwd, b.yRail, b.frameHalf);
   const freq = (ax, az) => { const u = solve(inertia(ax, 0, az)); let s1 = 0, s2 = 0; for (let i = 0; i < n; i++) { const d = ax ? u[i*6] : u[i*6 + 2]; s1 += mass[i]*d; s2 += mass[i]*d*d; } return Math.sqrt(9.81*Math.abs(s1)/s2)/(2*Math.PI); };
@@ -2390,7 +2402,7 @@ function archStrength(b) {
   return b.strength = {
     cases: out, governing: gov, fatigueRange: fat, fatigueAt: fatR.where, fatigueUtil: fat/ST.fatigueRange, sway: Math.abs(push[cn*6 + 2])*1000,
     freqSide: freq(0, 1), freqFore: freq(1, 0), steelKg: mass.reduce((a, v) => a + v, 0), braceKg: (b.braceKg || 0) + (sleeve ? b.supports.length*ST.sleeveLength*As*7980 : 0), sleeves: sleeve,
-    footF: Math.max(...out.map(c => c.foot))/1000, footM: Math.max(...out.map(c => c.footM))/1000, nodes: n, elements: els.length, section: { D, t },
+    stressMap: elements, footF: Math.max(...out.map(c => c.foot))/1000, footM: Math.max(...out.map(c => c.footM))/1000, nodes: n, elements: els.length, section: { D, t },
   };
 }
 
@@ -2408,6 +2420,34 @@ function strengthRows(s) {
     ['Largest foot load', `${num(s.footF, 1)} kN, ${num(s.footM, 2)} kN·m`],
     ['Supporting pipes and sleeves', s.braceKg ? `${num(s.braceKg, 1)} kg` : 'None'],
   ];
+}
+
+/* ---------- Stress colours: every pipe tinted from steel to deep red by how hard it works ---------- */
+const stressColour = (() => {
+  const lo = C('#dfe3e6'), mid = C('#f08a7a'), hi = C('#8c0a12'), cache = new Map();
+  return u => {
+    const k = Math.round(clamp(u, 0, 1)*32); if (cache.has(k)) return cache.get(k);
+    const f = k/32, c = f < .5 ? lo.clone().lerp(mid, f/.5) : mid.clone().lerp(hi, (f - .5)/.5);
+    const m = new T.MeshStandardMaterial({ color: c, roughness: .5, metalness: .2 }); cache.set(k, m); return m;
+  };
+})();
+function showStress(b, mode) {
+  b.stressViews = b.stressViews || {};
+  Object.values(b.stressViews).forEach(g => { g.visible = false; });
+  const s = mode !== 'off' && b.strength && b.strength.stressMap;
+  b.frame.traverse(m => { if (m.isMesh && m.material === mat.steel) m.visible = !s; });     // the plain steel hides while the colours show
+  if (!s) return;
+  if (!b.stressViews[mode]) {
+    const g = new T.Group(), full = ST.colourScale[mode];
+    s.forEach(e => rod(g, e.a, e.b, b.D/2 + .0012, stressColour(e[mode]/full), 10));
+    b.group.add(g); b.stressViews[mode] = g;
+  }
+  b.stressViews[mode].visible = true;
+}
+function stressLegend(mode) {
+  if (mode === 'off') return '';
+  const full = ST.colourScale[mode], label = mode === 'avg' ? 'Average over all loads' : 'Worst single load';
+  return `<div class="stress-legend"><span>${label}, share of what the pipe may carry</span><i></i><b><em>0 %</em><em>${num(full*50, 0)} %</em><em>${num(full*100, 0)} % +</em></b></div>`;
 }
 
 /* Renderer, light, water, cameras, views and UI. */

@@ -155,16 +155,17 @@ function archStrength(b) {
   };
   // 6. stresses and foot loads for one load vector
   const g = 9.81;
-  const evaluate = F => {
+  const evaluate = (F, perEl) => {
     const u = solve(F); let sMax = 0, where = null;
     const reac = new Map();
-    Ts.forEach(e => {
+    Ts.forEach((e, ei) => {
       const ue = e.dof.map(d => u[d]), ul = new Float64Array(12);
       for (let blk = 0; blk < 4; blk++) for (let r = 0; r < 3; r++) { let v = 0; for (let q = 0; q < 3; q++) v += e.R[r][q]*ue[blk*3 + q]; ul[blk*3 + r] = v; }
       const f = new Float64Array(12); for (let r = 0; r < 12; r++) { let v = 0; for (let q = 0; q < 12; q++) v += e.k[r*12 + q]*ul[q]; f[r] = v; }
       if (e.steel) [0, 6].forEach(o => {
         const Nx = f[o], Tq = f[o + 3], M = Math.hypot(f[o + 4], f[o + 5]), sig = Math.abs(Nx)/e.A + M/e.W, tau = Math.abs(Tq)/(2*e.W), vm = Math.sqrt(sig*sig + 3*tau*tau);
         if (vm > sMax) { sMax = vm; where = nodes[o ? e.j : e.i]; }
+        if (perEl && vm/1e6 > perEl[ei]) perEl[ei] = vm/1e6;
       });
       [[e.i, 0], [e.j, 6]].forEach(([nd, o]) => {
         if (!fixed.has(nd)) return;
@@ -183,7 +184,8 @@ function archStrength(b) {
   // 7. load cases
   const C = ST.cases, out = [], allow = ST.yield/ST.gamma;
   const q = .5*1.225*C.wind.speed**2*C.wind.cn, area = b.panels.length*AC.panel.length*AC.panel.width;
-  const run = (id, name, F, factor = 1) => { const r = evaluate(F); out.push({ id, name, stress: r.stress*factor, util: r.stress*factor/(allow/1e6), foot: r.foot*factor, footM: r.footM*factor, where: r.where }); return r; };
+  const perCase = [];                                   // each case's stress in every element, as a fraction of what it may carry
+  const run = (id, name, F, factor = 1) => { const el = new Float64Array(Ts.length), r = evaluate(F, el); perCase.push(el.map(v => v*factor/(allow/1e6))); out.push({ id, name, stress: r.stress*factor, util: r.stress*factor/(allow/1e6), foot: r.foot*factor, footM: r.footM*factor, where: r.where }); return r; };
   run('knock', `Knockdown, ${C.knock.side} g sideways`, inertia(0, -C.knock.down, C.knock.side));
   run('slam', `Slamming, ${C.slam.down} g down`, inertia(0, -C.slam.down, C.slam.side));
   run('pitch', `Pitching, ${C.pitch.fore} g fore and aft`, inertia(C.pitch.fore, -C.pitch.down, 0));
@@ -192,7 +194,9 @@ function archStrength(b) {
   { const F = add(inertia(0, -1, 0), near(b.railFwd, b.yRail, b.frameHalf), [0, 0, -C.person.push]); run('push', `Person thrown against a corner, ${C.person.push/1000} kN`, F); }
   { const F = add(inertia(0, -1, 0), near(b.railAft, b.yRail, 0), [0, -C.person.hang, 0]); run('hang', `Person hanging from the aft tube, ${C.person.hang/1000} kN`, F); }
   // fatigue: stress range from everyday rolling, both ways
-  const fatR = evaluate(inertia(0, 0, C.fatigue.side)), fat = fatR.stress*2;
+  const fatEl = new Float64Array(Ts.length), fatR = evaluate(inertia(0, 0, C.fatigue.side), fatEl), fat = fatR.stress*2;
+  perCase.push(fatEl.map(v => v*2/ST.fatigueRange));
+  const elements = Ts.map((e, k) => e.steel ? { a: nodes[e.i], b: nodes[e.j], avg: perCase.reduce((a, c) => a + c[k], 0)/perCase.length, max: Math.max(...perCase.map(c => c[k])) } : null).filter(Boolean);
   // sway: 1 kN at the top corner, and natural frequencies by Rayleigh's method
   const push = evaluate(add(new Float64Array(N), near(b.railFwd, b.yRail, b.frameHalf), [0, 0, 1000])).u, cn = near(b.railFwd, b.yRail, b.frameHalf);
   const freq = (ax, az) => { const u = solve(inertia(ax, 0, az)); let s1 = 0, s2 = 0; for (let i = 0; i < n; i++) { const d = ax ? u[i*6] : u[i*6 + 2]; s1 += mass[i]*d; s2 += mass[i]*d*d; } return Math.sqrt(9.81*Math.abs(s1)/s2)/(2*Math.PI); };
@@ -200,7 +204,7 @@ function archStrength(b) {
   return b.strength = {
     cases: out, governing: gov, fatigueRange: fat, fatigueAt: fatR.where, fatigueUtil: fat/ST.fatigueRange, sway: Math.abs(push[cn*6 + 2])*1000,
     freqSide: freq(0, 1), freqFore: freq(1, 0), steelKg: mass.reduce((a, v) => a + v, 0), braceKg: (b.braceKg || 0) + (sleeve ? b.supports.length*ST.sleeveLength*As*7980 : 0), sleeves: sleeve,
-    footF: Math.max(...out.map(c => c.foot))/1000, footM: Math.max(...out.map(c => c.footM))/1000, nodes: n, elements: els.length, section: { D, t },
+    stressMap: elements, footF: Math.max(...out.map(c => c.foot))/1000, footM: Math.max(...out.map(c => c.footM))/1000, nodes: n, elements: els.length, section: { D, t },
   };
 }
 
@@ -218,4 +222,32 @@ function strengthRows(s) {
     ['Largest foot load', `${num(s.footF, 1)} kN, ${num(s.footM, 2)} kN·m`],
     ['Supporting pipes and sleeves', s.braceKg ? `${num(s.braceKg, 1)} kg` : 'None'],
   ];
+}
+
+/* ---------- Stress colours: every pipe tinted from steel to deep red by how hard it works ---------- */
+const stressColour = (() => {
+  const lo = C('#dfe3e6'), mid = C('#f08a7a'), hi = C('#8c0a12'), cache = new Map();
+  return u => {
+    const k = Math.round(clamp(u, 0, 1)*32); if (cache.has(k)) return cache.get(k);
+    const f = k/32, c = f < .5 ? lo.clone().lerp(mid, f/.5) : mid.clone().lerp(hi, (f - .5)/.5);
+    const m = new T.MeshStandardMaterial({ color: c, roughness: .5, metalness: .2 }); cache.set(k, m); return m;
+  };
+})();
+function showStress(b, mode) {
+  b.stressViews = b.stressViews || {};
+  Object.values(b.stressViews).forEach(g => { g.visible = false; });
+  const s = mode !== 'off' && b.strength && b.strength.stressMap;
+  b.frame.traverse(m => { if (m.isMesh && m.material === mat.steel) m.visible = !s; });     // the plain steel hides while the colours show
+  if (!s) return;
+  if (!b.stressViews[mode]) {
+    const g = new T.Group(), full = ST.colourScale[mode];
+    s.forEach(e => rod(g, e.a, e.b, b.D/2 + .0012, stressColour(e[mode]/full), 10));
+    b.group.add(g); b.stressViews[mode] = g;
+  }
+  b.stressViews[mode].visible = true;
+}
+function stressLegend(mode) {
+  if (mode === 'off') return '';
+  const full = ST.colourScale[mode], label = mode === 'avg' ? 'Average over all loads' : 'Worst single load';
+  return `<div class="stress-legend"><span>${label}, share of what the pipe may carry</span><i></i><b><em>0 %</em><em>${num(full*50, 0)} %</em><em>${num(full*100, 0)} % +</em></b></div>`;
 }

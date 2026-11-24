@@ -44,6 +44,8 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .d-stub{stroke:var(--ink);stroke-width:3}.d-ref{stroke:var(--ink2);stroke-width:1.2;stroke-dasharray:4 3}.d-arc{fill:none;stroke:#b4471f;stroke-width:1.8}
 .d-lead{stroke:#b4471f;stroke-width:1}
 .d-val{fill:#a4331f;font-size:13px;font-weight:700}.d-tag{fill:var(--ink2);font-size:11px}
+.stress-legend{margin:2px 2px 8px;font-size:12px;color:var(--ink2)}.stress-legend i{display:block;height:10px;margin:4px 0 2px;border-radius:5px;background:linear-gradient(90deg,#dfe3e6,#f08a7a,#8c0a12)}
+.stress-legend b{display:flex;justify-content:space-between;font-weight:500}.stress-legend em{font-style:normal}
 .fine{margin:11px 2px 0;font-size:12px;line-height:1.4;color:var(--ink2)}
 @media (max-width:760px){.arch{top:auto;right:8px;left:8px;width:auto;max-width:none;bottom:calc(112px + env(safe-area-inset-bottom,0px));max-height:calc(100dvh - 210px)}}
 @media (max-width:620px){button{padding:9px 10px;font-size:13px}.title{left:16px}}
@@ -65,6 +67,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
       <fieldset class="seg" id="archHeightWrap"><legend>Headroom above toe rail</legend><div id="archHeightPick"></div></fieldset>
       <fieldset class="seg"><legend>Pipe diameter</legend><div id="archPipePick"></div></fieldset>
       <fieldset class="seg" id="archBraceWrap"><legend>Supporting pipes</legend><div id="archBracePresetPick"></div><div id="archBracePick" class="chips"></div></fieldset>
+      <fieldset class="seg" id="archStressWrap"><legend>Stress colours</legend><div id="archStressPick"></div></fieldset>
     </div>
     <fieldset class="seg"><legend>Panels along lifelines</legend><div id="archSidePick"></div></fieldset>
     <p class="note" id="archNote"></p>

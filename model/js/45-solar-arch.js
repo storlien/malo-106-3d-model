@@ -394,7 +394,7 @@ function measureSides(sb, b) {
 
 /* ---------- Selection and page panel ---------- */
 const archBuilt = {}, sideBuilt = {};
-const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1], orient: 'across', sides: 0, rear: 60, height: 'highest', fore: AC.foreAngles[0], edge: 'rear', braces: [] };
+const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1], orient: 'across', sides: 0, rear: 60, height: 'highest', fore: AC.foreAngles[0], edge: 'rear', braces: [], stress: 'off' };
 let fillEdges = () => {}, edgeList = '', currentArch = 'none', lastArch = AC.designs[0].id, currentBuilt = null, currentSide = null, archKick = () => {};
 const archById = id => AC.designs.find(d => d.id === id || d.alias === id);
 const num = (v, n) => v.toLocaleString('en-GB', { minimumFractionDigits: n, maximumFractionDigits: n });
@@ -410,7 +410,7 @@ function renderArchStats(r, q) {
       ['Inward lean, front view', deg(r.fore.sideways)], ['Fore pipe length', fmtM(r.fore.length)], ['Fore pipe foot from transom', fmtM(r.fore.footX)]]]] : []),
     ['Height', [['Panel top above water', fmtM(r.panelTopAboveWater)], ['Panel top above toe rail', fmtM(r.panelTopAboveRail)], ['Headroom above toe rail', fmtM(r.railHeadroom)], ['Headroom above stern platform', fmtM(r.platformHeadroom)]]],
     ['Size', [['Width', fmtM(r.width)], ['Length', fmtM(r.length)], ['Overhang past transom', fmtM(r.overhang)], ['Past hull side', fmtM(r.pastHull)], ['Boat length with arch', fmtM(r.lengthWithArch)]]],
-    ...(r.strength ? [[`Strength, ${num(r.strength.section.D*1000, 0)} × ${num(r.strength.section.t*1000, 1)} mm 316 stainless`, strengthRows(r.strength)]] : []),
+    ...(r.strength ? [[`Strength, ${num(r.strength.section.D*1000, 0)} × ${num(r.strength.section.t*1000, 1)} mm 316 stainless`, strengthRows(r.strength), stressLegend(archState.stress)]] : []),
     ['Clearance', [gapRow('Backstay', r.backstayGap), gapRow('Rails and pushpit', r.railGap), gapRow('Canvas', r.canvasGap), gapRow('Boom, full swing', r.boomGap)]]);
   if (q) groups.push(['Lifeline panels', [
     ['Panels', `${q.perSide} per side`],
@@ -438,6 +438,7 @@ function setArch(id, opts = {}) {
   if (AC.sidePanels.counts.includes(opts.sides)) archState.sides = opts.sides;
   if (AC.rearAngles.includes(opts.rear)) archState.rear = opts.rear;
   if (AC.foreAngles.includes(opts.fore)) archState.fore = opts.fore;
+  if (['off', 'avg', 'max'].includes(opts.stress)) archState.stress = opts.stress;
   if (Array.isArray(opts.braces)) archState.braces = ST.braceNames.map(q => q[0]).filter(k => opts.braces.includes(k));
   const oldHeight = { fit: 'highest', current: 'highest', higher: 'highest', lower: 'middle' }, oldMount = { edge: 'rear', free: 'fore' };
   const hId = oldHeight[opts.height] || opts.height; if (AC.archHeights.some(q => q.id === hId)) archState.height = hId;
@@ -482,10 +483,12 @@ function setArch(id, opts = {}) {
   currentSide = n ? (sideBuilt[n] || (sideBuilt[n] = buildSidePanels(n))) : null;
   if (currentSide) currentSide.group.visible = true;
   const r = currentBuilt ? measureArch(currentBuilt) : null, q = currentSide ? measureSides(currentSide, currentBuilt) : null;
+  const stressOn = !!(r && r.strength && r.strength.stressMap); document.getElementById('archStressWrap').hidden = !stressOn;
+  if (currentBuilt) showStress(currentBuilt, stressOn ? archState.stress : 'off');
   renderArchStats(r, q);
   document.getElementById('archCurrent').textContent = d ? `${d.name}, ${n ? `${archState.panels} + ${n*2}` : archState.panels} panels` : n ? `No arch, ${n*2} panels` : 'No arch';
   document.getElementById('archNote').textContent = d ? d.note : 'The boat as she is today, with the ensign staff and antenna in their original places.';
-  [['archDesign', id], ['archPanels', archState.panels], ['archOrient', archState.orient], ['archPipe', archState.pipe], ['archSides', n], ['archRear', archState.rear], ['archFore', archState.fore], ['archEdge', o.edge], ['archHeight', archState.height]].forEach(([k, v]) => { const el = document.querySelector(`input[name="${k}"][value="${v}"]`); if (el) el.checked = true; });
+  [['archDesign', id], ['archPanels', archState.panels], ['archOrient', archState.orient], ['archPipe', archState.pipe], ['archSides', n], ['archRear', archState.rear], ['archFore', archState.fore], ['archEdge', o.edge], ['archStress', archState.stress], ['archHeight', archState.height]].forEach(([k, v]) => { const el = document.querySelector(`input[name="${k}"][value="${v}"]`); if (el) el.checked = true; });
   try { history.replaceState(null, '', (d ? `#arch=${id}&panels=${archState.panels}&layout=${archState.orient}&pipe=${Math.round(archState.pipe*1000)}&rear=${archState.rear}&height=${archState.height}${angled ? `&fore=${archState.fore}` : ''}${edges.length > 1 ? `&edge=${o.edge}` : ''}${o.braces.length ? `&braces=${o.braces.join('.')}` : ''}` : '#arch=none') + `&sides=${n}`); } catch (e) { /* not available in some file:// contexts */ }
   archKick();
 }
@@ -515,6 +518,7 @@ function initArchUI(kick) {
     });
     l.append(i, document.createTextNode(label)); document.getElementById('archBracePick').append(l);
   });
+  addRadios('archStressPick', 'archStress', [['off', 'Off'], ['avg', 'Average'], ['max', 'Worst load']], v => setArch(lastArch, { stress: v }));
   addRadios('archHeightPick', 'archHeight', AC.archHeights.map(q => [q.id, q.name]), v => setArch(lastArch, { height: v }));
   fillEdges = list => {                                 // the choices depend on which pipes have a fixed angle
     const k = list.map(q => q[0]).join(); if (k === edgeList) return; edgeList = k; document.getElementById('archEdgePick').replaceChildren();

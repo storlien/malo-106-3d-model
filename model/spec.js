@@ -199,6 +199,7 @@ const SPEC = {
       E: 193e9, yield: 205e6, gamma: 1.25,   // 316L welded tube: the weld zone is annealed, so its yield is used; utilisation = stress / (yield / gamma)
       fatigueRange: 40,                      // MPa stress range for welded tube joints over millions of rolls (about FAT 40)
       sleeveLength: 0.3,                     // m of inner sleeve at each foot
+      colourScale: { avg: 0.6, max: 1.0 },  // stress colours: deep red at this share of the allowed stress
       panelFrame: 0.6,                       // panel end frames (aluminium, bolted) as a fraction of the pipe's bending stiffness
       warnUtil: 0.8, swayLimit: 15, minFreq: 4, element: 0.2, extraKg: 4,   // extraKg: cables, antenna, ensign
       cases: {
