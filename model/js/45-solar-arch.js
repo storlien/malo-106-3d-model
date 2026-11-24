@@ -1,15 +1,26 @@
 /* Solar arch designs. Each entry in SPEC.solarArches.designs is built from the same parts,
    and its measurements are taken from the finished geometry rather than from the inputs. */
 const AC = SPEC.solarArches;
+/* Monocrystalline cells as on the owner's 100 W panels [P]: near-black cells, 3 across by 7 along the panel,
+   fine silver lines running lengthwise, light seams and small diamonds where the clipped cell corners meet.
+   The texture's u axis runs along the long side; mat.cellAcross turns it for panels laid with the long side across. */
 mat.cell = (() => {
-  const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d'), n = 8, s = 512/n;
-  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
-    const v = 22 + ((i*7 + j*3)%5);
-    g.fillStyle = `rgb(${v},${v + 8},${v + 34})`; g.fillRect(i*s + 1, j*s + 1, s - 2, s - 2);
-    g.fillStyle = '#d7dde2'; for (let b = 1; b <= 3; b++) g.fillRect(i*s + 1, j*s + b*s/4 - .6, s - 2, 1.2);
+  const W = 1536, H = 996, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  const rows = 7, cols = 3, m = 10, cw = (W - 2*m)/rows, ch = (H - 2*m)/cols, gap = 5, cut = 9;
+  g.fillStyle = '#dfe2e4'; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+    const x0 = m + i*cw + gap/2, y0 = m + j*ch + 1, x1 = x0 + cw - gap, y1 = y0 + ch - 2;
+    const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, '#26282c'); gr.addColorStop(1, '#1b1d21');
+    g.fillStyle = gr; g.beginPath(); g.moveTo(x0 + cut, y0); g.lineTo(x1 - cut, y0); g.lineTo(x1, y0 + cut); g.lineTo(x1, y1 - cut); g.lineTo(x1 - cut, y1);
+    g.lineTo(x0 + cut, y1); g.lineTo(x0, y1 - cut); g.lineTo(x0, y0 + cut); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(205,210,214,.75)';
+    for (let k = 1; k <= 11; k++) g.fillRect(x0 + 2, y0 + k*(y1 - y0)/12 - .7, x1 - x0 - 4, 1.4);   // lengthwise lines
   }
   const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; t.anisotropy = 16;
-  return M('#ffffff', { map: t, roughness: .14, metalness: .25, envMapIntensity: 1.1 });
+  return M('#ffffff', { map: t, roughness: .12, metalness: .2, envMapIntensity: 1.0 });
+})();
+mat.cellAcross = (() => {
+  const m = mat.cell.clone(); m.map = mat.cell.map.clone(); m.map.needsUpdate = true; m.map.center.set(.5, .5); m.map.rotation = Math.PI/2; return m;
 })();
 
 /* Panel positions as [forward x, aft x, port z, starboard z].
@@ -159,7 +170,7 @@ function buildArch(d, count, D, orient, o = {}) {
   panels.forEach(([f, a, z0, z1]) => {
     const len = f - a, w = z1 - z0, xc = (f + a)/2, zc = (z0 + z1)/2;
     box(frame, [xc, panelY, zc], [len, AC.panel.thick, w], mat.alu);
-    const face = put(frame, new T.PlaneGeometry(len - .03, w - .03), mat.cell, false);
+    const face = put(frame, new T.PlaneGeometry(len - .03, w - .03), len >= w ? mat.cell : mat.cellAcross, false);
     face.rotation.x = -Math.PI/2; face.position.set(xc, panelY + AC.panel.thick/2 + .001, zc);
   });
 

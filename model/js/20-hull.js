@@ -140,16 +140,31 @@ foil(SPEC.keel.deadwood, mat.anti);
 foil(SPEC.keel.skeg, mat.anti);
 foil(SPEC.keel.rudder, mat.anti);
 
+/* Three-bladed polished brass propeller with broad, rounded, slightly skewed blades, a brass boss and a zinc anode cone [P]. */
+mat.brass = M('#d9a43c', { roughness: .22, metalness: .9, envMapIntensity: 1.3 });
+mat.zinc = M('#b9bec2', { roughness: .45, metalness: .85 });
 (function propeller() {
-  const p = SPEC.keel.prop, f = SPEC.keel.shaftFrom;
-  rod(G.hull, [f[0], f[1], 0], [p.x + .05, p.y, 0], .016, mat.steel);
-  const hub = put(G.hull, new T.SphereGeometry(.045, 16, 12), mat.bronze); hub.position.set(p.x, p.y, 0); hub.scale.set(1.5, 1, 1);
+  const p = SPEC.keel.prop, f = SPEC.keel.shaftFrom, R = p.r, pitch = p.pitch, hubR = .042;
+  rod(G.hull, [f[0], f[1], 0], [p.x + .06, p.y, 0], .016, mat.steel);
   const prop = new T.Group(); prop.position.set(p.x, p.y, 0); G.hull.add(prop);
-  const s = new T.Shape(); s.moveTo(.03, -.025); s.bezierCurveTo(p.r*.5, -.085, p.r*.95, -.075, p.r, -.005);
-  s.bezierCurveTo(p.r*.95, .06, p.r*.45, .07, .03, .025); s.closePath();
-  for (let i = 0; i < p.blades; i++) {
-    const h = new T.Group(); h.rotation.x = i*Math.PI*2/p.blades; prop.add(h);
-    const b = put(h, new T.ShapeGeometry(s, 14), mat.bronze);
-    b.rotation.order = 'YXZ'; b.rotation.y = 1.05; b.rotation.z = Math.PI/2;
+  // boss and anode along the shaft axis (x), the anode aft
+  const lathe = (pts, m) => { const g = new T.LatheGeometry(pts.map(([r, x]) => new T.Vector2(r, x)), 28); const o = put(prop, g, m); o.rotation.z = Math.PI/2; return o; };
+  lathe([[.0, -.064], [.034, -.064], [.04, -.05], [hubR, -.02], [hubR, .03], [.036, .05], [.022, .062], [0, .062]].map(([r, x]) => [r, -x]), mat.brass);
+  lathe([[0, -.064], [.031, -.064], [.029, -.08], [.022, -.13], [.012, -.13], [.012, -.12], [0, -.12]].map(([r, x]) => [r, -x]), mat.zinc);
+  const hole = put(prop, new T.CircleGeometry(.0115, 16), mat.dark); hole.rotation.y = -Math.PI/2; hole.position.x = -.119;
+  // blade: chord follows a broad rounded outline; each section lies on the pitch helix and is skewed back towards the tip
+  const nr = 24, nc = 16, half = q => { const q0 = .55, cm = .42*R; return q <= q0 ? cm*(.34 + .66*Math.sin(Math.PI/2*q/q0)) : cm*Math.sqrt(Math.max(0, 1 - Math.pow((q - q0)/(1 - q0), 2))); };   // broad paddle with a round tip
+  for (let b = 0; b < p.blades; b++) {
+    const th0 = b*Math.PI*2/p.blades, top = [], bot = [];
+    for (let i = 0; i <= nr; i++) {
+      const q = i/nr, rho = lerp(hubR*.9, R, q), c = half(q), skew = .22*q*q, rt = [], rb = [];
+      for (let k = 0; k <= nc; k++) {
+        const u = -1 + 2*k/nc, a = th0 + skew + u*c/rho, x = -pitch/(2*Math.PI)*(u*c/rho), t = .006*(1 - q*.7)*Math.sqrt(Math.max(0, 1 - u*u));
+        const P = (dx) => [x + dx, rho*Math.cos(a), rho*Math.sin(a)];
+        rt.push(P(t)); rb.push(P(-t));
+      }
+      top.push(rt); bot.push(rb);
+    }
+    grid(prop, top, mat.brass); grid(prop, bot.map(r => r.slice().reverse()), mat.brass);
   }
 })();
