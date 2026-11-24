@@ -38,10 +38,10 @@ function panelLayout(d, count, orient) {
   return count === 3 ? [...pair(f, g/2), [row2, row2 - W, -P/2, P/2]] : [...pair(f, g/2), ...pair(row2, g/2)];
 }
 
-function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current') {
+function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current', foreAngle = 0) {
   const group = new T.Group(), frame = new T.Group(), extras = new T.Group();
   group.add(frame, extras); group.visible = false; G.arch.add(group);
-  let steelKg = 0, steelM = 0, rear = null, foreLength = 0;
+  let steelKg = 0, steelM = 0, rear = null, fore = null, foreLength = 0;
   const kgPerM = Math.PI*(D - AC.pipeWall)*AC.pipeWall*7980;
   const pipe = (pts, seg = 12) => {
     for (let i = 0; i < pts.length - 1; i++) steelM += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2]);
@@ -80,26 +80,27 @@ function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current') {
     for (let i = 1; i <= 8; i++) { const a = i/8*Math.PI/2, y = yS + H.bend*Math.sin(a); pts.push([onHoop(y), y, s*(H.half - H.bend + H.bend*Math.cos(a))]); }
     return pts;
   };
-  if (!straight) pipe([...side(-1), [H.topX, H.topY, 0], ...side(1).reverse()], 14);
+  const foreStraight = !!d.foreStraight;
+  if (!straight && !foreStraight) pipe([...side(-1), [H.topX, H.topY, 0], ...side(1).reverse()], 14);
   const hoopYAt = z => { const o = Math.abs(z) - (H.half - H.bend); return o <= 0 ? H.topY : yS + Math.sqrt(Math.max(0, H.bend*H.bend - o*o)); };
 
   // carrier rails rest on the hoop and run under the panel edges, closed by two cross tubes
   const panels = rawPanels.map(q => [q[0] + shift, q[1] + shift, q[2], q[3]]), yRail = H.topY + D, panelY = yRail + D/2 + AC.panel.thick/2;
   const fwd = Math.max(...panels.map(q => q[0])), aft = Math.min(...panels.map(q => q[1]));
   const halfW = Math.max(...panels.flatMap(q => [Math.abs(q[2]), Math.abs(q[3])]));
-  const frameHalf = straight ? Math.max(halfW, A.footHalf) : d.foreStrut ? Math.max(halfW, H.half) : halfW,   // fore struts must land outside the bimini
+  const frameHalf = straight ? Math.max(halfW, A.footHalf) : foreStraight ? Math.max(halfW, H.half) : d.foreStrut ? Math.max(halfW, H.half) : halfW,   // fore struts must land outside the bimini
      footX = transomX(A.footY, A.footHalf) - A.standoff;
   // a chosen rear angle fixes where the pipe reaches the frame; the frame extends aft to meet it
   const strutTop = straight && rearAngle ? footX - (yRail - A.footY)/Math.tan(rearAngle*Math.PI/180) : Math.min(aft, -.04);
-  const railFwd = Math.max(fwd, straight ? H.topX : H.topX + .01), railAft = Math.min(aft, strutTop);
+  const railFwd = Math.max(fwd, straight || foreStraight ? H.topX : H.topX + .01), railAft = Math.min(aft, strutTop);
   // each rail runs under the panels it carries; the outer pair also ties the hoop to the struts
   const rails = [];
   panels.forEach(([f, a, z0, z1]) => [z0, z1].forEach(z => {
     const r = rails.find(q => Math.abs(q.z - z) < .06);
     if (r) { r.z = (r.z*r.n + z)/(r.n + 1); r.n++; r.f = Math.max(r.f, f); r.a = Math.min(r.a, a); } else rails.push({ z, n: 1, f, a });
   }));
-  if (straight) [1, -1].forEach(k => {                                // side rails directly above the fore and rear pipes
-    const z = k*A.footHalf, r = rails.find(q => Math.abs(q.z - z) < .06);
+  if (straight || foreStraight) [1, -1].forEach(k => {                // side rails directly above the fore (and rear) pipes
+    const z = k*(straight ? A.footHalf : H.half), r = rails.find(q => Math.abs(q.z - z) < .06);
     if (r) r.frame = true; else rails.push({ z, n: 1, f: railFwd, a: railAft, frame: true });
   });
   rails.forEach(r => {
@@ -108,7 +109,15 @@ function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current') {
     if (!straight && H.topX <= f && H.topX >= a && Math.abs(r.z) <= H.half) { const y = hoopYAt(r.z); pipe([[onHoop(y), y, r.z], [H.topX, yRail, r.z]], 10); }  // saddle on the hoop
   });
   // panels wider than the hoop get a third cross tube resting on it
-  const crossAt = straight ? [railFwd, railAft, strutTop] : [railFwd, railAft, ...(halfW > H.half - .02 ? [H.topX] : [])];
+  // straight fore pipes lean aft from the toe rail to the frame at the chosen angle
+  const foreFoot = (() => {
+    if (!foreStraight) return null;
+    const tanF = Math.tan((foreAngle || 90)*Math.PI/180), capEnd = SPEC.deck.toeRail.sternCapTo - .075, run = x => (yRail - deckY(x, H.footHalf))/tanF;
+    let x = H.footX; for (let k = 0; k < 6; k++) x = H.topX + run(x);
+    if (x > capEnd && x < capEnd + .15) x = capEnd;                 // keep the foot plate wholly on the wide toe rail, clear of the step down
+    return { x, topX: x - run(x) };
+  })();
+  const crossAt = straight ? [railFwd, railAft, strutTop] : foreStraight ? [railFwd, railAft, foreFoot.topX] : [railFwd, railAft, ...(halfW > H.half - .02 ? [H.topX] : [])];
   crossAt.filter((x, i, l) => l.findIndex(q => Math.abs(q - x) < 1e-6) === i).forEach(x => pipe([[x, yRail, -frameHalf], [x, yRail, frameHalf]]));
 
   [1, -1].forEach(s => {
@@ -123,6 +132,11 @@ function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current') {
     if (straight) {
       const onRail = H.topX < HS.transomCurve*tz*tz + SPEC.cockpit.aftRail, base = [H.topX, onRail ? PP.railTop : deckY(H.topX, tz), tz];
       pipe([base, [H.topX, yRail, tz]]); footPlate(base); foreLength = yRail - base[1];
+    } else if (foreStraight) {
+      // straight fore pipe from the toe rail up to the frame, leaning aft at the chosen angle to the frame
+      const base = [foreFoot.x, deckY(foreFoot.x, s*H.footHalf), s*H.footHalf], top = [foreFoot.topX, yRail, s*H.half];
+      pipe([base, top]); footPlate(base);
+      if (s === 1) { fore = { foot: base, top }; foreLength = Math.hypot(top[0] - base[0], top[1] - base[1], top[2] - base[2]); }
     } else footPlate([H.footX, fy, s*H.footHalf]);
     if (d.foreStrut) {
       const q = d.foreStrut, b = [q.footX, deckY(q.footX, q.footHalf), s*q.footHalf];
@@ -144,7 +158,7 @@ function buildArch(d, count, D, orient, rearAngle = 0, heightId = 'current') {
   const az = -frameHalf - .04;
   rod(extras, [railFwd, yRail, -frameHalf], [railFwd, yRail, az], .012, mat.steel);
   antenna(extras, [railFwd, yRail, az], [railFwd, yRail + .42, az]);
-  return { d, group, frame, count, D, rear, foreLength, foreX: H.topX, uncovered: Math.max(0, railFwd - railAft - depth), area: count*AC.panel.length*AC.panel.width, steelKg, steelM };
+  return { d, group, frame, count, D, rear, fore, foreLength, foreX: H.topX, uncovered: Math.max(0, railFwd - railAft - depth), area: count*AC.panel.length*AC.panel.width, steelKg, steelM };
 }
 
 /* ---------- Measurements ----------
@@ -227,13 +241,13 @@ function measureArch(b) {
     boom = Math.min(boom, Math.hypot(Math.max(0, Math.hypot(x - B.fwd, z) - reach), Math.max(0, Math.abs(y - B.y) - B.h/2)));   // full swing
     if (Math.abs(z) < .45 && y < under) { under = y; underX = x; }                // underside of the frame, clear of the legs
   }
-  const cells = toCells(clear), panelKg = b.count*AC.panel.kg, rear = Object.assign(rearAngles(b.rear), { foreLength: b.foreLength, foreX: b.foreX, uncovered: b.uncovered });
+  const cells = toCells(clear), panelKg = b.count*AC.panel.kg, rear = Object.assign(rearAngles(b.rear), { foreLength: b.fore ? 0 : b.foreLength, foreX: b.foreX, uncovered: b.uncovered }), fore = b.fore && foreAngles(b.fore);
   b.clear = clear; b.cells = cells;
   return b.report = {
     panelTopAboveWater: top - HS.floatSink, panelTopAboveRail: top - railTopY, railHeadroom: under - toeRailTop(underX), platformHeadroom: under - SPEC.platform.y,
     width: maxZ - minZ, length: maxX - minX, overhang: Math.max(0, -minX), lengthWithArch: L + Math.max(0, -minX), pastHull: Math.max(0, past),
     panels: b.count, watts: b.count*AC.panel.watts, panelArea: b.area, pipeMm: b.D*1000, steelM: b.steelM, steelKg: b.steelKg, panelKg, totalKg: b.steelKg + panelKg,
-    rear, backstayGap: stay - .0045, railGap: surfaceGap(clear, cells, obstacles.rails, obstacles.railCells),
+    rear, fore, backstayGap: stay - .0045, railGap: surfaceGap(clear, cells, obstacles.rails, obstacles.railCells),
     canvasGap: surfaceGap(clear, cells, obstacles.canvas, obstacles.canvasCells), boomGap: boom,
   };
 }
@@ -251,6 +265,18 @@ function rearAngles({ foot, top }) {
     transomCurve: deg(Math.atan(2*c*Math.abs(foot[2]))),
     sideways: deg(Math.atan2(Math.abs(dz), Math.abs(dx))),
     fromVertical: deg(Math.atan2(Math.abs(dx), Math.abs(dy))),
+  };
+}
+/* Fore pipe angles: to the top frame, and to the toe rail it stands on, both measured in side view. */
+function foreAngles({ foot, top }) {
+  const deg = v => v*180/Math.PI, dx = top[0] - foot[0], dy = top[1] - foot[1], dz = top[2] - foot[2];
+  const slope = Math.atan2(sheerY(foot[0] + .05) - sheerY(foot[0] - .05), .1), pipe = Math.atan2(dy, -dx);   // pipe rises aft
+  return {
+    foot, top, length: Math.hypot(dx, dy, dz),
+    topAft: deg(Math.atan2(Math.abs(dy), Math.abs(dx))),          // between the pipe and the frame running aft
+    deckAft: deg(pipe + slope),                                    // between the pipe and the deck running aft
+    sideways: deg(Math.atan2(Math.abs(dz), Math.hypot(dx, dy))),
+    footX: foot[0],
   };
 }
 /* True-scale side view of the rear pipe, bow to the right. */
@@ -337,9 +363,9 @@ function measureSides(sb, b) {
 
 /* ---------- Selection and page panel ---------- */
 const archBuilt = {}, sideBuilt = {};
-const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1], orient: 'across', sides: 0, rear: 60, height: 'fit' };
+const archState = { design: AC.designs[0].id, panels: 3, pipe: AC.pipes[1], orient: 'across', sides: 0, rear: 60, height: 'fit', fore: AC.foreAngles[0] };
 let currentArch = 'none', lastArch = AC.designs[0].id, currentBuilt = null, currentSide = null, archKick = () => {};
-const archById = id => AC.designs.find(d => d.id === id);
+const archById = id => AC.designs.find(d => d.id === id || d.alias === id);
 const num = (v, n) => v.toLocaleString('en-GB', { minimumFractionDigits: n, maximumFractionDigits: n });
 const fmtM = v => `${num(v, 2)} m`, fmtCm = v => `${num(v*100, 0)} cm`;
 const gapRow = (label, v, byDesign) => v < (byDesign ? 0 : AC.contactGap) ? [label, 'Contact', 'hit'] : [label, fmtCm(v), !byDesign && v < AC.warnGap ? 'warn' : ''];
@@ -347,8 +373,10 @@ const gapRow = (label, v, byDesign) => v < (byDesign ? 0 : AC.contactGap) ? [lab
 function renderArchStats(r, q) {
   const groups = [], deg = v => `${num(v, 1)}°`;
   if (r) groups.push(
-    ['Pipe angles and lengths', [['Top frame, forward side', deg(r.rear.topForward)], ['Top frame, aft side', deg(180 - r.rear.topForward)], ['Transom face, side view', deg(r.rear.transomSide)],
+    [r.fore ? 'Rear pipe angles and lengths' : 'Pipe angles and lengths', [['Top frame, forward side', deg(r.rear.topForward)], ['Top frame, aft side', deg(180 - r.rear.topForward)], ['Transom face, side view', deg(r.rear.transomSide)],
       ['Transom face, true angle', deg(r.rear.transomTrue)], ['Transom curve at mount', deg(r.rear.transomCurve)], ['Sideways from ship’s line', deg(r.rear.sideways)], ['Rear pipe length', fmtM(r.rear.length)], ...(r.rear.foreLength ? [['Fore pipe length, vertical', fmtM(r.rear.foreLength)], ['Fore pipes forward of transom', fmtM(r.rear.foreX)], ['Frame not covered by panels', fmtCm(r.rear.uncovered)]] : [])], angleDiagram(r.rear)],
+    ...(r.fore ? [['Fore pipe angles and lengths', [['Top frame, aft side', deg(r.fore.topAft)], ['Top frame, forward side', deg(180 - r.fore.topAft)], ['Toe rail, aft side', deg(r.fore.deckAft)], ['Toe rail, forward side', deg(180 - r.fore.deckAft)],
+      ['Inward lean, front view', deg(r.fore.sideways)], ['Fore pipe length', fmtM(r.fore.length)], ['Fore pipe foot from transom', fmtM(r.fore.footX)]]]] : []),
     ['Height', [['Panel top above water', fmtM(r.panelTopAboveWater)], ['Panel top above toe rail', fmtM(r.panelTopAboveRail)], ['Headroom above toe rail', fmtM(r.railHeadroom)], ['Headroom above stern platform', fmtM(r.platformHeadroom)]]],
     ['Size', [['Width', fmtM(r.width)], ['Length', fmtM(r.length)], ['Overhang past transom', fmtM(r.overhang)], ['Past hull side', fmtM(r.pastHull)], ['Boat length with arch', fmtM(r.lengthWithArch)]]],
     ['Clearance', [gapRow('Backstay', r.backstayGap), gapRow('Rails and pushpit', r.railGap), gapRow('Canvas', r.canvasGap), gapRow('Boom, full swing', r.boomGap)]]);
@@ -377,21 +405,24 @@ function setArch(id, opts = {}) {
   if (opts.orient === 'across' || opts.orient === 'fore') archState.orient = opts.orient;
   if (AC.sidePanels.counts.includes(opts.sides)) archState.sides = opts.sides;
   if (AC.rearAngles.includes(opts.rear)) archState.rear = opts.rear;
+  if (AC.foreAngles.includes(opts.fore)) archState.fore = opts.fore;
   if (AC.archHeights.some(q => q.id === opts.height)) archState.height = opts.height;
   const d = archById(id);
-  if (!d) id = 'none';
+  if (!d) id = 'none'; else id = d.id;
   Object.values(archBuilt).forEach(b => { b.group.visible = false; });
   Object.values(sideBuilt).forEach(b => { b.group.visible = false; });
   currentArch = id; G.asBuilt.visible = !d; currentBuilt = null;
   document.getElementById('archOptions').hidden = !d;
   const canAngle = !!(d && d.aftStrut.straight), rearA = canAngle ? archState.rear : 0;
+  const canFore = !!(d && d.foreStrut === undefined && d.foreStraight), foreA = canFore ? archState.fore : 0;
+  document.getElementById('archForeWrap').hidden = !canFore;
   document.getElementById('archRearWrap').hidden = !canAngle; document.getElementById('archHeightWrap').hidden = !canAngle;
   const heightA = canAngle ? (archState.height === 'fit' && !rearA ? 'current' : archState.height) : 'current';   // an arch at the panel edge has no gap to close
   const fitRadio = document.querySelector('input[name="archHeight"][value="fit"]'); if (fitRadio) fitRadio.disabled = !rearA;
   if (d) {
     lastArch = id; archState.design = id;
-    const key = `${id}|${archState.panels}|${archState.pipe}|${archState.orient}|${rearA}|${heightA}`;
-    const b = archBuilt[key] || (archBuilt[key] = Object.assign(buildArch(d, archState.panels, archState.pipe, archState.orient, rearA, heightA), { key }));
+    const key = `${id}|${archState.panels}|${archState.pipe}|${archState.orient}|${rearA}|${heightA}|${foreA}`;
+    const b = archBuilt[key] || (archBuilt[key] = Object.assign(buildArch(d, archState.panels, archState.pipe, archState.orient, rearA, heightA, foreA), { key }));
     b.group.visible = true; currentBuilt = b;
   }
   const n = archState.sides;
@@ -401,8 +432,8 @@ function setArch(id, opts = {}) {
   renderArchStats(r, q);
   document.getElementById('archCurrent').textContent = d ? `${d.name}, ${n ? `${archState.panels} + ${n*2}` : archState.panels} panels` : n ? `No arch, ${n*2} panels` : 'No arch';
   document.getElementById('archNote').textContent = d ? d.note : 'The boat as she is today, with the ensign staff and antenna in their original places.';
-  [['archDesign', id], ['archPanels', archState.panels], ['archOrient', archState.orient], ['archPipe', archState.pipe], ['archSides', n], ['archRear', archState.rear], ['archHeight', canAngle ? heightA : archState.height]].forEach(([k, v]) => { const el = document.querySelector(`input[name="${k}"][value="${v}"]`); if (el) el.checked = true; });
-  try { history.replaceState(null, '', (d ? `#arch=${id}&panels=${archState.panels}&layout=${archState.orient}&pipe=${Math.round(archState.pipe*1000)}&rear=${archState.rear}&height=${archState.height}` : '#arch=none') + `&sides=${n}`); } catch (e) { /* not available in some file:// contexts */ }
+  [['archDesign', id], ['archPanels', archState.panels], ['archOrient', archState.orient], ['archPipe', archState.pipe], ['archSides', n], ['archRear', archState.rear], ['archFore', archState.fore], ['archHeight', canAngle ? heightA : archState.height]].forEach(([k, v]) => { const el = document.querySelector(`input[name="${k}"][value="${v}"]`); if (el) el.checked = true; });
+  try { history.replaceState(null, '', (d ? `#arch=${id}&panels=${archState.panels}&layout=${archState.orient}&pipe=${Math.round(archState.pipe*1000)}&rear=${archState.rear}&height=${archState.height}${canFore ? `&fore=${archState.fore}` : ''}` : '#arch=none') + `&sides=${n}`); } catch (e) { /* not available in some file:// contexts */ }
   archKick();
 }
 function archReport() {
@@ -420,10 +451,11 @@ function initArchUI(kick) {
   addRadios('archPanelPick', 'archPanels', AC.panelCounts.map(n => [n, `${n} panels`]), v => setArch(lastArch, { panels: +v }));
   addRadios('archOrientPick', 'archOrient', [['across', 'Long side across'], ['fore', 'Long side fore-aft']], v => setArch(lastArch, { orient: v }));
   addRadios('archRearPick', 'archRear', AC.rearAngles.map(a => [a, a ? `${a}°` : 'At panel edge']), v => setArch(lastArch, { rear: +v }));
+  addRadios('archForePick', 'archFore', AC.foreAngles.map(a => [a, `${a}°`]), v => setArch(lastArch, { fore: +v }));
   addRadios('archHeightPick', 'archHeight', AC.archHeights.map(q => [q.id, q.name]), v => setArch(lastArch, { height: v }));
   addRadios('archPipePick', 'archPipe', AC.pipes.map(p => [p, `${Math.round(p*1000)} mm`]), v => setArch(lastArch, { pipe: +v }));
   addRadios('archSidePick', 'archSides', AC.sidePanels.counts.map(n => [n, n ? `${n} per side` : 'None']), v => setArch(currentArch, { sides: +v }));
   if (innerWidth <= 760) document.getElementById('archPanel').open = false;
   const h = new URLSearchParams(location.hash.slice(1)), a = h.get('arch'), sd = h.get('sides');
-  setArch(a === 'none' ? 'none' : archById(a) ? a : AC.designs[0].id, { panels: +h.get('panels'), pipe: +h.get('pipe')/1000, orient: h.get('layout'), rear: h.has('rear') ? +h.get('rear') : undefined, height: h.get('height'), sides: sd === null ? undefined : +sd });
+  setArch(a === 'none' ? 'none' : archById(a) ? a : AC.designs[0].id, { panels: +h.get('panels'), pipe: +h.get('pipe')/1000, orient: h.get('layout'), rear: h.has('rear') ? +h.get('rear') : undefined, height: h.get('height'), fore: h.has('fore') ? +h.get('fore') : undefined, sides: sd === null ? undefined : +sd });
 }

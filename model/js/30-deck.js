@@ -295,8 +295,16 @@ const tableY = (t, x) => { if (x <= t[0][0]) return t[0][1]; for (let i = 0; i <
 const screenTop = x => tableY(SC.topY, x), screenBase = x => tableY(SC.baseY, x);
 (function windscreen() {
   const loop = l => [...l.slice(1).reverse().map(p => [p[0], -p[1]]), ...l.slice(1)], base = loop(SC.base), top = loop(SC.top), dense = [];
-  for (let i = 0; i < base.length - 1; i++) for (let k = i ? 1 : 0; k <= 14; k++) dense.push([lerp(base[i][0], base[i + 1][0], k/14), lerp(base[i][1], base[i + 1][1], k/14)]);
-  const low = ([x, z]) => { const q = Math.min(x + .08, 6.66); return [q, roofY(q, z*1.05) - .005, z*1.05]; }, up = ([x, z]) => [x, screenBase(x) - .035, z];
+  for (let i = 0; i < base.length - 1; i++) for (let k = i ? 1 : 0; k <= 14; k++) {
+    const f = k/14, p = [lerp(base[i][0], base[i + 1][0], f), lerp(base[i][1], base[i + 1][1], f)];
+    p.top = [lerp(top[i][0], top[i + 1][0], f), lerp(top[i][1], top[i + 1][1], f)]; dense.push(p);
+  }
+  // the moulding's face carries on in the plane of the glass, from the glass base down to the roof
+  const low = p => {
+    const [x, z] = p, yb = screenBase(x), yt = screenTop(p.top[0]), dx = x - p.top[0], dz = z - p.top[1];
+    let t = 0; for (let k = 0; k < 4; k++) t = (yb - (roofY(x + dx*t, z + dz*t) - .005))/Math.max(yt - yb, .05);
+    const q = x + dx*t + .01*Math.sign(dx), w = z + dz*t; return [q, roofY(q, w) - .005, w];
+  }, up = ([x, z]) => [x, screenBase(x) - .035, z];
   // moulded base: a cream plinth from the roof up to the glass line
   const plinth = dense.map(p => { const b = screenBase(p[0]); return [low(p), up(p), [p[0] - .02, b, p[1]*.985]]; });
   grid(G.deck, plinth[0].map((_, k) => plinth.map(r => r[k])), mat.gel);

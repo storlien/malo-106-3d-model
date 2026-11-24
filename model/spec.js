@@ -130,9 +130,9 @@ const SPEC = {
   },
 
   screen: {    // fixed windscreen on its moulded base, read from the brochure drawing and photos [D/P]
-    base: [[4.16, 0], [4.16, 0.46], [3.36, 0.94], [1.964, 1.02]],  // plan polyline at the base of the glass, [x, z]
+    base: [[4.01, 0], [4.01, 0.45], [3.36, 0.94], [1.964, 1.02]],  // plan polyline at the base of the glass, [x, z]; the moulding below carries on in the plane of the glass
     top: [[3.56, 0], [3.56, 0.42], [3.10, 0.80], [2.184, 0.88]],   // one wide centre pane, angled corner panes, long side panes
-    baseY: [[1.964, 1.50], [3.36, 1.63], [4.16, 1.74]],            // [x, height]: [B] the moulded base rises steeply to the front, leaving a low centre pane
+    baseY: [[1.964, 1.50], [3.36, 1.60], [4.01, 1.66]],            // [x, height]: [B/D] the moulded base rises to the front; the front glass keeps the drawing's rake, so the centre pane is low
     topY: [[2.184, 1.82], [3.10, 1.93], [3.56, 2.00]],             // [x, height]: the top edge rises towards the front
   },
 
@@ -180,6 +180,7 @@ const SPEC = {
     panelCounts: [2, 3, 4],
     panelGap: 0.015,        // [E] between neighbouring panels
     pipes: [0.025, 0.032],  // [M] pipe sizes available to the owner, outer diameter
+    foreAngles: [70, 60],   // Angled arch: fore pipe angle to the top frame, degrees. 70 is close to the original drawing.
     rearAngles: [0, 60],    // selectable rear pipe angles at the top frame, degrees; 0 = pipe meets the aft panel edge. Add values here to test more.
     // vertical arch heights: y is the top of the fore pipes above the design waterline; 'fit' is solved so the panels fill the frame
     archHeights: [{ id: 'fit', name: 'Closes gap' }, { id: 'current', name: 'Current', y: 2.60 }, { id: 'lower', name: 'Lower', y: 2.40 }],
@@ -199,8 +200,9 @@ const SPEC = {
         hoop: { footX: 0.60, footHalf: 1.06, topX: 0.60, topY: 2.60, half: 0.98, bend: 0.20 },
         aftStrut: { footY: 1.00, footHalf: 0.88, standoff: 0.06, straight: true }, fwdX: 0.60 },
 
-      { id: 'low', name: 'Low arch', note: 'Lowest weight and windage. You have to duck under the panels at the stern ladder.',
+      { id: 'angled', alias: 'low', name: 'Angled arch', note: 'Straight, unbent pipes: fore pipes leaning aft from the stern toe rail and rear pipes on the transom. Low weight and windage. You have to duck under the panels at the stern ladder.',
         hoop: { footX: 0.72, footHalf: 1.06, topX: 0.30, topY: 2.26, half: 0.98, bend: 0.18 },
+        foreStraight: true,   // two straight fore pipes instead of a bent hoop; their angle is chosen on the page (foreAngles)
         aftStrut: { footY: 1.00, footHalf: 0.85, standoff: 0.06 }, fwdX: 0.46 },
 
       { id: 'tall', name: 'Standing height', note: 'You can stand upright on the aft deck. More weight and windage up high, so the frame must be stiffer.',
