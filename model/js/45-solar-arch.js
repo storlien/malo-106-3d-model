@@ -66,7 +66,7 @@ function pipeLayout(d, count, D, orient, o) {
   } else {                                              // angled fore pipes from the forward end of the wide stern toe rail
     const capEnd = SPEC.deck.toeRail.sternCapTo - .075, H = d.hoop;
     const sheerDeg = x => Math.atan2(sheerY(x + .05) - sheerY(x - .05), .1)*180/Math.PI;
-    const run = x => (yRail - deckY(x, H.footHalf))/Math.tan((o.fore - sheerDeg(x))*Math.PI/180);
+    const run = x => (yRail - standY(x, H.footHalf))/Math.tan((o.fore - sheerDeg(x))*Math.PI/180);
     const F0 = d.fwdX + Math.min(0, stayXAt(yRail) - stayXAt(H.topY + D));      // a lower frame moves aft, keeping its distance to the backstay
     if (o.rear && re) {
       F = Rt + depth; rearTop = Rt;
@@ -103,7 +103,7 @@ function buildArch(d, count, D, orient, o = {}) {
   let H = d.hoop, shift = 0;
   const foreStraight = !!d.foreStraight, LY = straight || foreStraight ? pipeLayout(d, count, D, orient, o) : null;
   if (LY) { shift = LY.shift; H = Object.assign({}, d.hoop, { topX: LY.foreTop, topY: LY.topY }); }
-  const fy = deckY(H.footX, H.footHalf), yS = H.topY - H.bend;
+  const fy = standY(H.footX, H.footHalf), yS = H.topY - H.bend;
   const onHoop = y => lerp(H.footX, H.topX, (y - fy)/(H.topY - fy));
   const side = s => {
     const pts = [[H.footX, fy, s*H.footHalf]];
@@ -153,16 +153,16 @@ function buildArch(d, count, D, orient, o = {}) {
     pipe([[tx, A.footY, tz], f], 10); supports.push({ p: [tx, A.footY, tz], kind: 'transom' });
     const plate = put(frame, new T.CylinderGeometry(.055, .055, .01, 22), mat.steel); plate.rotation.z = Math.PI/2; plate.position.set(tx - .004, A.footY, tz);
     if (straight) {
-      const onRail = H.topX < HS.transomCurve*tz*tz + SPEC.cockpit.aftRail, base = [H.topX, onRail ? PP.railTop : deckY(H.topX, tz), tz];
+      const onRail = H.topX < HS.transomCurve*tz*tz + SPEC.cockpit.aftRail, base = [H.topX, onRail ? PP.railTop : standY(H.topX, tz), tz];
       pipe([base, [H.topX, yRail, tz]]); footPlate(base); foreLength = yRail - base[1]; legs.push({ kind: 'fore', s, base, top: [H.topX, yRail, tz] });
     } else if (foreStraight) {
       // straight fore pipe from the toe rail up to the frame, leaning aft at the chosen angle to the frame
-      const base = [foreFoot.x, deckY(foreFoot.x, s*H.footHalf), s*H.footHalf], top = [foreFoot.topX, yRail, s*H.half];
+      const base = [foreFoot.x, standY(foreFoot.x, s*H.footHalf), s*H.footHalf], top = [foreFoot.topX, yRail, s*H.half];
       pipe([base, top]); footPlate(base); legs.push({ kind: 'fore', s, base, top });
       if (s === 1) { fore = { foot: base, top }; foreLength = Math.hypot(top[0] - base[0], top[1] - base[1], top[2] - base[2]); }
     } else footPlate([H.footX, fy, s*H.footHalf]);
     if (d.foreStrut) {
-      const q = d.foreStrut, b = [q.footX, deckY(q.footX, q.footHalf), s*q.footHalf];
+      const q = d.foreStrut, b = [q.footX, standY(q.footX, q.footHalf), s*q.footHalf];
       pipe([b, [railFwd, yRail, s*Math.min(frameHalf, H.half)]]); footPlate(b);   // stays inboard of the lifelines
     }
   });

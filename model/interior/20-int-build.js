@@ -83,7 +83,7 @@ function front(c, w, h, normal, kind = 'door') {
   // ceiling: coachroof, side decks, and the cockpit seats and sole over the aft cabins
   const ceilY = (x, a) => {
     if (x >= CP.fwd && x < HO.fwd - .02 && a < houseHalf(x) - .03) return HO.roof - .04;
-    if (x < CP.fwd) { if (a < CP.footHalf && x > footAft) return CP.sole - .04; if (a < cockpitHalf(x)) return CP.seat - .04; if (a < houseHalf(x) - .03) return HO.roof - .05; }
+    if (x < CP.fwd) { if (x > footAft && (a < CP.footHalf || (x < sideAft && a < cockpitHalf(x)))) return CP.sole - .04; if (a < cockpitHalf(x)) return CP.seat - .04; if (a < houseHalf(x) - .03) return HO.roof - .05; }
     return deckLevel(x, a) - .045;
   };
   const cx = span(.45, 8.86, 180);

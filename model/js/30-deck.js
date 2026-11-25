@@ -2,12 +2,17 @@
 const HO = SPEC.house, CP = SPEC.cockpit;
 const teakUV = p => [p[0]/3.4, p[2]/(SPEC.deck.plank*8)];
 
-/* Plan outline of the trunk at deck level, with rounded ends. */
+/* Plan outline of the trunk at deck level, with rounded ends. Aft of the deck the raised coaming stands right against the wide
+   stern toe rail, which widens from the corner of the transom to where the deck starts; forward of that the side decks open up. */
+const TR = SPEC.deck.toeRail;
+const sternRail = x => lerp(TR.cornerWidth, TR.endWidth, clamp((x - HO.aft)/(TR.sternCapTo - HO.aft), 0, 1));
 function houseSide(x) {
   const side = x > 5.66 ? HO.sideDeck*(1 + (x - 5.66)*.06) : HO.sideDeck, normal = Math.min(HO.maxHalf, Math.max(.05, halfB(x) - side));
-  const aftW = (CP.aftInnerHalf + CP.capWidth)/HO.tumble;
-  return lerp(aftW, x < 4 ? Math.max(normal, aftW) : normal, 1 - Math.pow(1 - clamp((x - HO.aft)/(1.6 - HO.aft), 0, 1), 2.2));     // measured width at the aft end, blending into the side decks; forward it follows the side decks to the front
+  if (x <= TR.sternCapTo) return halfB(x) - sternRail(x);
+  const end = halfB(TR.sternCapTo) - TR.endWidth;
+  return x < 4 ? Math.max(normal, lerp(end, normal, smooth(clamp((x - TR.sternCapTo)/(CP.fwd - TR.sternCapTo), 0, 1)))) : normal;
 }
+const tumbleAt = x => lerp(HO.sternTumble, HO.tumble, smooth(clamp((x - HO.aft)/(CP.fwd - HO.aft), 0, 1)));   // upright at the stern
 function houseHalf(x) {
   if (x <= HO.aft || x >= HO.fwd) return 0;
   const R = HO.frontCorner; let k = 1;
@@ -16,8 +21,8 @@ function houseHalf(x) {
 }
 const toTopX = x => lerp(HO.topAft, HO.topFwd, (x - HO.aft)/(HO.fwd - HO.aft));
 const fromTopX = x => lerp(HO.aft, HO.fwd, (x - HO.topAft)/(HO.topFwd - HO.topAft));
-const roofHalf = x => houseHalf(fromTopX(x))*HO.tumble;
-const roofSide = x => houseSide(fromTopX(x))*HO.tumble;                   // width without the rounded front corners
+const roofHalf = x => { const b = fromTopX(x); return houseHalf(b)*tumbleAt(b); };
+const roofSide = x => { const b = fromTopX(x); return houseSide(b)*tumbleAt(b); };                   // width without the rounded front corners
 const roofY = (x, z) => { const w = Math.max(roofSide(x), .2); return HO.roof + HO.roofCrown*Math.max(0, 1 - (z/w)*(z/w)); };
 
 /* Stations packed towards the tip of the front, where the outline turns quickly. */
@@ -26,11 +31,14 @@ const frontStations = (end, n = 48) => Array.from({ length: n + 1 }, (_, i) => e
 /* Half-width of the cockpit well. Its aft edge curves with the transom, right behind the stern toe rail. */
 const cockpitHalf = x => {
   if (x <= CP.aftRail || x >= CP.fwd) return 0;
-  const side = Math.min(CP.halfWidth, roofHalf(Math.max(x, HO.topAft + 1e-3)) - CP.capWidth), knee = CP.aftRail + CP.aftCorner;
+  const knee = CP.aftRail + CP.aftCorner, side = Math.min(lerp(CP.aftInnerHalf, CP.halfWidth, clamp((x - knee)/(CP.fwd - knee), 0, 1)), roofHalf(Math.max(x, HO.topAft + 1e-3)) - CP.minCap);
   const aft = Math.pow(1 - Math.pow(clamp((knee - x)/CP.aftCorner, 0, 1), 2.6), 1/2.6);
   const r = .16, d = CP.fwd - x, fwd = d >= r ? side : side - r + Math.sqrt(Math.max(0, r*r - (r - d)*(r - d)));
   return fwd*aft;
 };
+
+/* Height of what a fitting stands on at (x, z): the top of the raised coaming where it reaches, otherwise the toe rail or deck. */
+const standY = (x, z) => { const a = Math.abs(z); return x > HO.aft && a > cockpitHalf(x) && a < houseHalf(x) - .01 ? roofY(Math.max(x, HO.topAft + 1e-3), a) : deckY(x, a); };
 
 function stations(a, b, step, extra = []) {
   const xs = [...extra]; for (let x = a; x < b; x += step) xs.push(x); xs.push(b);
@@ -86,7 +94,7 @@ mat.toeRail = (() => {
 
 /* Trunk walls: a loop from aft around to the front, on each side. */
 const wallPt = (x, s, h) => {
-  const z0 = houseHalf(x), y0 = deckLevel(x, z0) - .01, tx = toTopX(x), z1 = z0*HO.tumble, y1 = roofY(tx, z1);
+  const z0 = houseHalf(x), y0 = deckLevel(x, z0) - .01, tx = toTopX(x), z1 = z0*tumbleAt(x), y1 = roofY(tx, z1);
   const k = h < .86 ? h/.86*.86 : h;                    // straight wall, rounded shoulder
   return [lerp(x, tx, k), lerp(y0, y1, h), s*(lerp(z0, z1, k) - .012*Math.pow(Math.max(0, h - .9)/.1, 2))];
 };
@@ -97,7 +105,7 @@ const wallPt = (x, s, h) => {
     grid(G.deck, rows, mat.gel);
     // navy stripe around the wall
     const b = HO.band, band = xs.filter(x => x >= b.from && x <= b.to).map(x => {
-      const z0 = houseHalf(x), y0 = deckLevel(x, z0), tx = toTopX(x), y1 = roofY(tx, z0*HO.tumble), r = [];
+      const z0 = houseHalf(x), y0 = deckLevel(x, z0), tx = toTopX(x), y1 = roofY(tx, z0*tumbleAt(x)), r = [];
       for (let k = 0; k <= 2; k++) {
         const y = lerp(b.y0, b.y1, k/2), h = clamp((y - y0)/(y1 - y0), 0, 1);
         const p = wallPt(x, s, h), nx = x < HO.aft + .34 ? -.004 : 0; r.push([p[0] + nx, y, p[2] + s*.003]);
@@ -135,17 +143,19 @@ const wallPt = (x, s, h) => {
   }), mat.teakRail));
 })();
 
-/* Cockpit well: coaming walls, helm bench to the stern toe rail, side seats, footwell and sole. */
-const footAft = CP.aftRail + CP.benchDepth, benchY = sheerY(0) + SPEC.deck.toeRail.height - CP.benchBelowRail, TG_CAP_END = SPEC.targa.baseX - .06, benchEdge = M('#6b5844', { roughness: .75 });
+/* Cockpit well: coaming walls, cross bench against the stern toe rail, open floor round the pedestal, side benches either side of
+   the footwell up to the companionway. */
+const footAft = CP.aftRail + CP.benchDepth, sideAft = CP.fwd - CP.sideLength, benchY = sheerY(0) + SPEC.deck.toeRail.height - CP.benchBelowRail, TG_CAP_END = SPEC.targa.baseX - .06, benchEdge = M('#6b5844', { roughness: .75 });
 (function cockpit() {
   const knee = CP.aftRail + CP.aftCorner, back = CP.benchBack, W = cockpitHalf(knee + .01);
   const aftEdge = z => knee - CP.aftCorner*Math.pow(Math.max(0, 1 - Math.pow(Math.min(1, z/W), 2.6)), 1/2.6);
   const seatHalf = x => x < knee + back ? cockpitHalf(x - back) : cockpitHalf(x);
   const wallTop = (x, z) => x <= HO.aft ? deckY(x, z) : x >= HO.topAft ? roofY(x, z) : lerp(deckY(x, z), roofY(x, z), (x - HO.aft)/(HO.topAft - HO.aft));
-  const xs = stations(knee, CP.fwd - 1e-3, .025, [HO.aft, HO.aft + 1e-3, HO.topAft, HO.topAft + 1e-3, ...endSamples(HO.topAft + 1e-3, CP.fwd - 1e-3, 14)]);
+  const xs = stations(knee, CP.fwd - 1e-3, .025, [HO.aft, HO.aft + 1e-3, HO.topAft, HO.topAft + 1e-3, footAft, footAft + .012, sideAft, sideAft + .012, ...endSamples(HO.topAft + 1e-3, CP.fwd - 1e-3, 14)]);
+  const wallFoot = x => x > footAft + .006 && x < sideAft + .006 ? CP.sole : CP.seat - .01;   // down to the floor between the benches
   const arc = []; for (let i = 0; i <= 44; i++) arc.push(W*(1 - Math.pow(1 - i/44, 2)));
   [1, -1].forEach(s => {
-    grid(G.deck, xs.map(x => { const z = cockpitHalf(x); return [[x, wallTop(x, z), s*z], [x, CP.seat, s*z]]; }), mat.gelDeck);
+    grid(G.deck, xs.map(x => { const z = cockpitHalf(x); return [[x, wallTop(x, z), s*z], [x, wallFoot(x), s*z]]; }), mat.gelDeck);
     grid(G.deck, arc.map(z => { const x = aftEdge(z); return [[x, deckY(x, z) + .002, s*z], [x + back, benchY, s*z]]; }), mat.gelDeck);   // sloped back up to the toe rail
     // wide solid teak toe rail: one plank across the stern, mitred at the coaming corner to one along each side
     const capTo = SPEC.deck.toeRail.sternCapTo, c = HS.transomCurve; let hz = 1; for (let k = 0; k < 30; k++) hz = halfB(c*hz*hz);
@@ -169,20 +179,24 @@ const footAft = CP.aftRail + CP.benchDepth, benchY = sheerY(0) + SPEC.deck.toeRa
     // teak cap on the coaming, carrying the aft winch
     const capX = stations(HO.topAft + .004, TG_CAP_END, .03);
     grid(G.deck, capX.map(x => { const a = cockpitHalf(x) + .006, o = roofHalf(x) - .014, r = []; for (let k = 0; k <= 4; k++) { const z = lerp(a, o, k/4); r.push([x, roofY(x, z) + .004, s*z]); } return r; }), mat.teak, { uv: teakUV });
-    const foot = x => (x > footAft && x < CP.footFwd) ? CP.footHalf : 0, first = CP.aftRail + back + 1e-3, ex = [footAft, footAft + 1e-3, CP.footFwd, CP.footFwd - 1e-3, knee + back, ...endSamples(HO.topAft + 1e-3, CP.fwd - 1e-3, 14)];
+    const foot = x => (x > footAft && x < CP.footFwd) ? CP.footHalf : 0, first = CP.aftRail + back + 1e-3, ex = [footAft, footAft + 1e-3, sideAft, CP.footFwd, CP.footFwd - 1e-3, knee + back, ...endSamples(HO.topAft + 1e-3, CP.fwd - 1e-3, 14)];
     for (let i = 0; i <= 24; i++) ex.push(first + CP.aftCorner*(i/24)*(i/24));
     const seatXs = stations(first, CP.fwd - 1e-3, .02, ex), seatRows = (list, y) => grid(G.deck, list.map(x => { const a = y === benchY ? 0 : Math.min(foot(x), seatHalf(x)), o = seatHalf(x), r = []; for (let k = 0; k <= 4; k++) { const z = lerp(a, o, k/4); r.push([x, y, s*z]); } return r; }), mat.teak, { uv: teakUV });
     seatRows(seatXs.filter(x => x <= footAft), benchY);      // helm bench, higher than the side seats
-    seatRows(seatXs.filter(x => x > footAft), CP.seat);
-    box(G.deck, [(footAft + CP.footFwd)/2, (CP.seat + CP.sole)/2, s*CP.footHalf], [CP.footFwd - footAft, CP.seat - CP.sole, .012], mat.gelDeck);
+    seatRows(seatXs.filter(x => x >= sideAft), CP.seat);     // side bench
+    box(G.deck, [(sideAft + CP.footFwd)/2, (CP.seat + CP.sole)/2, s*CP.footHalf], [CP.footFwd - sideAft, CP.seat - CP.sole, .012], mat.gelDeck);
+    const sw = cockpitHalf(sideAft) - CP.footHalf;
+    box(G.deck, [sideAft, (CP.seat + CP.sole)/2, s*(CP.footHalf + sw/2)], [.012, CP.seat - CP.sole, sw], mat.gelDeck);         // aft end of the side bench
+    tube(G.deck, [[sideAft + .012, CP.seat + .007, s*CP.footHalf], [sideAft + .012, CP.seat + .007, s*(CP.footHalf + sw)]], .012, benchEdge, false, 6);
     tube(G.deck, arc.map(z => [aftEdge(z) + back + .012, benchY + .007, s*z*.985]), .012, benchEdge, false, 6);     // dark border around the bench
     box(G.deck, [CP.aftRail + back + .06, benchY + .006, s*.27], [.1, .012, .035], mat.steel);                                   // locker hinge
   });
   box(G.deck, [footAft - .018, benchY + .007, 0], [.04, .018, cockpitHalf(footAft)*2 - .02], benchEdge);                                // bench front edge
   box(G.deck, [footAft, (benchY + CP.sole)/2, 0], [.012, benchY - CP.sole, cockpitHalf(footAft)*2], mat.gelDeck);          // front of the bench
   box(G.deck, [CP.footFwd, (CP.seat + CP.sole)/2, 0], [.012, CP.seat - CP.sole, CP.footHalf*2], mat.gelDeck);
-  const sole = [[footAft, CP.sole, -CP.footHalf], [footAft, CP.sole, CP.footHalf]], sole2 = [[CP.footFwd, CP.sole, -CP.footHalf], [CP.footFwd, CP.sole, CP.footHalf]];
-  grid(G.deck, [sole, sole2], mat.teak, { uv: teakUV });
+  const floorXs = stations(footAft, sideAft, .04), floor = x => { const w = x <= sideAft + 1e-6 ? cockpitHalf(x) : CP.footHalf; return [[x, CP.sole, -w], [x, CP.sole, w]]; };
+  grid(G.deck, floorXs.map(floor), mat.teak, { uv: teakUV });                                                         // full width round the pedestal
+  grid(G.deck, [[[sideAft, CP.sole, -CP.footHalf], [sideAft, CP.sole, CP.footHalf]], [[CP.footFwd, CP.sole, -CP.footHalf], [CP.footFwd, CP.sole, CP.footHalf]]], mat.teak, { uv: teakUV });
   // forward bulkhead of the cockpit, with the tall companionway opening in a teak frame
   const cx = CP.fwd, ch = CP.companionHalf, th = CP.threshold, Wb = cockpitHalf(cx - .002), top = z => roofY(cx, z) + .002;
   [1, -1].forEach(s => {
@@ -224,7 +238,7 @@ function placeLogo(loaded) {
   const fGeo = new T.ExtrudeGeometry(fShape, { depth: .012, bevelEnabled: false, curveSegments: 6 });
   const gGeo = new T.ShapeGeometry(hole, 6);
   [1, -1].forEach(s => HO.windows.forEach(x => {
-    const z0 = houseHalf(x), y0 = deckLevel(x, z0), y1 = roofY(toTopX(x), z0*HO.tumble), hh = (HO.windowY - y0)/(y1 - y0);
+    const z0 = houseHalf(x), y0 = deckLevel(x, z0), y1 = roofY(toTopX(x), z0*tumbleAt(x)), hh = (HO.windowY - y0)/(y1 - y0);
     const c = new V3(...wallPt(x, s, hh)), a = new V3(...wallPt(x + .02, s, hh)).sub(c).normalize();
     const up = new V3(...wallPt(x, s, Math.min(1, hh + .08))).sub(c).normalize(), n = new V3().crossVectors(a, up).normalize();
     if (n.z*s < 0) n.negate();
@@ -269,14 +283,14 @@ function winch(parent, x, y, z, k = 1) {
   [1, -1].forEach(s => {
     [.914, 2.384].forEach(x => { const q = (cockpitHalf(x) + roofHalf(x))/2; winch(G.deck, x, roofY(x, q) - .002, s*q, x < 1.7 ? 1.05 : .9); });
     winch(G.deck, 4.714, roofY(4.714, .84), s*.84, .62);
-    [[.50, 1.04], [6.064, 1.36], [9.944, .17]].forEach(([x, q]) => {           // mooring cleats
-      const zz = s*Math.min(q, deckHalf(x) - .12), y = deckY(x, zz);
+    [[.50, 0], [6.064, 1.36], [9.944, .17]].forEach(([x, q]) => {           // mooring cleats; the aft ones on the middle of the stern toe rail
+      const zz = s*(x < TR.sternCapTo ? deckHalf(x) - sternRail(x)/2 : Math.min(q, deckHalf(x) - .12)), y = deckY(x, zz);
       rod(G.deck, [x - .09, y + .035, zz], [x + .09, y + .035, zz], .012, mat.steel);
       [-.04, .04].forEach(d => rod(G.deck, [x + d, y, zz], [x + d, y + .035, zz], .012, mat.steel));
     });
   });
   /* Helm: white pedestal, compass, stainless guard with a teak bar, leather-covered wheel. */
-  const W = CP.wheel, wx = footAft + W.aheadOfBench, px = wx + .13, leather = M('#b4b69c', { roughness: .85 });
+  const W = CP.wheel, px = CP.pedestal, wx = px - W.aft, leather = M('#b4b69c', { roughness: .85 });
   rod(G.deck, [px, CP.sole, 0], [px, W.y + .05, 0], .085, mat.white, 22, .062);
   rod(G.deck, [px - .1, W.y, 0], [wx, W.y, 0], .018, mat.steel);
   const rim = put(G.deck, new T.TorusGeometry(W.r, .019, 12, 72), leather); rim.position.set(wx, W.y, 0); rim.rotation.y = Math.PI/2;
@@ -289,7 +303,7 @@ function winch(parent, x, y, z, k = 1) {
   box(G.deck, [gx + .014, W.y + .03, 0], [.022, .085, gz*2 + .05], mat.teakDark);
   [-1, 1].forEach(s => rod(G.deck, [gx, W.y - .22, s*gz], [px, W.y - .22, s*.06], .008, mat.steel));
   // engine controls, recessed in the starboard footwell-side wall beside the wheel
-  const ex = footAft + .42, ez = cockpitHalf(ex) - .004, ey = CP.seat + .23;
+  const ex = footAft + .42, ez = cockpitHalf(ex) - .004, ey = CP.sole + .62;
   box(G.deck, [ex, ey, ez], [.40, .30, .008], M('#e9e0c4', { roughness: .4 }));
   const dial = put(G.deck, new T.CylinderGeometry(.052, .052, .012, 24), mat.dark); dial.rotation.x = Math.PI/2; dial.position.set(ex - .09, ey + .04, ez - .007);
   box(G.deck, [ex + .1, ey - .02, ez - .012], [.07, .13, .018], mat.steel);

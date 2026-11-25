@@ -102,12 +102,15 @@ const SPEC = {
   deck: {
     crown: 0.07,              // [E] camber at the centreline
     plank: 0.056,             // [P] teak plank + caulking pitch
-    toeRail: { height: 0.05, width: 0.05, sternCapTo: 1.00 }, // [P] aft of sternCapTo there is no lowered deck, only a wide solid teak toe rail
+    // [M 2026-11-25] aft of sternCapTo there is no lowered deck: the solid teak toe rail runs between the hull and the cockpit's
+    // raised coaming, 0.15 m wide across the transom, 0.13 m just round the corner and 0.19 m where the deck starts, 1.0 m further
+    // forward; the deck is 0.05 m below it. Forward of that the toe rail is 0.05 m wide.
+    toeRail: { height: 0.05, width: 0.05, sternCapTo: 1.20, cornerWidth: 0.13, endWidth: 0.19 },
   },
 
   house: {   // cabin trunk and cockpit coamings, one continuous moulding [D/P]
-    aft: 0.37, fwd: 7.984,      // [D/P] coamings stop here; the bench runs on aft to the toe rail
-    topAft: 0.375, topFwd: 7.514, // [D] the raked front runs from topFwd down to fwd
+    aft: 0.24, fwd: 7.984,      // [M 2026-11-25] the coamings run aft to the stern toe rail; the cross bench lies between them
+    topAft: 0.245, topFwd: 7.514, // [D] the raked front runs from topFwd down to fwd
     frontCorner: 0.22,        // [P] how far the rounded corners of the flat, raked front reach aft
     logo: { width: 0.52, midHeight: 0.54 },   // [P] Malö Yachts logo on the front, width in metres
     roof: 1.40,               // [D]
@@ -115,27 +118,32 @@ const SPEC = {
     sideDeck: 0.46,           // [P] side-deck width amidships
     maxHalf: 1.2,             // [P]
     tumble: 0.93,             // [P] top half-width / base half-width
+    sternTumble: 0.985,       // [P] the coamings stand nearly upright at the stern, leaning in like the trunk by the companionway
     teakFrom: 2.33,            // [P] teak from the companionway forward, under the windscreen too
-    band: { y0: 1.265, y1: 1.325, from: 0.37, to: 6.92 }, // [D] navy stripe
+    band: { y0: 1.265, y1: 1.325, from: 0.24, to: 6.92 }, // [D] navy stripe
     windows: [2.539, 3.444, 5.124, 6.574], // [D] port-light centres
     windowSize: [0.38, 0.135],          // [P]
     windowY: 1.235,                     // [D]
   },
 
-  cockpit: {   // from the brochure and broker photos [E/P], replace with tape measurements
-    benchDepth: 0.38,         // [M 2026-11-23] helm bench, from the inside of the stern toe rail to the footwell
+  cockpit: {   // tape measurements [M], the rest from the brochure and photos [P]
+    benchDepth: 0.38,         // [M 2026-11-23] cross bench, from the inside of the stern toe rail to the footwell
     aftRail: 0.15,            // [M 2026-11-23] width of the toe rail across the stern
-    benchBelowRail: 0.10,     // [M 2026-11-23] bench surface below the top of the toe rail
+    benchBelowRail: 0.10,     // [M 2026-11-23] cross bench surface below the top of the toe rail
     benchBack: 0.025,         // sloped cream back between the toe rail and the teak seat
-    aftInnerHalf: 0.73,       // [M 2026-11-23] inner width between the coamings at their aft end, and so the bench, is 1.46 m
+    aftInnerHalf: 0.73,       // [M 2026-11-23] inner width between the coamings at their aft end, and so the cross bench, is 1.46 m
     aftCorner: 0.10,          // how far the rounded aft corners of the well reach forward
-    capWidth: 0.15,           // teak-topped coaming that carries the winches
-    fwd: 2.32, halfWidth: 0.86,   // [B][P] companionway bulkhead, at the aft side of the ladder; forward of it, under the windscreen, is a raised teak deck
-    footHalf: 0.40, footFwd: 2.32,   // [P] the footwell and seats run right up to the bulkhead
-    seat: 0.87, sole: 0.47,
-    wheel: { aheadOfBench: 0.25, y: 1.30, r: 0.42 },
+    capWidth: 0.20,           // [M 2026-11-25] the raised coaming is 0.20 m wide at the stern, then widens with the hull
+    minCap: 0.10,             // narrowest coaming top, by the companionway
+    fwd: 2.32, halfWidth: 0.90,   // [B][P] companionway bulkhead, at the aft side of the ladder; [M 2026-11-25] the cockpit is 1.80 m wide there
+    footHalf: 0.40, footFwd: 2.32,   // [P] footwell between the side benches, which run right up to the bulkhead
+    sideLength: 1.20,         // [M 2026-11-25] each side bench is 1.20 m long, from the companionway aft; open floor between it and the cross bench
+    // [M 2026-11-25] side benches 0.80 m above the top of the water tank under the starboard one (0.215 m, solved for 220 l), floor 0.50 m below them
+    seat: 1.015, sole: 0.515,
+    pedestal: 1.05,           // [M 2026-11-25] centre of the steering pedestal, 0.90 m forward of the inside of the stern toe rail
+    wheel: { aft: 0.13, y: 1.30, r: 0.42 },   // wheel hub this far aft of the pedestal's centre
     companionHalf: 0.28,      // [P] tall, narrow opening with a teak frame
-    threshold: 0.67,          // [P] sill of the companionway, above the footwell sole
+    threshold: 0.67,          // [P] sill of the companionway
   },
 
   screen: {    // fixed windscreen on its moulded base, read from the brochure drawing and photos [D/P]
@@ -146,7 +154,8 @@ const SPEC = {
   },
 
   targa: {     // Malö's moulded mainsheet arch [D/P]
-    baseX: 1.684, topX: 2.224, baseHalf: 1.0, topHalf: 0.88, topY: 2.238, width: 0.11, depth: 0.05,
+    // topY: [M 2026-11-25] the underside is 1.65 m above the cockpit floor (it sits 7 mm below topY at the centre)
+    baseX: 1.684, topX: 2.224, baseHalf: 1.0, topHalf: 0.88, topY: 2.172, width: 0.11, depth: 0.05,
   },
 
   canvas: {    // navy sprayhood and bimini with side enclosure, from the owner's marina photo [P]

@@ -22,7 +22,7 @@ function archBraces({ list, pipe, footPlate, legs, yRail, railFwd, railAft, fram
     pipe([at(f, B.side.low), [xm, yRail, zm]]);
   });
   if (on('stays')) legs.filter(l => l.kind === 'fore').forEach(l => {   // stay from the frame corner forward and down to the side deck
-    const fx = l.base[0] + B.stays.forward, fz = l.s*(Math.abs(l.base[2]) + B.stays.outboard), foot = [fx, deckY(fx, fz), fz];
+    const fx = l.base[0] + B.stays.forward, fz = l.s*(Math.abs(l.base[2]) + B.stays.outboard), foot = [fx, standY(fx, fz), fz];
     pipe([at(l, .97), foot]); footPlate(foot);
   });
   if (on('aftBar')) {                                    // rear truss: a cross bar between the rear pipes above head height, and a V up to the middle of the aft tube
